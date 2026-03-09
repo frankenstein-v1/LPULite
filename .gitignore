@@ -1,0 +1,5 @@
+build/
+*.out
+*.vcd
+*.json
+.DS_Store

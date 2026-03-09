@@ -1,0 +1,6 @@
+<testsuites name="results">
+  <testsuite name="all" package="all">
+    <property name="random_seed" value="1772580369" />
+    <testcase name="test_half_adder" classname="half_adder_cocotb" file="/Users/sakshambatra/tinylpu/tb/half_adder_cocotb.py" lineno="9" time="0.0009889602661132812" sim_time_ns="4.0" ratio_time="4044.651880424301" />
+  </testsuite>
+</testsuites>
