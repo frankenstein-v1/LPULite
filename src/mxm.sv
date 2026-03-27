@@ -5,16 +5,22 @@ module mxm#(
 )(
     input logic clk, 
     input logic rst, 
+    input logic mxm_clear,
 
     //input bits 
     input logic mxm_start,
-    input logic [7:0] mxm_act_in [mxm_size-1 : 0],
+    input logic signed [7:0] mxm_act_in [mxm_size-1 : 0],
     input logic wght_load [mxm_size-1 : 0],
-    input logic [7:0] wght_val [mxm_size-1 : 0],
+    input logic signed [7:0] wght_val [mxm_size-1 : 0],
+   
 
     //outputs
-    output logic signed [19:0] mxm_out [mxm_size-1 : 0][mxm_size-1 : 0]
+    output logic signed [31:0] mxm_out [mxm_size-1 : 0][mxm_size-1 : 0]
 );
+
+//20 bit product wire
+
+logic signed [19:0] product_wire [mxm_size-1:0][mxm_size-1:0];
 
 genvar r, c;
 generate
@@ -27,16 +33,24 @@ generate
             .activation_in(mxm_act_in[r]),
             .weight_load(wght_load[c]),
             .weight_value(wght_val[c]),
-            .product(mxm_out[r][c])
+            .product(product_wire[r][c])
         );
+
+        acc u_acc(
+            .clk(clk),
+            .rst(rst),
+            .en(mxm_start),
+            .clear(mxm_clear),
+            .product_in(product_wire[r][c]),
+            .sum_out(mxm_out[r][c])
+        );
+
 
         end 
     end 
 
 
 endgenerate
-
-
 
    
 endmodule
