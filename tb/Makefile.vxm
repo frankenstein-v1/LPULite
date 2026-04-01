@@ -1,0 +1,16 @@
+# Makefile for vxm cocotb testbench
+
+SIM ?= icarus
+TOPLEVEL_LANG ?= verilog
+
+PWD=$(shell pwd)
+
+VERILOG_SOURCES = $(PWD)/../src/lpu_pkg.sv $(PWD)/../src/vxm.sv
+
+TOPLEVEL = vxm
+MODULE = vxm_tb
+
+# Enable VCD waveform dumping
+export WAVES=1
+
+include $(shell cocotb-config --makefiles)/Makefile.sim
