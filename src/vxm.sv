@@ -39,9 +39,18 @@ module vxm (
         // 2. THE MATH (Safely isolated in 4 ALUs)
         for (int i = 0; i < 4; i++) begin
             case (math_op)
-                2'b01: alu_result[i] = data_lane[i] + param_lane[i]; // Bias
-                2'b10: alu_result[i] = data_lane[i] * param_lane[i]; // Scale
-                default: alu_result[i] = data_lane[i];               // Pass-through
+                2'b00: begin // ReLU
+                    if (data_lane[i] < 0) 
+                        alu_result[i] = 8'd0;
+                    else 
+                        alu_result[i] = data_lane[i];
+                end
+                2'b01: begin // Bias
+                    alu_result[i] = data_lane[i] + param_lane[i];
+                end
+                2'b10: begin // Scale
+                    alu_result[i] = data_lane[i] * param_lane[i];
+                end
             endcase
         end
     end

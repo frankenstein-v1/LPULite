@@ -1,9 +1,11 @@
 <testsuites name="results">
   <testsuite name="all" package="all">
-    <property name="random_seed" value="1775060431" />
-    <testcase name="test_vxm_pass" classname="vxm_tb" file="/home/micha/projects/tinyLPU/tb/vxm_tb.py" lineno="16" time="0.001271963119506836" sim_time_ns="40.0" ratio_time="31447.4526710403" />
-    <testcase name="test_vxm_add" classname="vxm_tb" file="/home/micha/projects/tinyLPU/tb/vxm_tb.py" lineno="41" time="0.00035858154296875" sim_time_ns="40.00000000000001" ratio_time="111550.63829787236" />
-    <testcase name="test_vxm_multiply" classname="vxm_tb" file="/home/micha/projects/tinyLPU/tb/vxm_tb.py" lineno="65" time="0.00033473968505859375" sim_time_ns="40.0" ratio_time="119495.84045584046" />
-    <testcase name="test_vxm_accumulate" classname="vxm_tb" file="/home/micha/projects/tinyLPU/tb/vxm_tb.py" lineno="90" time="0.0003807544708251953" sim_time_ns="49.999999999999986" ratio_time="131318.22166562302" />
+    <property name="random_seed" value="1775080762" />
+    <testcase name="test_vxm_relu" classname="vxm_tb" file="/home/micha/projects/tinyLPU/tb/vxm_tb.py" lineno="16" time="0.002869844436645508" sim_time_ns="40.0" ratio_time="13938.03771703913">
+      <failure error_type="AssertionError" error_msg="Expected 0x0, got 0x4030201" />
+    </testcase>
+    <testcase name="test_vxm_add" classname="vxm_tb" file="/home/micha/projects/tinyLPU/tb/vxm_tb.py" lineno="42" time="0.0003826618194580078" sim_time_ns="40.00000000000001" ratio_time="104530.94080996886" />
+    <testcase name="test_vxm_multiply" classname="vxm_tb" file="/home/micha/projects/tinyLPU/tb/vxm_tb.py" lineno="66" time="0.0002522468566894531" sim_time_ns="40.0" ratio_time="158574.82041587902" />
+    <testcase name="test_vxm_accumulate" classname="vxm_tb" file="/home/micha/projects/tinyLPU/tb/vxm_tb.py" lineno="91" time="0.00030493736267089844" sim_time_ns="49.999999999999986" ratio_time="163968.10007818605" />
   </testsuite>
 </testsuites>

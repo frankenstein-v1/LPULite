@@ -14,18 +14,18 @@ async def reset_dut(dut):
     await Timer(10, unit="ns")
 
 @cocotb.test()
-async def test_vxm_pass(dut):
-    """Test pass-through operation"""
+async def test_vxm_relu(dut):
+    """Test ReLU operation"""
     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
     await reset_dut(dut)
 
     await RisingEdge(dut.clk)
     
     # Send some data
-    # 4 lanes, e.g., 0x01, 0x02, 0x03, 0x04
+    # 4 lanes, negative values: -5 (FB), -4 (FC), -3 (FD), -1 (FF)
     dut.stream_in_data.value = 0x04030201
     dut.stream_in_param.value = 0x00000000
-    dut.math_op.value = 0 # Pass
+    dut.math_op.value = 0 # ReLU
     dut.accum_en.value = 1
     dut.flush.value = 0
     
@@ -36,7 +36,8 @@ async def test_vxm_pass(dut):
     await RisingEdge(dut.clk)
     dut.flush.value = 0
     
-    assert dut.stream_out.value == 0x04030201, f"Expected 0x04030201, got {hex(dut.stream_out.value)}"
+    expected = 0x00000000
+    assert dut.stream_out.value == expected, f"Expected {hex(expected)}, got {hex(dut.stream_out.value)}"
 
 @cocotb.test()
 async def test_vxm_add(dut):
