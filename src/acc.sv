@@ -20,7 +20,7 @@ always_ff @(posedge clk or posedge rst) begin
     end 
 
     else if(en) begin 
-        sum_out <= product_in + sum_out;
+        sum_out <= sum_out + {{12{product_in[19]}}, product_in};
     end 
 
 
