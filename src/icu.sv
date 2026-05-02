@@ -5,37 +5,44 @@ module icu #(
     input  logic clk,
     input  logic rst_n,
 
-    // --- OUTGOING CONTROL CABLES ---
+    // mem0 Control (11 bits)
+    output logic      mem0_read_en,
+    output logic      mem0_write_en,
+    output logic [8:0] mem0_addr,
 
-    // West MEM Control (11 bits)
-    output logic       west_mem_read_en,
-    output logic       west_mem_write_en,
-    output logic [8:0] west_mem_addr,
-
-    // East MEM Control (11 bits)
-    output logic       east_mem_read_en,
-    output logic       east_mem_write_en,
-    output logic [8:0] east_mem_addr,
+    // mem1 Control (11 bits)
+    output logic      mem1_read_en,
+    output logic      mem1_write_en,
+    output logic [8:0] mem1_addr,
 
     // SXM Control (24 bits)
     output logic [11:0] sxm_opcode_data,
     output logic [11:0] sxm_opcode_weight,
 
-    // MXM Control (6 bits)
-    output logic       mxm_clear,
-    output logic       mxm_start,
-    output logic [3:0] mxm_wght_load,
-
     // VXM Control (4 bits)
     output logic [1:0] vxm_math_op,
-    output logic       vxm_accum_en,
-    output logic       vxm_flush
+    output logic      vxm_accum_en,
+    output logic      vxm_flush,
+
+    // bus control (12 bits)
+    output logic [2:0] westbound_sel,
+    output logic [2:0] eastbound_sel,
+    output logic [2:0] westbound_consumer_sel,
+    output logic [2:0] eastbound_consumer_sel,
+
+    // MXM control (9 bits)
+    output logic [1:0] mxm_ingress_mode,
+    output logic      mxm_start,
+    output logic      mxm_clear,
+    output logic [1:0] mxm_e_row_sel,
+    output logic [1:0] mxm_e_col_sel,
+    output logic      mxm_e_valid_in
 );
 
     // 1. THE INSTRUCTION MEMORY (IMEM)
     // This is the physical SRAM vault holding your compiled software.
-    // It is 64 bits wide and has INSTRUCTION_COUNT rows.
-    logic [63:0] imem_array [0:INSTRUCTION_COUNT-1];
+    // It is 96 bits wide and has INSTRUCTION_COUNT rows.
+    logic [95:0] imem_array [0:INSTRUCTION_COUNT-1];
 
     // 2. THE PROGRAM COUNTER (PC)
     // A simple register that tracks what line of code we are on.
@@ -51,35 +58,41 @@ module icu #(
     end
 
     // 3. THE SLICER (The Dispatcher)
-    // We grab the massive 64-bit word sitting at the current PC address...
-    logic [63:0] current_instruction;
+    // We grab the current 96-bit instruction word at the current PC address.
+    logic [95:0] current_instruction;
     assign current_instruction = imem_array[pc];
 
-    // ...and we physically slice it up and attach it to the output cables.
-    // (Bits [63:56] are left unconnected as padding for future upgrades)
+    // Bus control
+    assign westbound_sel          = current_instruction[2:0];
+    assign eastbound_sel          = current_instruction[5:3];
+    assign westbound_consumer_sel = current_instruction[8:6];
+    assign eastbound_consumer_sel = current_instruction[11:9];
 
-    // West MEM [55:45]
-    assign west_mem_read_en  = current_instruction[55];
-    assign west_mem_write_en = current_instruction[54];
-    assign west_mem_addr     = current_instruction[53:45];
+    // mem0 control
+    assign mem0_read_en = current_instruction[12];
+    assign mem0_write_en = current_instruction[13];
+    assign mem0_addr = current_instruction[22:14];
 
-    // East MEM [44:34]
-    assign east_mem_read_en  = current_instruction[44];
-    assign east_mem_write_en = current_instruction[43];
-    assign east_mem_addr     = current_instruction[42:34];
+    // mem1 control
+    assign mem1_read_en = current_instruction[23];
+    assign mem1_write_en = current_instruction[24];
+    assign mem1_addr = current_instruction[33:25];
 
-    // SXM [33:10]
-    assign sxm_opcode_data   = current_instruction[33:22];
-    assign sxm_opcode_weight = current_instruction[21:10];
+    // SXM control
+    assign sxm_opcode_data = current_instruction[45:34];
+    assign sxm_opcode_weight = current_instruction[57:46];
+    
+    // VXM control
+    assign vxm_math_op = current_instruction[59:58];
+    assign vxm_accum_en = current_instruction[60];
+    assign vxm_flush = current_instruction[61];
 
-    // MXM [9:4]
-    assign mxm_clear         = current_instruction[9];
-    assign mxm_start         = current_instruction[8];
-    assign mxm_wght_load     = current_instruction[7:4];
-
-    // VXM [3:0]
-    assign vxm_math_op       = current_instruction[3:2];
-    assign vxm_accum_en      = current_instruction[1];
-    assign vxm_flush         = current_instruction[0];
+    // MXM control
+    assign mxm_ingress_mode = current_instruction[63:62];
+    assign mxm_start = current_instruction[64];
+    assign mxm_clear = current_instruction[65];
+    assign mxm_e_row_sel = current_instruction[67:66];
+    assign mxm_e_col_sel = current_instruction[69:68];
+    assign mxm_e_valid_in = current_instruction[70];
 
 endmodule
