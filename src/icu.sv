@@ -16,7 +16,7 @@ module icu #(
     output logic [8:0] mem1_addr,
 
     // SXM Control (24 bits)
-    output logic [11:0] sxm_opcode_data,
+    output logic [11:0] sxm_opcode_input,
     output logic [11:0] sxm_opcode_weight,
 
     // VXM Control (4 bits)
@@ -30,7 +30,7 @@ module icu #(
     output logic [2:0] westbound_consumer_sel,
     output logic [2:0] eastbound_consumer_sel,
 
-    // MXM control (9 bits)
+    // mxm control (9 bits)
     output logic [1:0] mxm_ingress_mode,
     output logic      mxm_start,
     output logic      mxm_clear,
@@ -58,41 +58,41 @@ module icu #(
     end
 
     // 3. THE SLICER (The Dispatcher)
-    // We grab the current 96-bit instruction word at the current PC address.
+    // We grab the current 96-bit word sitting at the current PC address.
     logic [95:0] current_instruction;
     assign current_instruction = imem_array[pc];
 
-    // Bus control
+    // bus control
     assign westbound_sel          = current_instruction[2:0];
     assign eastbound_sel          = current_instruction[5:3];
     assign westbound_consumer_sel = current_instruction[8:6];
     assign eastbound_consumer_sel = current_instruction[11:9];
 
     // mem0 control
-    assign mem0_read_en = current_instruction[12];
+    assign mem0_read_en  = current_instruction[12];
     assign mem0_write_en = current_instruction[13];
-    assign mem0_addr = current_instruction[22:14];
+    assign mem0_addr     = current_instruction[22:14];
 
     // mem1 control
-    assign mem1_read_en = current_instruction[23];
+    assign mem1_read_en  = current_instruction[23];
     assign mem1_write_en = current_instruction[24];
-    assign mem1_addr = current_instruction[33:25];
+    assign mem1_addr     = current_instruction[33:25];
 
     // SXM control
-    assign sxm_opcode_data = current_instruction[45:34];
+    assign sxm_opcode_input  = current_instruction[45:34];
     assign sxm_opcode_weight = current_instruction[57:46];
     
     // VXM control
-    assign vxm_math_op = current_instruction[59:58];
+    assign vxm_math_op  = current_instruction[59:58];
     assign vxm_accum_en = current_instruction[60];
-    assign vxm_flush = current_instruction[61];
+    assign vxm_flush    = current_instruction[61];
 
     // MXM control
     assign mxm_ingress_mode = current_instruction[63:62];
-    assign mxm_start = current_instruction[64];
-    assign mxm_clear = current_instruction[65];
-    assign mxm_e_row_sel = current_instruction[67:66];
-    assign mxm_e_col_sel = current_instruction[69:68];
-    assign mxm_e_valid_in = current_instruction[70];
+    assign mxm_start        = current_instruction[64];
+    assign mxm_clear        = current_instruction[65];
+    assign mxm_e_row_sel    = current_instruction[67:66];
+    assign mxm_e_col_sel    = current_instruction[69:68];
+    assign mxm_e_valid_in   = current_instruction[70];
 
 endmodule
