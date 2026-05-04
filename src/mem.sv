@@ -1,6 +1,6 @@
 import lpu_pkg::*;
 
-module mem_block (
+module mem (
     input  logic clk,
     input  logic rst_n,       // Active-low reset signal
 

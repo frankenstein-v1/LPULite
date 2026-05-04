@@ -24,8 +24,8 @@ async def test_mxm_2x2_matmul(dut):
     dut.rst.value = 1
     dut.mxm_clear.value = 0
     dut.mxm_start.value = 0
-    dut.act0.value = 0
-    dut.act1.value = 0
+    dut.input0.value = 0
+    dut.input1.value = 0
     dut.wght_load0.value = 0
     dut.wght_load1.value = 0
     dut.wght_val0.value = 0
@@ -53,27 +53,27 @@ async def test_mxm_2x2_matmul(dut):
     # Stream K dimension through the MXM.
     # For each k:
     # 1) load column weights B[k][0], B[k][1]
-    # 2) drive activations A[0][k], A[1][k]
+    # 2) drive inputs A[0][k], A[1][k]
     # 3) tick once for load
     # 4) drop load and tick once for compute/accumulate
     for k in range(2):
-        # Load phase: push k-th activation slice and k-th weight slice.
-        dut.act0.value = a[0][k]
-        dut.act1.value = a[1][k]
+        # Load phase: push k-th input slice and k-th weight slice.
+        dut.input0.value = a[0][k]
+        dut.input1.value = a[1][k]
         dut.wght_val0.value = b[k][0]
         dut.wght_val1.value = b[k][1]
         dut.wght_load0.value = 1
         dut.wght_load1.value = 1
         await tick(dut, 1)
 
-        # Compute phase: keep activations, stop loading new weights.
+        # Compute phase: keep inputs, stop loading new weights.
         dut.wght_load0.value = 0
         dut.wght_load1.value = 0
         await tick(dut, 1)
 
-    # Flush one more cycle with zero activations so final pipeline state settles.
-    dut.act0.value = 0
-    dut.act1.value = 0
+    # Flush one more cycle with zero inputs so final pipeline state settles.
+    dut.input0.value = 0
+    dut.input1.value = 0
     await tick(dut, 1)
 
     # Stop computation after all required cycles are complete.

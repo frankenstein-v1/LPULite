@@ -4,7 +4,7 @@ module mac (
     input  logic               clk,
     input  logic               rst,
     input  logic               en,
-    input  logic signed [7:0]  activation_in,
+    input  logic signed [7:0]  input_in,
     input  logic               weight_load,
     
     input  logic signed [7:0]  weight_value,
@@ -29,7 +29,7 @@ always_ff @(posedge clk or posedge rst) begin
     end 
 
     else if (en) begin
-        product <= weight_reg * activation_in;
+        product <= weight_reg * input_in;
     end 
 
     else begin 

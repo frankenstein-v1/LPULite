@@ -8,7 +8,7 @@ module mxm_tb;
   logic mxm_clear;
   logic mxm_start;
 
-  logic signed [7:0] mxm_act_in [N-1:0];
+  logic signed [7:0] mxm_input_in [N-1:0];
   logic              wght_load  [N-1:0];
   logic signed [7:0] wght_val   [N-1:0];
 
@@ -46,7 +46,7 @@ module mxm_tb;
     .rst(rst),
     .mxm_clear(mxm_clear),
     .mxm_start(mxm_start),
-    .mxm_act_in(mxm_act_in),
+    .mxm_input_in(mxm_input_in),
     .wght_load(wght_load),
     .wght_val(wght_val),
     .mxm_out(mxm_out)
@@ -90,7 +90,7 @@ module mxm_tb;
     mxm_start = 1'b0;
 
     for (r = 0; r < N; r++) begin
-      mxm_act_in[r] = '0;
+      mxm_input_in[r] = '0;
       wght_load[r] = 1'b0;
       wght_val[r] = '0;
       for (c = 0; c < N; c++) begin
@@ -134,7 +134,7 @@ module mxm_tb;
     mxm_start = 1'b1;
     for (k = 0; k < N; k++) begin
       for (r = 0; r < N; r++) begin
-        mxm_act_in[r] = a_mat[r][k];
+        mxm_input_in[r] = a_mat[r][k];
       end
       for (c = 0; c < N; c++) begin
         wght_val[c] = b_mat[k][c];
@@ -150,7 +150,7 @@ module mxm_tb;
 
     // Flush final product into accumulator
     for (r = 0; r < N; r++) begin
-      mxm_act_in[r] = '0;
+      mxm_input_in[r] = '0;
     end
     tick();
     mxm_start = 1'b0;
