@@ -1,26 +1,42 @@
 `timescale 1ns/1ps
 import lpu_pkg::*;
 
-module mxm_mem_westbound_cocotb_top (
+module lpu_cocotb_top (
     input  logic        clk,
     input  logic        rst_n,
 
-    input  logic        mem_write_en,
-    input  logic        mem_read_en,
-    input  logic [8:0]  mem_addr,
-    input  logic [31:0] mem_write_data,
+    output logic [31:0] pc_dbg,
 
-    input logic         mem1_write_en, 
-    input logic         mem1_read_en, 
-    input logic [8:0]   mem1_addr,
-    input logic [31:0]  mem1_write_data,
+    output logic        mem0_read_en_dbg,
+    output logic        mem0_write_en_dbg,
+    output logic [8:0]  mem0_addr_dbg,
+    output logic        mem1_read_en_dbg,
+    output logic        mem1_write_en_dbg,
+    output logic [8:0]  mem1_addr_dbg,
 
-    input  logic [2:0]  westbound_sel,
-    input  logic [2:0]  westbound_consumer_sel,
-    input  logic [1:0]  mxm_ingress_mode,
+    output logic [2:0]  westbound_sel_dbg,
+    output logic [2:0]  westbound_consumer_sel_dbg,
+    output logic [1:0]  mxm_ingress_mode_dbg,
+    output logic        mxm_start_dbg,
+    output logic        mxm_clear_dbg,
 
-    input  logic        mxm_clear,
-    input  logic        mxm_start,
+    output logic        mem0_valid_dbg,
+    output logic        mem1_valid_dbg,
+    output logic [31:0] westbound_payload_dbg,
+    output logic        westbound_valid_dbg,
+    output logic        mxm_west_en_dbg,
+
+    output logic        input_loaded_dbg,
+    output logic signed [7:0] input_buf0,
+    output logic signed [7:0] input_buf1,
+    output logic signed [7:0] input_buf2,
+    output logic signed [7:0] input_buf3,
+
+    output logic        wght_loaded_dbg,
+    output logic signed [7:0] wght_buf0,
+    output logic signed [7:0] wght_buf1,
+    output logic signed [7:0] wght_buf2,
+    output logic signed [7:0] wght_buf3,
 
     output logic signed [31:0] mxm_out_00_dbg,
     output logic signed [31:0] mxm_out_01_dbg,
@@ -37,166 +53,68 @@ module mxm_mem_westbound_cocotb_top (
     output logic signed [31:0] mxm_out_30_dbg,
     output logic signed [31:0] mxm_out_31_dbg,
     output logic signed [31:0] mxm_out_32_dbg,
-    output logic signed [31:0] mxm_out_33_dbg,
-    output logic [31:0] westbound_payload_dbg,
-    output logic        westbound_valid_dbg,
-    output logic        mxm_west_en_dbg,
-    output logic        input_loaded_dbg,
-    output logic signed [7:0] input_buf0,
-    output logic signed [7:0] input_buf1,
-    output logic signed [7:0] input_buf2,
-    output logic signed [7:0] input_buf3,
-
-    output logic        wght_loaded_dbg, 
-    output logic signed [7:0] wght_buf0,
-    output logic signed [7:0] wght_buf1, 
-    output logic signed [7:0] wght_buf2, 
-    output logic signed [7:0] wght_buf3
+    output logic signed [31:0] mxm_out_33_dbg
 );
 
-    westbound_producer_e producer_sel_t;
-    westbound_consumer_e consumer_sel_t;
-
-    logic [31:0] mem0_stream_out;
-    logic        mem0_valid;
-
-    logic [31:0] mem1_stream_out;
-    logic        mem1_valid;
-
-    logic [31:0] westbound_payload;
-    logic        westbound_valid;
-    logic        mxm_west_en;
-
-    logic signed [7:0]  mxm_input_in [3:0];
-    logic               wght_load  [3:0];
-    logic signed [7:0]  wght_val   [3:0];
-    logic signed [31:0] mxm_out    [3:0][3:0];
-
-    assign producer_sel_t = westbound_producer_e'(westbound_sel);
-    assign consumer_sel_t = westbound_consumer_e'(westbound_consumer_sel);
-
-    generate
-        for (genvar i = 0; i < 4; i++) begin : g_tieoff
-            assign mxm_input_in[i] = '0;
-            assign wght_load[i]  = 1'b0;
-            assign wght_val[i]   = '0;
-        end
-    endgenerate
-
-    // mem read data is synchronous, so register valid alongside it.
-    always_ff @(posedge clk or negedge rst_n) begin
-        if (!rst_n)
-        begin 
-            mem0_valid <= 1'b0;
-            mem1_valid <= 1'b0;
-        end 
-        else
-        begin 
-            mem0_valid <= mem_read_en;
-            mem1_valid <= mem1_read_en;
-        end 
-    end
-
-
-    mem u_mem0 (
+    lpu u_lpu (
         .clk(clk),
-        .rst_n(rst_n),
-        .stream_in(mem_write_data),
-        .stream_out(mem0_stream_out),
-        .read_en(mem_read_en),
-        .write_en(mem_write_en),
-        .addr(mem_addr)
+        .rst_n(rst_n)
     );
 
-    mem u_mem1 (
-        .clk(clk), 
-        .rst_n(rst_n),
-        .stream_in(mem1_write_data),
-        .stream_out(mem1_stream_out),
-        .read_en(mem1_read_en),
-        .write_en(mem1_write_en),
-        .addr(mem1_addr)
-    );
+    assign pc_dbg                    = u_lpu.u_icu.pc;
 
-    westbound_bus #(
-        .PAYLOAD_W(32)
-    ) u_westbound_bus (
-        .producer_sel(producer_sel_t),
-        .sxm_payload('0),
-        .sxm_valid(1'b0),
-        .mem0_payload(mem0_stream_out),
-        .mem0_valid(mem0_valid),
-        .vxm_payload('0),
-        .vxm_valid(1'b0),
-        .mem1_payload(mem1_stream_out),
-        .mem1_valid(mem1_valid),
-        .westbound_payload(westbound_payload),
-        .westbound_valid(westbound_valid)
-    );
+    assign mem0_read_en_dbg          = u_lpu.mem0_read_en;
+    assign mem0_write_en_dbg         = u_lpu.mem0_write_en;
+    assign mem0_addr_dbg             = u_lpu.mem0_addr;
+    assign mem1_read_en_dbg          = u_lpu.mem1_read_en;
+    assign mem1_write_en_dbg         = u_lpu.mem1_write_en;
+    assign mem1_addr_dbg             = u_lpu.mem1_addr;
 
-    westbound_consumer_decode u_westbound_consumer_decode (
-        .consumer_sel(consumer_sel_t),
-        .westbound_valid(westbound_valid),
-        .mxm_west_en(mxm_west_en),
-        .sxm_west_en(),
-        .mem0_west_en(),
-        .vxm_west_en()
-    );
+    assign westbound_sel_dbg         = u_lpu.westbound_sel;
+    assign westbound_consumer_sel_dbg = u_lpu.westbound_consumer_sel;
+    assign mxm_ingress_mode_dbg      = u_lpu.mxm_ingress_mode;
+    assign mxm_start_dbg             = u_lpu.mxm_start;
+    assign mxm_clear_dbg             = u_lpu.mxm_clear;
 
-    mxm #(
-        .mxm_size(4)
-    ) u_mxm (
-        .clk(clk),
-        .rst(!rst_n),
-        .mxm_clear(mxm_clear),
-        .mxm_start(mxm_start),
-        .westbound_payload(westbound_payload),
-        .westbound_valid(westbound_valid),
-        .mxm_west_en(mxm_west_en),
-        .mxm_ingress_mode(mxm_ingress_mode),
-        .mxm_input_in(mxm_input_in),
-        .wght_load(wght_load),
-        .wght_val(wght_val),
-        .mxm_out(mxm_out)
-    );
+    assign mem0_valid_dbg            = u_lpu.mem0_valid;
+    assign mem1_valid_dbg            = u_lpu.mem1_valid;
+    assign westbound_payload_dbg     = u_lpu.westbound_payload;
+    assign westbound_valid_dbg       = u_lpu.westbound_valid;
+    assign mxm_west_en_dbg           = u_lpu.mxm_west_en;
 
-    assign mxm_out_00_dbg = mxm_out[0][0];
-    assign mxm_out_01_dbg = mxm_out[0][1];
-    assign mxm_out_02_dbg = mxm_out[0][2];
-    assign mxm_out_03_dbg = mxm_out[0][3];
-    assign mxm_out_10_dbg = mxm_out[1][0];
-    assign mxm_out_11_dbg = mxm_out[1][1];
-    assign mxm_out_12_dbg = mxm_out[1][2];
-    assign mxm_out_13_dbg = mxm_out[1][3];
-    assign mxm_out_20_dbg = mxm_out[2][0];
-    assign mxm_out_21_dbg = mxm_out[2][1];
-    assign mxm_out_22_dbg = mxm_out[2][2];
-    assign mxm_out_23_dbg = mxm_out[2][3];
-    assign mxm_out_30_dbg = mxm_out[3][0];
-    assign mxm_out_31_dbg = mxm_out[3][1];
-    assign mxm_out_32_dbg = mxm_out[3][2];
-    assign mxm_out_33_dbg = mxm_out[3][3];
+    assign input_loaded_dbg          = u_lpu.u_mxm.mxm_input_ingress_loaded;
+    assign input_buf0                = u_lpu.u_mxm.mxm_input_ingress_reg[0];
+    assign input_buf1                = u_lpu.u_mxm.mxm_input_ingress_reg[1];
+    assign input_buf2                = u_lpu.u_mxm.mxm_input_ingress_reg[2];
+    assign input_buf3                = u_lpu.u_mxm.mxm_input_ingress_reg[3];
 
-    assign westbound_payload_dbg = westbound_payload;
-    assign westbound_valid_dbg   = westbound_valid;
-    assign mxm_west_en_dbg       = mxm_west_en;
+    assign wght_loaded_dbg           = u_lpu.u_mxm.mxm_wght_ingress_loaded;
+    assign wght_buf0                 = u_lpu.u_mxm.mxm_wght_ingress_reg[0];
+    assign wght_buf1                 = u_lpu.u_mxm.mxm_wght_ingress_reg[1];
+    assign wght_buf2                 = u_lpu.u_mxm.mxm_wght_ingress_reg[2];
+    assign wght_buf3                 = u_lpu.u_mxm.mxm_wght_ingress_reg[3];
 
-    assign input_loaded_dbg = u_mxm.mxm_input_ingress_loaded;
-    assign input_buf0 = u_mxm.mxm_input_ingress_reg[0];
-    assign input_buf1 = u_mxm.mxm_input_ingress_reg[1];
-    assign input_buf2 = u_mxm.mxm_input_ingress_reg[2];
-    assign input_buf3 = u_mxm.mxm_input_ingress_reg[3];
-
-    assign wght_loaded_dbg = u_mxm.mxm_wght_ingress_loaded;
-    assign wght_buf0 = u_mxm.mxm_wght_ingress_reg[0];
-    assign wght_buf1 = u_mxm.mxm_wght_ingress_reg[1];
-    assign wght_buf2 = u_mxm.mxm_wght_ingress_reg[2];
-    assign wght_buf3 = u_mxm.mxm_wght_ingress_reg[3];
+    assign mxm_out_00_dbg            = u_lpu.u_mxm.mxm_out[0][0];
+    assign mxm_out_01_dbg            = u_lpu.u_mxm.mxm_out[0][1];
+    assign mxm_out_02_dbg            = u_lpu.u_mxm.mxm_out[0][2];
+    assign mxm_out_03_dbg            = u_lpu.u_mxm.mxm_out[0][3];
+    assign mxm_out_10_dbg            = u_lpu.u_mxm.mxm_out[1][0];
+    assign mxm_out_11_dbg            = u_lpu.u_mxm.mxm_out[1][1];
+    assign mxm_out_12_dbg            = u_lpu.u_mxm.mxm_out[1][2];
+    assign mxm_out_13_dbg            = u_lpu.u_mxm.mxm_out[1][3];
+    assign mxm_out_20_dbg            = u_lpu.u_mxm.mxm_out[2][0];
+    assign mxm_out_21_dbg            = u_lpu.u_mxm.mxm_out[2][1];
+    assign mxm_out_22_dbg            = u_lpu.u_mxm.mxm_out[2][2];
+    assign mxm_out_23_dbg            = u_lpu.u_mxm.mxm_out[2][3];
+    assign mxm_out_30_dbg            = u_lpu.u_mxm.mxm_out[3][0];
+    assign mxm_out_31_dbg            = u_lpu.u_mxm.mxm_out[3][1];
+    assign mxm_out_32_dbg            = u_lpu.u_mxm.mxm_out[3][2];
+    assign mxm_out_33_dbg            = u_lpu.u_mxm.mxm_out[3][3];
 
 `ifdef WAVEFORM
     initial begin
-        $dumpfile("mxm_mem_westbound_cocotb.vcd");
-        $dumpvars(0, mxm_mem_westbound_cocotb_top);
+        $dumpfile("lpu_cocotb.vcd");
+        $dumpvars(0, lpu_cocotb_top);
     end
 `endif
 
