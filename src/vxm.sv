@@ -1,76 +1,135 @@
-import lpu_pkg::*;
-
-module vxm (
+module vxm #(
+    parameter int LANES   = 4,
+    parameter int LANE_W  = 8,
+    parameter int ALU_W   = 16,
+    parameter int ACCUM_W = 20
+) (
     input  logic clk,
     input  logic rst_n,
-    
-    // The 32-bit Superlanes
-    input  logic [31:0] stream_in_data,
-    input  logic [31:0] stream_in_param,
 
-    // The Compiler's Control Signals
-    input  logic [1:0]  math_op,   // 00 = Pass, 01 = Add, 10 = Multiply
-    input  logic        accum_en,  // 1 = Save to register, 0 = Ignore
-    input  logic        flush,     // 1 = Dump register to output, 0 = Hold
+    // Input vectors, one signed lane per chunk of LANE_W bits.
+    input  logic [LANES*LANE_W-1:0] stream_in_data,
+    input  logic [LANES*LANE_W-1:0] stream_in_param,
+    input  logic                    in_valid,
+    output logic                    in_ready,
 
-    // The Output Superlane
-    output logic [31:0] stream_out
+    // 00 = ReLU, 01 = Add, 10 = Multiply, 11 = Pass-through
+    input  logic [1:0] math_op,
+
+    // Control the stateful accumulator independently from output emission.
+    input  logic accum_en,
+    input  logic emit_result,
+    input  logic flush,
+    input  logic clear_accum,
+
+    output logic [LANES*ACCUM_W-1:0] stream_out,
+    output logic                     out_valid,
+    input  logic                     out_ready
 );
 
-    // 1. THE UNPACKING (Fixing the Lane Collision)
-    // We create distinct 8-bit wires so the math can't bleed across lanes
-    logic signed [7:0] data_lane  [0:3];
-    logic signed [7:0] param_lane [0:3];
-    logic signed [7:0] alu_result [0:3];
-    logic signed [7:0] accum_reg  [0:3]; // Our new stateful registers
+    localparam logic [1:0] VXM_OP_RELU = 2'b00;
+    localparam logic [1:0] VXM_OP_ADD  = 2'b01;
+    localparam logic [1:0] VXM_OP_MUL  = 2'b10;
+    localparam logic [1:0] VXM_OP_PASS = 2'b11;
+
+    logic signed [LANE_W-1:0]  data_lane     [0:LANES-1];
+    logic signed [LANE_W-1:0]  param_lane    [0:LANES-1];
+    logic signed [ALU_W-1:0]   alu_result    [0:LANES-1];
+    logic signed [ACCUM_W-1:0] accum_reg     [0:LANES-1];
+
+    logic [LANES*ACCUM_W-1:0] packed_alu_result;
+    logic [LANES*ACCUM_W-1:0] packed_accum_result;
+    logic [LANES*ACCUM_W-1:0] out_payload_reg;
+
+    logic out_slot_available;
+    logic take_input;
+    logic do_emit_result;
+    logic do_flush;
+
+    function automatic logic signed [ALU_W-1:0] widen_lane(
+        input logic signed [LANE_W-1:0] lane_value
+    );
+        widen_lane = {{(ALU_W-LANE_W){lane_value[LANE_W-1]}}, lane_value};
+    endfunction
+
+    assign out_slot_available = !out_valid || out_ready;
+    assign in_ready           = !emit_result || out_slot_available;
+    assign take_input         = in_valid && in_ready;
+    assign do_emit_result     = take_input && emit_result && !flush;
+    assign do_flush           = flush && out_slot_available;
 
     always_comb begin
-        // Manually slicing the 32-bit highway into 4 isolated lanes
-        data_lane[0] = stream_in_data[7:0];
-        data_lane[1] = stream_in_data[15:8];
-        data_lane[2] = stream_in_data[23:16];
-        data_lane[3] = stream_in_data[31:24];
+        for (int i = 0; i < LANES; i++) begin
+            data_lane[i]  = stream_in_data[i*LANE_W +: LANE_W];
+            param_lane[i] = stream_in_param[i*LANE_W +: LANE_W];
 
-        param_lane[0] = stream_in_param[7:0];
-        param_lane[1] = stream_in_param[15:8];
-        param_lane[2] = stream_in_param[23:16];
-        param_lane[3] = stream_in_param[31:24];
-
-        // 2. THE MATH (Safely isolated in 4 ALUs)
-        for (int i = 0; i < 4; i++) begin
-            case (math_op)
-                2'b00: begin // ReLU
-                    if (data_lane[i] < 0) 
-                        alu_result[i] = 8'd0;
-                    else 
-                        alu_result[i] = data_lane[i];
+            unique case (math_op)
+                VXM_OP_RELU: begin
+                    if (data_lane[i] < 0)
+                        alu_result[i] = '0;
+                    else
+                        alu_result[i] = widen_lane(data_lane[i]);
                 end
-                2'b01: begin // Bias
-                    alu_result[i] = data_lane[i] + param_lane[i];
+                VXM_OP_ADD: begin
+                    alu_result[i] = widen_lane(data_lane[i]) + widen_lane(param_lane[i]);
                 end
-                2'b10: begin // Scale
-                    alu_result[i] = data_lane[i] * param_lane[i];
+                VXM_OP_MUL: begin
+                    alu_result[i] = $signed(data_lane[i]) * $signed(param_lane[i]);
+                end
+                VXM_OP_PASS: begin
+                    alu_result[i] = widen_lane(data_lane[i]);
+                end
+                default: begin
+                    alu_result[i] = '0;
                 end
             endcase
+
+            packed_alu_result[i*ACCUM_W +: ACCUM_W]   = {{(ACCUM_W-ALU_W){alu_result[i][ALU_W-1]}}, alu_result[i]};
+            packed_accum_result[i*ACCUM_W +: ACCUM_W] = accum_reg[i];
         end
     end
 
-    // 3. THE ACCUMULATOR (Our new inference optimization)
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            for (int i = 0; i < 4; i++) accum_reg[i] <= 8'd0;
-        end else if (flush) begin
-            // Reset the registers after we dump the answer
-            for (int i = 0; i < 4; i++) accum_reg[i] <= 8'd0;
-        end else if (accum_en) begin
-            // Keep a running total
-            for (int i = 0; i < 4; i++) accum_reg[i] <= accum_reg[i] + alu_result[i];
+            out_valid        <= 1'b0;
+            out_payload_reg  <= '0;
+            for (int i = 0; i < LANES; i++) begin
+                accum_reg[i] <= '0;
+            end
+        end else begin
+            if (do_flush) begin
+                out_payload_reg <= packed_accum_result;
+                out_valid       <= 1'b1;
+            end else if (do_emit_result) begin
+                out_payload_reg <= packed_alu_result;
+                out_valid       <= 1'b1;
+            end else if (out_valid && out_ready) begin
+                out_valid <= 1'b0;
+            end
+
+            if (clear_accum) begin
+                for (int i = 0; i < LANES; i++) begin
+                    accum_reg[i] <= '0;
+                end
+            end else if (take_input && accum_en) begin
+                for (int i = 0; i < LANES; i++) begin
+                    accum_reg[i] <= accum_reg[i] + {{(ACCUM_W-ALU_W){alu_result[i][ALU_W-1]}}, alu_result[i]};
+                end
+            end
         end
     end
 
-    // 4. THE PACKING (Putting it back on the highway)
-    // We use the {} concatenation operator to stitch the 4 lanes back into 32 bits.
-    // We only push data when the compiler yells "flush", otherwise we blow zeros (bubbles).
-    assign stream_out = flush ? {accum_reg[3], accum_reg[2], accum_reg[1], accum_reg[0]} : 32'd0;
+    always_comb begin
+        assert (ALU_W >= (LANE_W + 1))
+            else $error("VXM ALU_W must be large enough for signed addition");
+        assert (ALU_W >= (2 * LANE_W))
+            else $error("VXM ALU_W must be large enough for signed multiply");
+        assert (ACCUM_W >= ALU_W)
+            else $error("VXM ACCUM_W must be at least ALU_W");
+        assert (!(emit_result && flush))
+            else $error("VXM emit_result and flush cannot be asserted together");
+    end
+
+    assign stream_out = out_payload_reg;
 
 endmodule
