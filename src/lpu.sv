@@ -66,10 +66,10 @@ logic mem0_west_en;
 logic vxm_west_en;
 
 // mxm datapath
-logic signed [7:0]  mxm_input_in [3:0];
-logic               wght_load    [3:0];
-logic signed [7:0]  wght_val     [3:0];
-logic signed [31:0] mxm_out      [3:0][3:0];
+logic signed [3:0][7:0]  mxm_input_in;
+logic [3:0]              wght_load;
+logic signed [3:0][7:0]  wght_val;
+logic signed [3:0][3:0][31:0] mxm_out;
 
 //icu instance
 icu u_icu(
@@ -185,11 +185,85 @@ westbound_consumer_decode u_westbound_consumer_decode(
     .vxm_west_en(vxm_west_en)
 );
 
+logic [31:0] mxm_payload_e;
+logic mxm_valid_e;
+
+mxm_eastbound_adapter #(
+    .MXM_SIZE(4),
+    .PAYLOAD_W(32)
+) u_mxm_to_eastbound (
+    .mxm_out(mxm_out),
+    .mxm_row_sel(mxm_e_row_sel),
+    .mxm_col_sel(mxm_e_col_sel),
+    .mxm_valid_in(mxm_e_valid_in),
+    .mxm_payload(mxm_payload_e),
+    .mxm_valid(mxm_valid_e)
+);
+
+eastbound_bus #(
+    .PAYLOAD_E(32)
+) u_eastbound_bus(
+    .producer_sel(eastbound_sel_t),
+    .mxm_payload_e(mxm_payload_e),
+    .mxm_valid_e(mxm_valid_e),
+    .vxm_payload_e('0),
+    .vxm_valid_e(1'b0),
+    .sxm_payload_e('0),
+    .sxm_valid_e(1'b0),
+    .mem0_payload_e(mem0_stream_out),
+    .mem0_valid_e(mem0_valid),
+    .eastbound_payload(eastbound_payload),
+    .eastbound_valid(eastbound_valid)
+);
+
+logic sxm_east_en;
+logic mem0_east_en;
+logic vxm_east_en;
+logic mem1_east_en;
+
+eastbound_consumer_decode u_eastbound_consumer_decode(
+    .consumer_sel(eastbound_consumer_sel_t),
+    .eastbound_valid(eastbound_valid),
+    .sxm_east_en(sxm_east_en),
+    .mem0_east_en(mem0_east_en),
+    .vxm_east_en(vxm_east_en),
+    .mem1_east_en(mem1_east_en)
+);
+
+logic [31:0] sxm_e_payload_reg;
+logic [31:0] sxm_w_payload_reg;
+
+always_ff @(posedge clk or negedge rst_n) begin
+    if (!rst_n) begin
+        sxm_e_payload_reg <= '0;
+        sxm_w_payload_reg <= '0;
+    end else begin
+        if (sxm_east_en && eastbound_valid)
+            sxm_e_payload_reg <= eastbound_payload;
+        if (sxm_west_en && westbound_valid)
+            sxm_w_payload_reg <= westbound_payload;
+    end
+end
+
+superlane_t sxm_stream_out_to_mxm_left;
+superlane_t sxm_stream_out_to_mxm_top;
+
+sxm u_sxm(
+    .clk(clk),
+    .rst_n(rst_n),
+    .opcode_input(sxm_opcode_input),
+    .opcode_weight(sxm_opcode_weight),
+    .stream_in_west(sxm_e_payload_reg),
+    .stream_in_east(sxm_w_payload_reg),
+    .stream_out_to_mxm_left(sxm_stream_out_to_mxm_left),
+    .stream_out_to_mxm_top(sxm_stream_out_to_mxm_top)
+);
+
 generate
-    for (genvar i = 0; i < 4; i++) begin : g_mxm_tieoff
-        assign mxm_input_in[i] = '0;
+    for (genvar i = 0; i < 4; i++) begin : g_mxm_feed
+        assign mxm_input_in[i] = sxm_stream_out_to_mxm_left[i*8 +: 8];
+        assign wght_val[i]     = sxm_stream_out_to_mxm_top[i*8 +: 8];
         assign wght_load[i]    = 1'b0;
-        assign wght_val[i]     = '0;
     end
 endgenerate
 

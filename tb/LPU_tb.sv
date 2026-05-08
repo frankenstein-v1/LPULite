@@ -16,6 +16,8 @@ module lpu_cocotb_top (
 
     output logic [2:0]  westbound_sel_dbg,
     output logic [2:0]  westbound_consumer_sel_dbg,
+    output logic [2:0]  eastbound_sel_dbg,
+    output logic [2:0]  eastbound_consumer_sel_dbg,
     output logic [1:0]  mxm_ingress_mode_dbg,
     output logic        mxm_start_dbg,
     output logic        mxm_clear_dbg,
@@ -25,6 +27,12 @@ module lpu_cocotb_top (
     output logic [31:0] westbound_payload_dbg,
     output logic        westbound_valid_dbg,
     output logic        mxm_west_en_dbg,
+
+    output logic [31:0] eastbound_payload_dbg,
+    output logic        eastbound_valid_dbg,
+    output logic        sxm_east_en_dbg,
+    output logic [31:0] sxm_stream_out_left_dbg,
+    output logic [31:0] sxm_stream_out_top_dbg,
 
     output logic        input_loaded_dbg,
     output logic signed [7:0] input_buf0,
@@ -72,6 +80,8 @@ module lpu_cocotb_top (
 
     assign westbound_sel_dbg         = u_lpu.westbound_sel;
     assign westbound_consumer_sel_dbg = u_lpu.westbound_consumer_sel;
+    assign eastbound_sel_dbg         = u_lpu.eastbound_sel;
+    assign eastbound_consumer_sel_dbg = u_lpu.eastbound_consumer_sel;
     assign mxm_ingress_mode_dbg      = u_lpu.mxm_ingress_mode;
     assign mxm_start_dbg             = u_lpu.mxm_start;
     assign mxm_clear_dbg             = u_lpu.mxm_clear;
@@ -81,6 +91,12 @@ module lpu_cocotb_top (
     assign westbound_payload_dbg     = u_lpu.westbound_payload;
     assign westbound_valid_dbg       = u_lpu.westbound_valid;
     assign mxm_west_en_dbg           = u_lpu.mxm_west_en;
+
+    assign eastbound_payload_dbg     = u_lpu.eastbound_payload;
+    assign eastbound_valid_dbg       = u_lpu.eastbound_valid;
+    assign sxm_east_en_dbg           = u_lpu.sxm_east_en;
+    assign sxm_stream_out_left_dbg   = u_lpu.sxm_stream_out_to_mxm_left;
+    assign sxm_stream_out_top_dbg    = u_lpu.sxm_stream_out_to_mxm_top;
 
     assign input_loaded_dbg          = u_lpu.u_mxm.mxm_input_ingress_loaded;
     assign input_buf0                = u_lpu.u_mxm.mxm_input_ingress_reg[0];

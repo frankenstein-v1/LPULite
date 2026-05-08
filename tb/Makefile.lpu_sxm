@@ -1,0 +1,29 @@
+# Makefile for LPU SXM cocotb testbench
+
+SIM ?= icarus
+TOPLEVEL_LANG ?= verilog
+
+PWD=$(shell pwd)
+
+VERILOG_SOURCES = $(PWD)/../src/lpu_pkg.sv \
+    $(PWD)/../src/mac.sv \
+    $(PWD)/../src/acc.sv \
+    $(PWD)/../src/mem.sv \
+    $(PWD)/../src/mxm.sv \
+    $(PWD)/../src/sxm.sv \
+    $(PWD)/../src/icu.sv \
+    $(PWD)/../src/westbound_bus/westbound_bus.sv \
+    $(PWD)/../src/westbound_bus/westbound_consumer_decode.sv \
+    $(PWD)/../src/eastbound_bus/eastbound_bus.sv \
+    $(PWD)/../src/eastbound_bus/eastbound_consumer_decode.sv \
+    $(PWD)/../src/westbound_bus/mxm_eastbound_adapter.sv \
+    $(PWD)/../src/lpu.sv \
+    $(PWD)/LPU_tb.sv
+
+TOPLEVEL = lpu_cocotb_top
+MODULE = lpu_sxm_tb
+
+# Enable VCD waveform dumping
+export WAVES=1
+
+include $(shell cocotb-config --makefiles)/Makefile.sim

@@ -5,7 +5,7 @@ module mxm_eastbound_adapter #(
     parameter int PAYLOAD_W = 32
 ) (
     // Full MXM output matrix.
-    input  logic signed [PAYLOAD_W-1:0] mxm_out [MXM_SIZE-1:0][MXM_SIZE-1:0],
+    input  logic signed [MXM_SIZE-1:0][MXM_SIZE-1:0][PAYLOAD_W-1:0] mxm_out,
 
     // Which MXM cell should be exposed onto the shared bus this cycle.
     input  logic [$clog2(MXM_SIZE)-1:0] mxm_row_sel,
@@ -19,9 +19,20 @@ module mxm_eastbound_adapter #(
     output logic                 mxm_valid
 );
 
+    // Unpack locally to avoid Icarus Verilog packed array dynamic indexing bugs
+    logic [PAYLOAD_W-1:0] mxm_out_unpacked [MXM_SIZE-1:0][MXM_SIZE-1:0];
+
+    generate
+        for (genvar r = 0; r < MXM_SIZE; r++) begin : g_row
+            for (genvar c = 0; c < MXM_SIZE; c++) begin : g_col
+                assign mxm_out_unpacked[r][c] = mxm_out[r][c];
+            end
+        end
+    endgenerate
+
     // Combinationally pick one MXM output element.
     always_comb begin
-        mxm_payload = mxm_out[mxm_row_sel][mxm_col_sel];
+        mxm_payload = mxm_out_unpacked[mxm_row_sel][mxm_col_sel];
         mxm_valid   = mxm_valid_in;
     end
 

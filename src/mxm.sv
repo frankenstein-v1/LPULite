@@ -13,13 +13,13 @@ module mxm#(
     input logic westbound_valid, 
     input logic mxm_west_en, 
     input logic [1:0] mxm_ingress_mode, 
-    input logic signed [7:0] mxm_input_in [mxm_size-1 : 0],
-    input logic wght_load [mxm_size-1 : 0],
-    input logic signed [7:0] wght_val [mxm_size-1 : 0],
+    input logic signed [mxm_size-1 : 0][7:0] mxm_input_in,
+    input logic [mxm_size-1 : 0] wght_load,
+    input logic signed [mxm_size-1 : 0][7:0] wght_val,
    
 
     //outputs
-    output logic signed [31:0] mxm_out [mxm_size-1 : 0][mxm_size-1 : 0]
+    output logic signed [mxm_size-1 : 0][mxm_size-1 : 0][31:0] mxm_out
 );
 
 //wires that hold the product of each MAC units 
