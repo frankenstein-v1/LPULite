@@ -253,10 +253,10 @@ sxm u_sxm(
     .rst_n(rst_n),
     .opcode_input(sxm_opcode_input),
     .opcode_weight(sxm_opcode_weight),
-    .stream_in_west(sxm_e_payload_reg),
-    .stream_in_east(sxm_w_payload_reg),
-    .stream_out_to_mxm_left(sxm_stream_out_to_mxm_left),
-    .stream_out_to_mxm_top(sxm_stream_out_to_mxm_top)
+    .eastbound_in(sxm_e_payload_reg),
+    .westbound_in(sxm_w_payload_reg),
+    .eastbound_out(sxm_stream_out_to_mxm_left),
+    .westbound_out(sxm_stream_out_to_mxm_top)
 );
 
 generate

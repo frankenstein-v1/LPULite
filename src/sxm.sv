@@ -9,13 +9,13 @@ module sxm (
     input  logic [11:0] opcode_input,
     input  logic [11:0] opcode_weight,
     
-    // Incoming Streams
-    input  superlane_t stream_in_west,  // Input moving East
-    input  superlane_t stream_in_east,  // Weights moving West
+    // Eastbound Bus
+    input  superlane_t eastbound_in,
+    output superlane_t eastbound_out,
     
-    // Outgoing Streams directly into the MXM
-    output superlane_t stream_out_to_mxm_left, 
-    output superlane_t stream_out_to_mxm_top   
+    // Westbound Bus
+    input  superlane_t westbound_in,
+    output superlane_t westbound_out
 );
 
     // --- 1. THE DELAY LINES (FIFOs) ---
@@ -29,12 +29,12 @@ module sxm (
             weight_d1 <= '0; weight_d2 <= '0; weight_d3 <= '0;
         end else begin
             // Input shifts one box to the right every clock cycle
-            input_d1 <= stream_in_west;
+            input_d1 <= eastbound_in;
             input_d2 <= input_d1;
             input_d3 <= input_d2;
             
-            // Weights shift one box to the right every clock cycle
-            weight_d1 <= stream_in_east;
+            // Weights shift one box to the left every clock cycle
+            weight_d1 <= westbound_in;
             weight_d2 <= weight_d1;
             weight_d3 <= weight_d2;
         end
@@ -42,11 +42,11 @@ module sxm (
 
     // --- 2. THE MULTIPLEXERS (Crossbars & Selectors) ---
     // This happens instantly. No clock required.
-    logic [7:0] router_left_out [3:0];
-    logic [7:0] router_top_out  [3:0];
+    logic [7:0] router_eb_out [3:0];
+    logic [7:0] router_wb_out [3:0];
 
-    logic [7:0] w_lane [3:0];
-    logic [7:0] e_lane [3:0];
+    logic [7:0] eb_lane [3:0];
+    logic [7:0] wb_lane [3:0];
     logic [7:0] id1_lane [3:0];
     logic [7:0] id2_lane [3:0];
     logic [7:0] id3_lane [3:0];
@@ -56,8 +56,8 @@ module sxm (
 
     generate
         for (genvar j = 0; j < 4; j++) begin : g_slice
-            assign w_lane[j] = stream_in_west[j*8 +: 8];
-            assign e_lane[j] = stream_in_east[j*8 +: 8];
+            assign eb_lane[j] = eastbound_in[j*8 +: 8];
+            assign wb_lane[j] = westbound_in[j*8 +: 8];
             assign id1_lane[j] = input_d1[j*8 +: 8];
             assign id2_lane[j] = input_d2[j*8 +: 8];
             assign id3_lane[j] = input_d3[j*8 +: 8];
@@ -75,42 +75,42 @@ module sxm (
 
             always_comb begin
                 // Default assignments
-                router_left_out[i] = 8'd0;
-                router_top_out[i]  = 8'd0;
+                router_eb_out[i] = 8'd0;
+                router_wb_out[i] = 8'd0;
 
                 // --- EASTBOUND ROUTER (INPUT) ---
                 case (cur_op_input)
                     // Crossbar / Straight Pass / Broadcast
-                    3'b000: router_left_out[i] = w_lane[0];
-                    3'b001: router_left_out[i] = w_lane[1];
-                    3'b010: router_left_out[i] = w_lane[2];
-                    3'b011: router_left_out[i] = w_lane[3];
+                    3'b000: router_eb_out[i] = eb_lane[0];
+                    3'b001: router_eb_out[i] = eb_lane[1];
+                    3'b010: router_eb_out[i] = eb_lane[2];
+                    3'b011: router_eb_out[i] = eb_lane[3];
                     // Staggering (Delays)
-                    3'b100: router_left_out[i] = id1_lane[i];
-                    3'b101: router_left_out[i] = id2_lane[i];
-                    3'b110: router_left_out[i] = id3_lane[i];
+                    3'b100: router_eb_out[i] = id1_lane[i];
+                    3'b101: router_eb_out[i] = id2_lane[i];
+                    3'b110: router_eb_out[i] = id3_lane[i];
                     // Bubbles
-                    3'b111: router_left_out[i] = 8'd0;
+                    3'b111: router_eb_out[i] = 8'd0;
                 endcase
 
                 // --- WESTBOUND ROUTER (WEIGHTS) ---
                 case (cur_op_weight)
                     // Crossbar / Straight Pass / Broadcast
-                    3'b000: router_top_out[i] = e_lane[0];
-                    3'b001: router_top_out[i] = e_lane[1];
-                    3'b010: router_top_out[i] = e_lane[2];
-                    3'b011: router_top_out[i] = e_lane[3];
+                    3'b000: router_wb_out[i] = wb_lane[0];
+                    3'b001: router_wb_out[i] = wb_lane[1];
+                    3'b010: router_wb_out[i] = wb_lane[2];
+                    3'b011: router_wb_out[i] = wb_lane[3];
                     // Staggering (Delays)
-                    3'b100: router_top_out[i] = wd1_lane[i];
-                    3'b101: router_top_out[i] = wd2_lane[i];
-                    3'b110: router_top_out[i] = wd3_lane[i];
+                    3'b100: router_wb_out[i] = wd1_lane[i];
+                    3'b101: router_wb_out[i] = wd2_lane[i];
+                    3'b110: router_wb_out[i] = wd3_lane[i];
                     // Bubbles
-                    3'b111: router_top_out[i] = 8'd0;
+                    3'b111: router_wb_out[i] = 8'd0;
                 endcase
             end
             
-            assign stream_out_to_mxm_left[i*8 +: 8] = router_left_out[i];
-            assign stream_out_to_mxm_top[i*8 +: 8]  = router_top_out[i];
+            assign eastbound_out[i*8 +: 8] = router_eb_out[i];
+            assign westbound_out[i*8 +: 8] = router_wb_out[i];
         end
     endgenerate
 
