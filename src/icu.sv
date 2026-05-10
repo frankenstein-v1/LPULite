@@ -20,9 +20,8 @@ module icu #(
     output logic [11:0] sxm_opcode_weight,
 
     // VXM Control (4 bits)
-    output logic [1:0] vxm_math_op,
-    output logic      vxm_accum_en,
-    output logic      vxm_flush,
+    output logic [2:0] vxm_ctrl,
+    output logic       vxm_data_sel,
 
     // bus control (12 bits)
     output logic [2:0] westbound_sel,
@@ -83,9 +82,8 @@ module icu #(
     assign sxm_opcode_weight = current_instruction[57:46];
     
     // VXM control
-    assign vxm_math_op  = current_instruction[59:58];
-    assign vxm_accum_en = current_instruction[60];
-    assign vxm_flush    = current_instruction[61];
+    assign vxm_ctrl      = current_instruction[73:71];
+    assign vxm_data_sel  = current_instruction[76];
 
     // MXM control
     assign mxm_ingress_mode = current_instruction[63:62];

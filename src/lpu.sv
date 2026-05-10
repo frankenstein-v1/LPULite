@@ -19,9 +19,8 @@ logic [11:0] sxm_opcode_input;
 logic [11:0] sxm_opcode_weight;
 
 //icxu vxm outs
-logic [1:0] vxm_math_op;
-logic vxm_accum_en;
-logic vxm_flush;
+logic [2:0] vxm_ctrl;
+logic vxm_data_sel;
 
 //icu busses
 logic [2:0] westbound_sel;
@@ -83,9 +82,8 @@ icu u_icu(
     .mem1_addr(mem1_addr),
     .sxm_opcode_input(sxm_opcode_input),
     .sxm_opcode_weight(sxm_opcode_weight),
-    .vxm_math_op(vxm_math_op),
-    .vxm_accum_en(vxm_accum_en),
-    .vxm_flush(vxm_flush),
+    .vxm_ctrl(vxm_ctrl),
+    .vxm_data_sel(vxm_data_sel),
     .westbound_sel(westbound_sel),
     .eastbound_sel(eastbound_sel),
     .westbound_consumer_sel(westbound_consumer_sel),
@@ -162,6 +160,9 @@ always_ff @(posedge clk or negedge rst_n) begin
     end
 end
 
+logic [31:0] vxm_stream_out;
+logic vxm_out_valid;
+
 westbound_bus u_westbound_bus(
     .producer_sel(westbound_sel_t),
     .mem0_payload(mem0_stream_out),
@@ -170,8 +171,8 @@ westbound_bus u_westbound_bus(
     .mem1_valid(mem1_valid),
     .sxm_payload('0),
     .sxm_valid(1'b0), 
-    .vxm_payload('0),
-    .vxm_valid(1'b0),
+    .vxm_payload(vxm_stream_out),
+    .vxm_valid(vxm_out_valid),
     .westbound_payload(westbound_payload),
     .westbound_valid(westbound_valid)
 );
@@ -206,8 +207,8 @@ eastbound_bus #(
     .producer_sel(eastbound_sel_t),
     .mxm_payload_e(mxm_payload_e),
     .mxm_valid_e(mxm_valid_e),
-    .vxm_payload_e('0),
-    .vxm_valid_e(1'b0),
+    .vxm_payload_e(vxm_stream_out),
+    .vxm_valid_e(vxm_out_valid),
     .sxm_payload_e('0),
     .sxm_valid_e(1'b0),
     .mem0_payload_e(mem0_stream_out),
@@ -285,5 +286,35 @@ mxm u_mxm(
 
 
 
+logic [31:0] vxm_e_payload_reg;
+logic [31:0] vxm_w_payload_reg;
+logic [31:0] vxm_stream_in_data;
+
+always_ff @(posedge clk or negedge rst_n) begin
+    if (!rst_n) begin
+        vxm_e_payload_reg <= '0;
+        vxm_w_payload_reg <= '0;
+    end else begin
+        if (vxm_east_en && eastbound_valid)
+            vxm_e_payload_reg <= eastbound_payload;
+        if (vxm_west_en && westbound_valid)
+            vxm_w_payload_reg <= westbound_payload;
+    end
+end
+
+assign vxm_stream_in_data = vxm_data_sel ? vxm_e_payload_reg : vxm_w_payload_reg;
+
+vxm u_vxm(
+    .clk(clk),
+    .rst_n(rst_n),
+    .stream_in_data(vxm_stream_in_data),
+    .stream_in_bias(vxm_w_payload_reg), // Bias typically arrives on the westbound bus
+    .in_valid(vxm_east_en || vxm_west_en), // Placeholder for valid signal logic
+    .in_ready(), 
+    .vxm_ctrl(vxm_ctrl),
+    .stream_out(vxm_stream_out),
+    .out_valid(vxm_out_valid),
+    .out_ready(1'b1)
+);
 
 endmodule

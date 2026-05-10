@@ -1,50 +1,52 @@
 module vxm #(
     parameter int LANES   = 4,
-    parameter int LANE_W  = 8,
-    parameter int ALU_W   = 16,
-    parameter int ACCUM_W = 20
+    parameter int LANE_W  = 32, // Upgraded to 32 bits
+    parameter int ALU_W   = 32 // Upgraded ALU width to 32 bits per user request
 ) (
     input  logic clk,
     input  logic rst_n,
 
-    // Input vectors, one signed lane per chunk of LANE_W bits.
+    // Input vectors
     input  logic [LANES*LANE_W-1:0] stream_in_data,
-    input  logic [LANES*LANE_W-1:0] stream_in_param,
+    input  logic [LANES*LANE_W-1:0] stream_in_bias,
+    
+    // Valid/ready signaling
     input  logic                    in_valid,
     output logic                    in_ready,
 
-    // 00 = ReLU, 01 = Add, 10 = Multiply, 11 = Pass-through
-    input  logic [1:0] math_op,
+    // Control bits for the Muxes (3 cascaded 2-to-1 muxes)
+    // [0]: Mux1 Sel
+    // [1]: Mux2 Sel
+    // [2]: Mux3 Sel
+    input  logic [2:0]              vxm_ctrl,
 
-    // Control the stateful accumulator independently from output emission.
-    input  logic accum_en,
-    input  logic emit_result,
-    input  logic flush,
-    input  logic clear_accum,
-
-    output logic [LANES*ACCUM_W-1:0] stream_out,
-    output logic                     out_valid,
-    input  logic                     out_ready
+    // Outputs
+    output logic [LANES*LANE_W-1:0] stream_out,
+    output logic                    out_valid,
+    input  logic                    out_ready
 );
 
-    localparam logic [1:0] VXM_OP_RELU = 2'b00;
-    localparam logic [1:0] VXM_OP_ADD  = 2'b01;
-    localparam logic [1:0] VXM_OP_MUL  = 2'b10;
-    localparam logic [1:0] VXM_OP_PASS = 2'b11;
+    logic signed [LANE_W-1:0] data_lane [0:LANES-1];
+    logic signed [LANE_W-1:0] bias_lane [0:LANES-1];
 
-    logic signed [LANE_W-1:0]  data_lane     [0:LANES-1];
-    logic signed [LANE_W-1:0]  param_lane    [0:LANES-1];
-    logic signed [ALU_W-1:0]   alu_result    [0:LANES-1];
-    logic signed [ACCUM_W-1:0] accum_reg     [0:LANES-1];
+    logic signed [ALU_W-1:0]  bias_add_out [0:LANES-1];
+    logic signed [ALU_W-1:0]  mux1_out     [0:LANES-1];
+    logic signed [ALU_W-1:0]  relu_out     [0:LANES-1];
+    logic signed [ALU_W-1:0]  mux2_out     [0:LANES-1];
+    logic signed [ALU_W-1:0]  scale_out    [0:LANES-1];
+    logic signed [ALU_W-1:0]  mux3_out     [0:LANES-1];
+    
+    // Placeholder outputs for Saksham's modules
+    logic signed [LANE_W-1:0] quant_out    [0:LANES-1];
+    logic [LANES*LANE_W-1:0]  reg_out;
 
-    logic [LANES*ACCUM_W-1:0] packed_alu_result;
-    logic [LANES*ACCUM_W-1:0] packed_accum_result;
-    logic [LANES*ACCUM_W-1:0] out_payload_reg;
+    logic mux1_sel;
+    logic mux2_sel;
+    logic mux3_sel;
 
-    logic out_slot_available;
-    logic take_input;
-    logic do_emit_result;
-    logic do_flush;
+    assign mux1_sel = vxm_ctrl[0];
+    assign mux2_sel = vxm_ctrl[1];
+    assign mux3_sel = vxm_ctrl[2];
 
     function automatic logic signed [ALU_W-1:0] widen_lane(
         input logic signed [LANE_W-1:0] lane_value
@@ -52,84 +54,54 @@ module vxm #(
         widen_lane = {{(ALU_W-LANE_W){lane_value[LANE_W-1]}}, lane_value};
     endfunction
 
-    assign out_slot_available = !out_valid || out_ready;
-    assign in_ready           = !emit_result || out_slot_available;
-    assign take_input         = in_valid && in_ready;
-    assign do_emit_result     = take_input && emit_result && !flush;
-    assign do_flush           = flush && out_slot_available;
-
     always_comb begin
         for (int i = 0; i < LANES; i++) begin
-            data_lane[i]  = stream_in_data[i*LANE_W +: LANE_W];
-            param_lane[i] = stream_in_param[i*LANE_W +: LANE_W];
+            data_lane[i] = stream_in_data[i*LANE_W +: LANE_W];
+            bias_lane[i] = stream_in_bias[i*LANE_W +: LANE_W];
 
-            unique case (math_op)
-                VXM_OP_RELU: begin
-                    if (data_lane[i] < 0)
-                        alu_result[i] = '0;
-                    else
-                        alu_result[i] = widen_lane(data_lane[i]);
-                end
-                VXM_OP_ADD: begin
-                    alu_result[i] = widen_lane(data_lane[i]) + widen_lane(param_lane[i]);
-                end
-                VXM_OP_MUL: begin
-                    alu_result[i] = $signed(data_lane[i]) * $signed(param_lane[i]);
-                end
-                VXM_OP_PASS: begin
-                    alu_result[i] = widen_lane(data_lane[i]);
-                end
-                default: begin
-                    alu_result[i] = '0;
-                end
-            endcase
+            // 1. Bias Add
+            bias_add_out[i] = widen_lane(data_lane[i]) + widen_lane(bias_lane[i]);
 
-            packed_alu_result[i*ACCUM_W +: ACCUM_W]   = {{(ACCUM_W-ALU_W){alu_result[i][ALU_W-1]}}, alu_result[i]};
-            packed_accum_result[i*ACCUM_W +: ACCUM_W] = accum_reg[i];
+            // 2. Mux 1 (2-to-1): Input vs Bias Add
+            mux1_out[i] = (mux1_sel) ? bias_add_out[i] : widen_lane(data_lane[i]);
+
+            // 3. ReLU (feeds from Mux 1)
+            if (mux1_out[i] < 0) begin
+                relu_out[i] = '0;
+            end else begin
+                relu_out[i] = mux1_out[i];
+            end
+
+            // 4. Mux 2 (2-to-1): Mux 1 vs ReLU
+            mux2_out[i] = (mux2_sel) ? relu_out[i] : mux1_out[i];
+
+            // 5. Scale Function
+            // TODO: @Saksham - Implement scale function here using mux2_out as input.
+            // Using a simple passthrough placeholder for now.
+            scale_out[i] = mux2_out[i];
+
+            // 6. Mux 3 (2-to-1): Mux 2 vs Scale
+            mux3_out[i] = (mux3_sel) ? scale_out[i] : mux2_out[i];
+            
+            // 7. Quantization Module
+            // TODO: @Saksham - Instantiate quantization module here to map mux3_out to quant_out.
+            // Using a simple truncation placeholder for now.
+            quant_out[i] = mux3_out[i][LANE_W-1:0]; 
         end
     end
 
-    always_ff @(posedge clk or negedge rst_n) begin
-        if (!rst_n) begin
-            out_valid        <= 1'b0;
-            out_payload_reg  <= '0;
-            for (int i = 0; i < LANES; i++) begin
-                accum_reg[i] <= '0;
-            end
-        end else begin
-            if (do_flush) begin
-                out_payload_reg <= packed_accum_result;
-                out_valid       <= 1'b1;
-            end else if (do_emit_result) begin
-                out_payload_reg <= packed_alu_result;
-                out_valid       <= 1'b1;
-            end else if (out_valid && out_ready) begin
-                out_valid <= 1'b0;
-            end
-
-            if (clear_accum) begin
-                for (int i = 0; i < LANES; i++) begin
-                    accum_reg[i] <= '0;
-                end
-            end else if (take_input && accum_en) begin
-                for (int i = 0; i < LANES; i++) begin
-                    accum_reg[i] <= accum_reg[i] + {{(ACCUM_W-ALU_W){alu_result[i][ALU_W-1]}}, alu_result[i]};
-                end
-            end
-        end
-    end
-
+    // 8. Register Block
+    // TODO: @Saksham - Add register/buffer logic here.
+    // Using a simple continuous assignment placeholder for now.
     always_comb begin
-        assert (ALU_W >= (LANE_W + 1))
-            else $error("VXM ALU_W must be large enough for signed addition");
-        assert (ALU_W >= (2 * LANE_W))
-            else $error("VXM ALU_W must be large enough for signed multiply");
-        assert (ACCUM_W >= ALU_W)
-            else $error("VXM ACCUM_W must be at least ALU_W");
-        assert (!(emit_result && flush))
-            else $error("VXM emit_result and flush cannot be asserted together");
+        for (int i = 0; i < LANES; i++) begin
+            reg_out[i*LANE_W +: LANE_W] = quant_out[i];
+        end
     end
 
-    assign stream_out = out_payload_reg;
+    // Output assignment
+    assign stream_out = reg_out;
+    assign out_valid = in_valid;
+    assign in_ready = out_ready;
 
 endmodule
