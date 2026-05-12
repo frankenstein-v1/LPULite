@@ -1,16 +1,17 @@
-# Makefile for vxm cocotb testbench
-
 SIM ?= icarus
 TOPLEVEL_LANG ?= verilog
 
-PWD=$(shell pwd)
+TB_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+REPO_ROOT := $(abspath $(TB_DIR)/..)
+PATH := $(REPO_ROOT)/.venv_cocotb13/bin:$(PATH)
+COCOTB_CONFIG ?= $(if $(wildcard $(REPO_ROOT)/.venv_cocotb13/bin/cocotb-config),$(REPO_ROOT)/.venv_cocotb13/bin/cocotb-config,cocotb-config)
 
-VERILOG_SOURCES = $(PWD)/../src/lpu_pkg.sv $(PWD)/../src/vxm.sv
+VERILOG_SOURCES = $(REPO_ROOT)/src/vxm.sv
 
 TOPLEVEL = vxm
-MODULE = vxm_tb
+COCOTB_TEST_MODULES = vxm_tb
 
-# Enable VCD waveform dumping
-export WAVES=1
+export PYTHONPATH := $(TB_DIR):$(PYTHONPATH)
+export WAVES = 1
 
-include $(shell cocotb-config --makefiles)/Makefile.sim
+include $(shell $(COCOTB_CONFIG) --makefiles)/Makefile.sim

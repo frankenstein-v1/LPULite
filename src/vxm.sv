@@ -36,8 +36,6 @@ module vxm #(
     logic signed [ALU_W-1:0]  scale_out    [0:LANES-1];
     logic signed [ALU_W-1:0]  mux3_out     [0:LANES-1];
     
-    // Placeholder outputs for Saksham's modules
-    logic signed [LANE_W-1:0] quant_out    [0:LANES-1];
     logic [LANES*LANE_W-1:0]  reg_out;
 
     logic mux1_sel;
@@ -76,26 +74,21 @@ module vxm #(
             mux2_out[i] = (mux2_sel) ? relu_out[i] : mux1_out[i];
 
             // 5. Scale Function
-            // TODO: @Saksham - Implement scale function here using mux2_out as input.
-            // Using a simple passthrough placeholder for now.
-            scale_out[i] = mux2_out[i];
+            // Arithmetic right shift preserves the signed value while scaling by 2.
+            // input x 1/sqrt(dk). 
+            //in this case dk = 4, sqrt(dk) = 2, so multiply by 1/2 is the same as shifting right by 1
+            scale_out[i] = mux2_out[i] >>> 1;
 
             // 6. Mux 3 (2-to-1): Mux 2 vs Scale
             mux3_out[i] = (mux3_sel) ? scale_out[i] : mux2_out[i];
             
-            // 7. Quantization Module
-            // TODO: @Saksham - Instantiate quantization module here to map mux3_out to quant_out.
-            // Using a simple truncation placeholder for now.
-            quant_out[i] = mux3_out[i][LANE_W-1:0]; 
         end
     end
 
-    // 8. Register Block
-    // TODO: @Saksham - Add register/buffer logic here.
-    // Using a simple continuous assignment placeholder for now.
+   //collect the outputs as rows 
     always_comb begin
         for (int i = 0; i < LANES; i++) begin
-            reg_out[i*LANE_W +: LANE_W] = quant_out[i];
+            reg_out[i*LANE_W +: LANE_W] = mux3_out[i];
         end
     end
 
