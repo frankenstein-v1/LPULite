@@ -6,7 +6,11 @@ REPO_ROOT := $(abspath $(TB_DIR)/..)
 PATH := $(REPO_ROOT)/.venv_cocotb13/bin:$(PATH)
 COCOTB_CONFIG ?= $(if $(wildcard $(REPO_ROOT)/.venv_cocotb13/bin/cocotb-config),$(REPO_ROOT)/.venv_cocotb13/bin/cocotb-config,cocotb-config)
 
-VERILOG_SOURCES = $(REPO_ROOT)/src/vxm.sv
+VERILOG_SOURCES = $(REPO_ROOT)/src/vxm.sv \
+                  $(REPO_ROOT)/src/softmax.sv \
+                  $(REPO_ROOT)/src/quant.sv \
+                  $(REPO_ROOT)/src/exp.sv \
+                  $(REPO_ROOT)/src/divider.sv
 
 TOPLEVEL = vxm
 COCOTB_TEST_MODULES = vxm_tb

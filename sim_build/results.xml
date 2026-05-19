@@ -1,0 +1,8 @@
+<testsuites name="results">
+  <testsuite name="all" package="all">
+    <property name="random_seed" value="1779154350" />
+    <testcase name="test_raw_input_then_scale_into_row_collector" classname="vxm_tb" file="C:\Users\micha\Documents(Local)\Projects\tinyLPU\tb\vxm_tb.py" lineno="34" time="0.002908468246459961" sim_time_ns="21.0" ratio_time="7220.295434051972" />
+    <testcase name="test_bias_and_relu_are_bypassed_on_raw_scale_path" classname="vxm_tb" file="C:\Users\micha\Documents(Local)\Projects\tinyLPU\tb\vxm_tb.py" lineno="62" time="0.0022563934326171875" sim_time_ns="30.999999999999996" ratio_time="13738.738799661875" />
+    <testcase name="test_scale_into_softmax" classname="vxm_tb" file="C:\Users\micha\Documents(Local)\Projects\tinyLPU\tb\vxm_tb.py" lineno="82" time="0.006203174591064453" sim_time_ns="380.0" ratio_time="61258.956107310325" />
+  </testsuite>
+</testsuites>
