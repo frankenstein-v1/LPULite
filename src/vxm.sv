@@ -18,7 +18,8 @@ module vxm #(
     // [0]: Mux1 Sel
     // [1]: Mux2 Sel
     // [2]: Mux3 Sel
-    input  logic [2:0]              vxm_ctrl,
+    // [3]: Softmax Bypass Sel (0: Quantize, 1: Softmax)
+    input  logic [3:0]              vxm_ctrl,
 
     // Outputs
     output logic [LANES*LANE_W-1:0] stream_out,
@@ -37,14 +38,21 @@ module vxm #(
     logic signed [ALU_W-1:0]  mux3_out     [0:LANES-1];
     
     logic [LANES*LANE_W-1:0]  reg_out;
+    logic [LANES*LANE_W-1:0]  quantize_out;
+    logic                     quantize_valid;
+    logic [LANES*LANE_W-1:0]  softmax_out;
+    logic                     softmax_valid;
+    logic [LANES*LANE_W-1:0]  mux_out;
 
     logic mux1_sel;
     logic mux2_sel;
     logic mux3_sel;
+    logic bypass_sel;
 
     assign mux1_sel = vxm_ctrl[0];
     assign mux2_sel = vxm_ctrl[1];
     assign mux3_sel = vxm_ctrl[2];
+    assign bypass_sel = vxm_ctrl[3];
 
     function automatic logic signed [ALU_W-1:0] widen_lane(
         input logic signed [LANE_W-1:0] lane_value
@@ -92,9 +100,46 @@ module vxm #(
         end
     end
 
+    // ---------------------------------------------------------
+    // Row Collector -> Softmax (High Precision)
+    // ---------------------------------------------------------
+    softmax #(
+        .LANES(LANES),
+        .LANE_W(LANE_W)
+    ) softmax_inst (
+        .clk(clk),
+        .rst_n(rst_n),
+        .in_valid(in_valid),
+        .x_in(reg_out),
+        .out_valid(softmax_valid),
+        .y_out(softmax_out)
+    );
+
+    // ---------------------------------------------------------
+    // Softmax Bypass Mux
+    // ---------------------------------------------------------
+    logic mux_valid;
+    assign mux_out = bypass_sel ? softmax_out : reg_out;
+    assign mux_valid = bypass_sel ? softmax_valid : in_valid;
+
+    // ---------------------------------------------------------
+    // Mux -> Quantize
+    // ---------------------------------------------------------
+    quant #(
+        .LANES(LANES),
+        .LANE_W(LANE_W)
+    ) q_inst (
+        .clk(clk),
+        .rst_n(rst_n),
+        .in_valid(mux_valid),
+        .x_input(mux_out),
+        .out_valid(quantize_valid),
+        .q_row_out(quantize_out)
+    );
+
     // Output assignment
-    assign stream_out = reg_out;
-    assign out_valid = in_valid;
+    assign stream_out = quantize_out;
+    assign out_valid = quantize_valid;
     assign in_ready = out_ready;
 
 endmodule

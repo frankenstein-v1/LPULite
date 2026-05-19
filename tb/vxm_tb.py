@@ -78,3 +78,42 @@ async def test_bias_and_relu_are_bypassed_on_raw_scale_path(dut):
         observed = dut.stream_out.value[(i + 1) * LANE_W - 1 : i * LANE_W].to_signed()
         expected = raw_value >> 1
         assert observed == expected, f"lane {i} should scale the raw input, not bias-add or ReLU it"
+
+@cocotb.test()
+async def test_scale_into_softmax(dut):
+    """Test VXM Scale followed by Softmax Module"""
+    cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
+    await reset_dut(dut)
+    
+    # Drive inputs with the 4 test vectors from user
+    data_lanes = [10, -8, 7, -3]
+    
+    dut.stream_in_data.value = pack_lanes(data_lanes)
+    dut.stream_in_bias.value = 0
+    # vxm_ctrl: 1100 (0xC)
+    # [3]: Softmax Bypass Sel = 1 (Select Softmax)
+    # [2]: Mux3 Sel = 1 (Activate Scale)
+    # [1]: Mux2 Sel = 0 (Bypass ReLU)
+    # [0]: Mux1 Sel = 0 (Bypass Bias Add)
+    dut.vxm_ctrl.value = 0b1100
+    dut.in_valid.value = 1
+    dut.out_ready.value = 1
+    
+    await RisingEdge(dut.clk)
+    dut.in_valid.value = 0
+    
+    dut._log.info("Inputs driven. Waiting for Softmax calculation to finish (takes ~32 cycles due to divider)...")
+    
+    # Wait for output to be valid (Softmax takes ~32 cycles)
+    timeout = 0
+    while int(dut.out_valid.value) == 0:
+        await RisingEdge(dut.clk)
+        timeout += 1
+        if timeout > 100:
+            assert False, "Timeout waiting for Softmax output!"
+            
+    dut._log.info(f"Softmax finished in {timeout} cycles.")
+    
+    for i in range(LANES):
+        observed = dut.stream_out.value[(i + 1) * LANE_W - 1 : i * LANE_W].to_signed()
+        dut._log.info(f"Lane {i} Softmax Output: {observed}")
