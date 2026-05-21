@@ -11,7 +11,7 @@
 `include "../src/westbound_bus/westbound_consumer_decode.sv"
 `include "../src/eastbound_bus/eastbound_bus.sv"
 `include "../src/eastbound_bus/eastbound_consumer_decode.sv"
-`include "../src/westbound_bus/mxm_eastbound_adapter.sv"
+`include "../src/eastbound_bus/mxm_eastbound_adapter.sv"
 `include "../src/lpu.sv"
 `include "LPU_tb.sv"
 
@@ -26,7 +26,7 @@ module lpu_sxm_pure_tb;
     logic [31:0] mem0_rdata_dbg;
     logic [31:0] mem1_rdata_dbg;
     logic [31:0] westbound_payload_dbg;
-    logic [31:0] eastbound_payload_dbg;
+    mxm_row_t    eastbound_payload_dbg;
     logic        eastbound_valid_dbg;
     logic        sxm_east_en_dbg;
     logic [31:0] sxm_stream_out_left_dbg;

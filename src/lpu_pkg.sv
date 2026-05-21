@@ -1,6 +1,9 @@
 package lpu_pkg;
     // 4 lanes of 8-bit data = 32 bits total for the superlane
     typedef logic [31:0] superlane_t;
+    localparam int MXM_SIZE = 4;
+    localparam int MXM_ACC_W = 32;
+    typedef logic [MXM_SIZE*MXM_ACC_W-1:0] mxm_row_t;
 
     // Producer IDs for the shared westbound bus select signal.
     typedef enum logic [2:0] {

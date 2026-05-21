@@ -46,8 +46,9 @@ eastbound_producer_e eastbound_sel_t;
 // shared bus signals (to be driven by bus fabric later)
 superlane_t westbound_payload;
 logic       westbound_valid;
-superlane_t eastbound_payload;
+mxm_row_t   eastbound_payload;
 logic       eastbound_valid;
+superlane_t eastbound_payload_lane0;
 
 // mem0 datapath
 superlane_t mem0_stream_in;
@@ -115,7 +116,7 @@ always_comb begin
     if (mem0_write_from_west)
         mem0_stream_in = westbound_payload;
     else if (mem0_write_from_east)
-        mem0_stream_in = eastbound_payload;
+        mem0_stream_in = eastbound_payload_lane0;
 end
 
 mem u_mem0(
@@ -142,7 +143,7 @@ assign eastbound_sel_t = eastbound_producer_e'(eastbound_sel);
 mem u_mem1(
     .clk(clk),
     .rst_n(rst_n),
-    .stream_in(eastbound_payload),
+    .stream_in(eastbound_payload_lane0),
     .stream_out(mem1_stream_out),
     .read_en(mem1_read_en),
     .write_en(mem1_write_en_eff),
@@ -160,8 +161,9 @@ always_ff @(posedge clk or negedge rst_n) begin
     end
 end
 
-logic [31:0] vxm_stream_out;
+mxm_row_t vxm_stream_out;
 logic vxm_out_valid;
+mxm_row_t westbound_payload_row;
 
 westbound_bus u_westbound_bus(
     .producer_sel(westbound_sel_t),
@@ -171,7 +173,7 @@ westbound_bus u_westbound_bus(
     .mem1_valid(mem1_valid),
     .sxm_payload('0),
     .sxm_valid(1'b0), 
-    .vxm_payload(vxm_stream_out),
+    .vxm_payload(vxm_stream_out[31:0]),
     .vxm_valid(vxm_out_valid),
     .westbound_payload(westbound_payload),
     .westbound_valid(westbound_valid)
@@ -186,11 +188,27 @@ westbound_consumer_decode u_westbound_consumer_decode(
     .vxm_west_en(vxm_west_en)
 );
 
-logic [31:0] mxm_payload_e;
+mxm_row_t mxm_payload_e;
 logic mxm_valid_e;
+mxm_row_t vxm_payload_e_bus;
+mxm_row_t sxm_payload_e_bus;
+mxm_row_t mem0_payload_e_bus;
+
+assign eastbound_payload_lane0 = eastbound_payload[31:0];
+
+always_comb begin
+    vxm_payload_e_bus = '0;
+    sxm_payload_e_bus = '0;
+    mem0_payload_e_bus = '0;
+    westbound_payload_row = '0;
+
+    vxm_payload_e_bus = vxm_stream_out;
+    mem0_payload_e_bus[31:0] = mem0_stream_out;
+    westbound_payload_row[31:0] = westbound_payload;
+end
 
 mxm_eastbound_adapter #(
-    .MXM_SIZE(4),
+    .MXM_SIZE(MXM_SIZE),
     .PAYLOAD_W(32)
 ) u_mxm_to_eastbound (
     .mxm_out(mxm_out),
@@ -202,16 +220,16 @@ mxm_eastbound_adapter #(
 );
 
 eastbound_bus #(
-    .PAYLOAD_E(32)
+    .PAYLOAD_E($bits(mxm_row_t))
 ) u_eastbound_bus(
     .producer_sel(eastbound_sel_t),
     .mxm_payload_e(mxm_payload_e),
     .mxm_valid_e(mxm_valid_e),
-    .vxm_payload_e(vxm_stream_out),
+    .vxm_payload_e(vxm_payload_e_bus),
     .vxm_valid_e(vxm_out_valid),
-    .sxm_payload_e('0),
+    .sxm_payload_e(sxm_payload_e_bus),
     .sxm_valid_e(1'b0),
-    .mem0_payload_e(mem0_stream_out),
+    .mem0_payload_e(mem0_payload_e_bus),
     .mem0_valid_e(mem0_valid),
     .eastbound_payload(eastbound_payload),
     .eastbound_valid(eastbound_valid)
@@ -240,7 +258,7 @@ always_ff @(posedge clk or negedge rst_n) begin
         sxm_w_payload_reg <= '0;
     end else begin
         if (sxm_east_en && eastbound_valid)
-            sxm_e_payload_reg <= eastbound_payload;
+            sxm_e_payload_reg <= eastbound_payload_lane0;
         if (sxm_west_en && westbound_valid)
             sxm_w_payload_reg <= westbound_payload;
     end
@@ -286,9 +304,9 @@ mxm u_mxm(
 
 
 
-logic [31:0] vxm_e_payload_reg;
-logic [31:0] vxm_w_payload_reg;
-logic [31:0] vxm_stream_in_data;
+mxm_row_t vxm_e_payload_reg;
+mxm_row_t vxm_w_payload_reg;
+mxm_row_t vxm_stream_in_data;
 
 always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
@@ -298,17 +316,21 @@ always_ff @(posedge clk or negedge rst_n) begin
         if (vxm_east_en && eastbound_valid)
             vxm_e_payload_reg <= eastbound_payload;
         if (vxm_west_en && westbound_valid)
-            vxm_w_payload_reg <= westbound_payload;
+            vxm_w_payload_reg <= westbound_payload_row;
     end
 end
 
 assign vxm_stream_in_data = vxm_data_sel ? vxm_e_payload_reg : vxm_w_payload_reg;
 
-vxm u_vxm(
+vxm #(
+    .LANES(4),
+    .LANE_W(32),
+    .ALU_W(32)
+) u_vxm(
     .clk(clk),
     .rst_n(rst_n),
     .stream_in_data(vxm_stream_in_data),
-    .stream_in_bias(vxm_w_payload_reg), // Bias typically arrives on the westbound bus
+    .stream_in_bias(vxm_w_payload_reg), // Bias currently occupies lane 0 when sourced from westbound
     .in_valid(vxm_east_en || vxm_west_en), // Placeholder for valid signal logic
     .in_ready(), 
     .vxm_ctrl(vxm_ctrl),

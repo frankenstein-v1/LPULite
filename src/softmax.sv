@@ -17,6 +17,7 @@ module softmax #(
     input  logic                     in_valid,
     input  logic [LANES*LANE_W-1:0]  x_in,
 
+    output logic                     in_ready,
     output logic                     out_valid,
     output logic [LANES*LANE_W-1:0]  y_out
 );
@@ -83,6 +84,8 @@ module softmax #(
     logic divider_start;
     logic divider_done;
     logic [LANE_W-1:0] quotient, remainder;
+
+    assign in_ready = (state == IDLE);
 
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin

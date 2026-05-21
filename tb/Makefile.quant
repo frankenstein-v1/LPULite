@@ -1,0 +1,18 @@
+# Makefile for quant cocotb testbench
+
+SIM ?= icarus
+TOPLEVEL_LANG ?= verilog
+
+TB_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+REPO_ROOT := $(abspath $(TB_DIR)/..)
+
+VERILOG_SOURCES = $(REPO_ROOT)/src/quant.sv
+
+TOPLEVEL = quant
+COCOTB_TEST_MODULES = quant_tb
+
+export PYTHONPATH := $(TB_DIR):$(PYTHONPATH)
+
+export WAVES=1
+
+include $(shell cocotb-config --makefiles)/Makefile.sim

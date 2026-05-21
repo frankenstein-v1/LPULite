@@ -28,7 +28,7 @@ module lpu_cocotb_top (
     output logic        westbound_valid_dbg,
     output logic        mxm_west_en_dbg,
 
-    output logic [31:0] eastbound_payload_dbg,
+    output mxm_row_t     eastbound_payload_dbg,
     output logic        eastbound_valid_dbg,
     output logic        sxm_east_en_dbg,
     output logic [31:0] sxm_stream_out_left_dbg,
