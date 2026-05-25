@@ -24,6 +24,7 @@ module softmax #(
 
     localparam int MAX_BITS = 30;
     localparam int OUT_BITS = 8;
+    localparam logic [LANE_W-1:0] RECIP_DIVIDEND = 32'd1 << MAX_BITS;
     localparam int SHIFT = MAX_BITS - OUT_BITS;
 
     // ---------------------------------------------------------
@@ -129,15 +130,16 @@ module softmax #(
     // ---------------------------------------------------------
     // 6. Reciprocal Divider
     // ---------------------------------------------------------
-    divider #(.DW(LANE_W)) div_inst (
+    lut_softmax_div #(.DW(LANE_W)) u_lut_softmax_div (
         .clk(clk),
         .rst(~rst_n),
         .start(divider_start),
-        .dividend(32'd1073741824), // 1 << 30
+        .dividend(RECIP_DIVIDEND),
         .divisor(sum_exp_reg),
         .quotient(quotient),
         .remainder(remainder),
         .done(divider_done)
+
     );
 
     // ---------------------------------------------------------
