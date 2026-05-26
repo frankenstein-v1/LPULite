@@ -1,0 +1,17 @@
+# Makefile for lut_softmax_exp cocotb testbench
+
+SIM ?= icarus
+TOPLEVEL_LANG ?= verilog
+
+TB_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+REPO_ROOT := $(abspath $(TB_DIR)/..)
+
+VERILOG_SOURCES = $(REPO_ROOT)/src/lut_softmax_exp.sv
+
+TOPLEVEL = lut_softmax_exp
+COCOTB_TEST_MODULES = lut_softmax_exp_tb
+
+export PYTHONPATH := $(TB_DIR):$(PYTHONPATH)
+export WAVES = 1
+
+include $(shell cocotb-config --makefiles)/Makefile.sim
