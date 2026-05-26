@@ -59,7 +59,7 @@ module softmax #(
     genvar i;
     generate
         for (i = 0; i < LANES; i++) begin : gen_exp
-            exp #(.DW(LANE_W)) exp_inst (
+            lut_softmax_exp #(.DW(LANE_W)) exp_inst (
                 .clk(clk),
                 .rst(~rst_n),
                 .q(lane_sub[i]),
