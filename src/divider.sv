@@ -85,7 +85,7 @@ module divider #(
       
       DONE: begin
         done = 1'b1;
-        next_state = DONE;
+        next_state = IDLE;
       end
     endcase
   end

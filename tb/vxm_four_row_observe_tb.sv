@@ -1,4 +1,4 @@
-`timescale 1ns/1ps
+`timescale 1ns/1ns
 
 module vxm_four_row_observe_tb;
     localparam int LANES = 4;

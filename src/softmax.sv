@@ -5,7 +5,7 @@
 // for the tinyLPU architecture.
 // ==============================================================================
 `default_nettype none
-`timescale 1ns/1ps
+`timescale 1ns/1ns
 
 module softmax #(
     parameter int LANES   = 4,

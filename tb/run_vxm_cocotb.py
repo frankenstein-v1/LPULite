@@ -9,8 +9,8 @@ def test_vxm():
         src_dir / "vxm.sv",
         src_dir / "softmax.sv",
         src_dir / "quant.sv",
-        src_dir / "exp.sv",
-        src_dir / "divider.sv"
+        src_dir / "lut_softmax_exp.sv",
+        src_dir / "lut_softmax_div.sv"
     ]
     
     runner = get_runner("icarus")

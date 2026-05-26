@@ -1,3 +1,5 @@
+`timescale 1ns/1ns
+
 module quant #(
     parameter int MULTIPLIER = 2032,
     parameter int SHIFT  = 16,

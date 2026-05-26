@@ -1,3 +1,5 @@
+`timescale 1ns/1ns
+
 module vxm #(
     parameter int LANES   = 4,
     parameter int LANE_W  = 32, // Upgraded to 32 bits
@@ -62,14 +64,31 @@ module vxm #(
     //outputs for quantize & softmax & muxes
     logic [31:0]              quantize_out;
     logic                     quantize_valid;
-    logic [LANES*LANE_W-1:0]  softmax_out;
-    logic                     softmax_valid;
-    logic                     softmax_in_ready;
-    logic                     softmax_hold;
-    logic                     softmax_launch;
+    logic [3:0][ROW_W-1:0]    softmax_out_vec;
+    logic [3:0]               softmax_valid_vec;
+    logic [3:0]               softmax_in_ready_vec;
+    logic [3:0]               softmax_launch_vec;
+    logic                     softmax_stall;
     logic                     stall_pipeline;
-    logic [ROW_W-1:0]         softmax_result_reg;
-    logic                     softmax_result_valid;
+    logic [1:0]               launch_idx;
+    logic [1:0]               collect_idx;
+    logic [ROW_W-1:0]         softmax_result_reg [0:3];
+    logic                     softmax_result_valid [0:3];
+
+    initial begin
+        launch_idx = 2'd0;
+        collect_idx = 2'd0;
+        softmax_result_reg[0] = '0;
+        softmax_result_reg[1] = '0;
+        softmax_result_reg[2] = '0;
+        softmax_result_reg[3] = '0;
+        softmax_result_valid[0] = 1'b0;
+        softmax_result_valid[1] = 1'b0;
+        softmax_result_valid[2] = 1'b0;
+        softmax_result_valid[3] = 1'b0;
+    end
+    logic                     softmax_active_valid;
+    logic [ROW_W-1:0]         softmax_active_data;
     logic [LANES*LANE_W-1:0]  mux_out;
     logic                     mux_valid;
     logic                     quant_mode_softmax;
@@ -142,19 +161,69 @@ module vxm #(
         end
     end
     
-    //logic to turn registers representing state "n+1" into state "n"
-    assign softmax_launch = s4_valid && s4_bypass_sel_reg && !softmax_hold &&
-                            !softmax_result_valid && softmax_in_ready;
+    // logic to route the launch signal to the correct engine
+    always_comb begin
+        softmax_launch_vec = '0;
+        if (s4_valid && s4_bypass_sel_reg && !stall_pipeline) begin
+            case (launch_idx)
+                2'd0: softmax_launch_vec[0] = 1'b1;
+                2'd1: softmax_launch_vec[1] = 1'b1;
+                2'd2: softmax_launch_vec[2] = 1'b1;
+                2'd3: softmax_launch_vec[3] = 1'b1;
+            endcase
+        end
+    end
 
-    assign mux_out = softmax_result_valid ? softmax_result_reg : s4_handoff_reg;
-    assign mux_valid = softmax_result_valid || (s4_valid && !s4_bypass_sel_reg);
-    assign quant_mode_softmax = softmax_result_valid;
+    // logic to determine the current active softmax result (either from register or direct output)
+    logic             active_result_valid;
+    logic [ROW_W-1:0] active_result_data;
+
+    always_comb begin
+        active_result_valid = 1'b0;
+        active_result_data  = '0;
+        case (collect_idx)
+            2'd0: begin
+                active_result_valid = softmax_result_valid[0] || softmax_valid_vec[0];
+                active_result_data  = softmax_result_valid[0] ? softmax_result_reg[0] : softmax_out_vec[0];
+            end
+            2'd1: begin
+                active_result_valid = softmax_result_valid[1] || softmax_valid_vec[1];
+                active_result_data  = softmax_result_valid[1] ? softmax_result_reg[1] : softmax_out_vec[1];
+            end
+            2'd2: begin
+                active_result_valid = softmax_result_valid[2] || softmax_valid_vec[2];
+                active_result_data  = softmax_result_valid[2] ? softmax_result_reg[2] : softmax_out_vec[2];
+            end
+            2'd3: begin
+                active_result_valid = softmax_result_valid[3] || softmax_valid_vec[3];
+                active_result_data  = softmax_result_valid[3] ? softmax_result_reg[3] : softmax_out_vec[3];
+            end
+        endcase
+    end
+
+    assign softmax_active_valid = active_result_valid;
+    assign softmax_active_data  = active_result_data;
+
+    assign mux_out   = softmax_active_valid ? softmax_active_data : s4_handoff_reg;
+    assign mux_valid = softmax_active_valid || (s4_valid && !s4_bypass_sel_reg);
+    assign quant_mode_softmax = softmax_active_valid;
     assign quant_slot_available = !quant_inflight && (!stream_out_valid_reg || out_ready);
     assign quant_issue = mux_valid && quant_slot_available;
 
-    assign stall_pipeline = softmax_launch ||
-                            (softmax_hold && !softmax_valid) ||
-                            (mux_valid && !quant_issue);
+    logic target_in_ready;
+    always_comb begin
+        target_in_ready = 1'b0;
+        case (launch_idx)
+            2'd0: target_in_ready = softmax_in_ready_vec[0];
+            2'd1: target_in_ready = softmax_in_ready_vec[1];
+            2'd2: target_in_ready = softmax_in_ready_vec[2];
+            2'd3: target_in_ready = softmax_in_ready_vec[3];
+        endcase
+    end
+
+    assign softmax_stall = s4_valid && s4_bypass_sel_reg && !target_in_ready;
+    assign stall_pipeline = softmax_stall ||
+                            (s4_valid && !s4_bypass_sel_reg && !quant_issue);
 
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
@@ -174,23 +243,68 @@ module vxm #(
             s4_handoff_reg      <= '0;
             s4_bypass_sel_reg   <= 1'b0;
             s4_valid            <= 1'b0;
-            softmax_hold        <= 1'b0;
-            softmax_result_reg  <= '0;
-            softmax_result_valid <= 1'b0;
+            launch_idx          <= 2'd0;
+            collect_idx         <= 2'd0;
+            softmax_result_reg[0]   <= '0;
+            softmax_result_reg[1]   <= '0;
+            softmax_result_reg[2]   <= '0;
+            softmax_result_reg[3]   <= '0;
+            softmax_result_valid[0] <= 1'b0;
+            softmax_result_valid[1] <= 1'b0;
+            softmax_result_valid[2] <= 1'b0;
+            softmax_result_valid[3] <= 1'b0;
             quant_inflight      <= 1'b0;
             stream_out_reg      <= '0;
             stream_out_valid_reg <= 1'b0;
         end else begin
-            if (softmax_launch)
-                softmax_hold <= 1'b1;
-            else if (softmax_valid)
-                softmax_hold <= 1'b0;
+            // Launch idx update
+            if (s4_valid && s4_bypass_sel_reg && !stall_pipeline) begin
+                launch_idx <= launch_idx + 2'd1;
+            end
 
-            if (softmax_valid) begin
-                softmax_result_reg   <= softmax_out;
-                softmax_result_valid <= 1'b1;
-            end else if (quant_issue && softmax_result_valid) begin
-                softmax_result_valid <= 1'b0;
+            // Capture newly completed softmax outputs into their registers (statically unrolled)
+            if (softmax_valid_vec[0]) begin
+                if (2'd0 == collect_idx && quant_issue && softmax_active_valid) begin
+                    // Do not store, it goes straight to quant!
+                end else begin
+                    softmax_result_reg[0]   <= softmax_out_vec[0];
+                    softmax_result_valid[0] <= 1'b1;
+                end
+            end
+            if (softmax_valid_vec[1]) begin
+                if (2'd1 == collect_idx && quant_issue && softmax_active_valid) begin
+                    // Do not store, it goes straight to quant!
+                end else begin
+                    softmax_result_reg[1]   <= softmax_out_vec[1];
+                    softmax_result_valid[1] <= 1'b1;
+                end
+            end
+            if (softmax_valid_vec[2]) begin
+                if (2'd2 == collect_idx && quant_issue && softmax_active_valid) begin
+                    // Do not store, it goes straight to quant!
+                end else begin
+                    softmax_result_reg[2]   <= softmax_out_vec[2];
+                    softmax_result_valid[2] <= 1'b1;
+                end
+            end
+            if (softmax_valid_vec[3]) begin
+                if (2'd3 == collect_idx && quant_issue && softmax_active_valid) begin
+                    // Do not store, it goes straight to quant!
+                end else begin
+                    softmax_result_reg[3]   <= softmax_out_vec[3];
+                    softmax_result_valid[3] <= 1'b1;
+                end
+            end
+
+            // Handle the issue/collection of the current collect_idx
+            if (quant_issue && softmax_active_valid) begin
+                collect_idx <= collect_idx + 2'd1;
+                case (collect_idx)
+                    2'd0: softmax_result_valid[0] <= 1'b0;
+                    2'd1: softmax_result_valid[1] <= 1'b0;
+                    2'd2: softmax_result_valid[2] <= 1'b0;
+                    2'd3: softmax_result_valid[3] <= 1'b0;
+                endcase
             end
 
             if (quant_issue)
@@ -235,18 +349,23 @@ module vxm #(
         end
     end
 
-    softmax #(
-        .LANES(LANES),
-        .LANE_W(LANE_W)
-    ) softmax_inst (
-        .clk(clk),
-        .rst_n(rst_n),
-        .in_valid(softmax_launch),
-        .x_in(s4_handoff_reg),
-        .in_ready(softmax_in_ready),
-        .out_valid(softmax_valid),
-        .y_out(softmax_out)
-    );
+    genvar k;
+    generate
+        for (k = 0; k < 4; k++) begin : gen_softmax
+            softmax #(
+                .LANES(LANES),
+                .LANE_W(LANE_W)
+            ) softmax_inst (
+                .clk(clk),
+                .rst_n(rst_n),
+                .in_valid(softmax_launch_vec[k]),
+                .x_in(s4_handoff_reg),
+                .in_ready(softmax_in_ready_vec[k]),
+                .out_valid(softmax_valid_vec[k]),
+                .y_out(softmax_out_vec[k])
+            );
+        end
+    endgenerate
 
     quant #(
         .LANES(LANES),
