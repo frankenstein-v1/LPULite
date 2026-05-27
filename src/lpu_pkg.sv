@@ -1,3 +1,5 @@
+`timescale 1ns/1ns
+
 package lpu_pkg;
     // 4 lanes of 8-bit data = 32 bits total for the superlane
     typedef logic [31:0] superlane_t;

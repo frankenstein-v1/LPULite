@@ -1,8 +1,6 @@
 <testsuites name="results">
   <testsuite name="all" package="all">
-    <property name="random_seed" value="1779803578" />
-    <testcase name="test_reset_behavior" classname="lut_softmax_exp_tb" file="C:\Users\z005a2rv\Documents\tinyLPU\tb\lut_softmax_exp_tb.py" lineno="59" time="0.025089740753173828" sim_time_ns="31.0" ratio_time="1235.564779443906" />
-    <testcase name="test_specific_cases" classname="lut_softmax_exp_tb" file="C:\Users\z005a2rv\Documents\tinyLPU\tb\lut_softmax_exp_tb.py" lineno="69" time="0.0030002593994140625" sim_time_ns="38.0" ratio_time="12665.571519389701" />
-    <testcase name="test_sweep" classname="lut_softmax_exp_tb" file="C:\Users\z005a2rv\Documents\tinyLPU\tb\lut_softmax_exp_tb.py" lineno="95" time="0.10680294036865234" sim_time_ns="2031.0" ratio_time="19016.330383691547" />
+    <property name="random_seed" value="1779905147" />
+    <testcase name="test_sxm_complete" classname="sxm_tb" file="C:\Users\z005a2rv\Documents\tinyLPU\tb\sxm_tb.py" lineno="203" time="0.05338406562805176" sim_time_ns="565.0" ratio_time="10583.682478149605" />
   </testsuite>
 </testsuites>

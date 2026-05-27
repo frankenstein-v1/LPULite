@@ -1,3 +1,5 @@
+`timescale 1ns/1ns
+
 import lpu_pkg::*;
 
 module sxm (
