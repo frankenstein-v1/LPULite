@@ -62,6 +62,8 @@ module quant #(
         end
     end
 
+    // Lane-wise combinational quantization logic
+    // (Using generate loops and continuous assigns to avoid iverilog compilation issues)
     generate
         for (genvar i = 0; i < LANES; i++) begin : g_quant_lanes
             logic signed [LANE_W-1:0] lane_in_val;

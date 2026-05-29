@@ -2,12 +2,10 @@
 
 import lpu_pkg::*;
 
-// Handoff note:
-// - Current router behavior is preserved.
-// - Transpose implementation is intentionally not finished here.
-// - Start in section 2 ("TODO: transpose mode state goes here").
-// - Then update section 5 to switch between normal router output and
-//   transpose-emission output.
+// Switch Execution Module (SXM)
+// Supports two primary modes:
+// 1. Normal Router Mode: Byte-lane crossbar with 3-cycle systolic delay lines.
+// 2. Transpose Mode: Pipelined 4x4 matrix transposition.
 
 module sxm (
     input  logic clk,

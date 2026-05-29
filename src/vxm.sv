@@ -107,6 +107,7 @@ module vxm #(
     endfunction
 
     // stage buffering logic using generate loop for all lanes
+    // (Using generate loops and continuous assigns to avoid iverilog compilation issues)
     generate
         for (genvar i = 0; i < LANES; i++) begin : g_vxm_lanes
             // Stage 1: bias add logic

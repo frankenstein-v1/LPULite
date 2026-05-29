@@ -19,6 +19,8 @@ logic              weight_is_signed_reg;
 logic signed [8:0] input_ext;
 logic signed [8:0] weight_ext;
 
+// Sign-extend input and weight operands combinationally
+// (Implemented as continuous assigns for maximum iverilog compatibility)
 assign input_ext = input_is_signed
     ? $signed({input_in[7], input_in})
     : $signed({1'b0, input_in});

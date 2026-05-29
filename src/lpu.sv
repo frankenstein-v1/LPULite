@@ -184,6 +184,7 @@ westbound_bus u_westbound_bus(
     .mem1_payload(mem1_stream_out[31:0]),
     .mem0_valid(mem0_valid),
     .mem1_valid(mem1_valid),
+    // SXM output is wired to the westbound bus to support matrix transposition writebacks
     .sxm_payload(sxm_stream_out_to_mxm_top),
     .sxm_valid(1'b1), 
     .vxm_payload(vxm_stream_out_buf),
@@ -239,6 +240,7 @@ eastbound_bus #(
     .mxm_valid_e(mxm_valid_e),
     .vxm_payload_e(vxm_payload_e_bus),
     .vxm_valid_e(vxm_stream_out_buf_valid_e),
+    // SXM output is wired to the eastbound bus to support matrix transposition writebacks
     .sxm_payload_e(sxm_payload_e_bus),
     .sxm_valid_e(1'b1),
     .mem0_payload_e(mem0_payload_e_bus),
