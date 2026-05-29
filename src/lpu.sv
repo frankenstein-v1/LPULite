@@ -184,8 +184,8 @@ westbound_bus u_westbound_bus(
     .mem1_payload(mem1_stream_out[31:0]),
     .mem0_valid(mem0_valid),
     .mem1_valid(mem1_valid),
-    .sxm_payload('0),
-    .sxm_valid(1'b0), 
+    .sxm_payload(sxm_stream_out_to_mxm_top),
+    .sxm_valid(1'b1), 
     .vxm_payload(vxm_stream_out_buf),
     .vxm_valid(vxm_stream_out_buf_valid_w),
     .westbound_payload(westbound_payload),
@@ -215,6 +215,7 @@ always_comb begin
     mem0_payload_e_bus = '0;
 
     vxm_payload_e_bus[31:0] = vxm_stream_out_buf;
+    sxm_payload_e_bus[31:0] = sxm_stream_out_to_mxm_left;
     mem0_payload_e_bus = mem0_stream_out;
 end
 
@@ -239,7 +240,7 @@ eastbound_bus #(
     .vxm_payload_e(vxm_payload_e_bus),
     .vxm_valid_e(vxm_stream_out_buf_valid_e),
     .sxm_payload_e(sxm_payload_e_bus),
-    .sxm_valid_e(1'b0),
+    .sxm_valid_e(1'b1),
     .mem0_payload_e(mem0_payload_e_bus),
     .mem0_valid_e(mem0_valid),
     .eastbound_payload(eastbound_payload),

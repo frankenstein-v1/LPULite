@@ -106,100 +106,58 @@ module vxm #(
         widen_lane = {{(ALU_W-LANE_W){lane_value[LANE_W-1]}}, lane_value};
     endfunction
 
-    //data for each lane
-    always_comb begin
-        logic signed [LANE_W-1:0] data_lane;
-        logic signed [LANE_W-1:0] bias_lane;
-        logic signed [ALU_W-1:0]  bias_add_out;
-        logic signed [ALU_W-1:0]  mux1_out;
+    // stage buffering logic using generate loop for all lanes
+    generate
+        for (genvar i = 0; i < LANES; i++) begin : g_vxm_lanes
+            // Stage 1: bias add logic
+            logic signed [LANE_W-1:0] data_lane;
+            logic signed [LANE_W-1:0] bias_lane_s0;
+            logic signed [ALU_W-1:0]  bias_add_out;
+            logic signed [ALU_W-1:0]  mux1_out;
 
-        //logic for stage 1 bias next data 
-        s1_bias_next = '0;
-        for (int i = 0; i < LANES; i++) begin
-            data_lane = s0_data_reg[i*LANE_W +: LANE_W];
-            bias_lane = s0_bias_reg[i*LANE_W +: LANE_W];
-            bias_add_out = widen_lane(data_lane) + widen_lane(bias_lane);
-            mux1_out = s0_ctrl_reg[0] ? bias_add_out : widen_lane(data_lane);
-            s1_bias_next[i*LANE_W +: LANE_W] = mux1_out[LANE_W-1:0];
+            assign data_lane    = s0_data_reg[i*LANE_W +: LANE_W];
+            assign bias_lane_s0 = s0_bias_reg[i*LANE_W +: LANE_W];
+            assign bias_add_out = widen_lane(data_lane) + widen_lane(bias_lane_s0);
+            assign mux1_out     = s0_ctrl_reg[0] ? bias_add_out : widen_lane(data_lane);
+            assign s1_bias_next[i*LANE_W +: LANE_W] = mux1_out[LANE_W-1:0];
+
+            // Stage 2: ReLU logic
+            logic signed [LANE_W-1:0] bias_lane_s1;
+            logic signed [ALU_W-1:0]  relu_out;
+
+            assign bias_lane_s1 = s1_bias_reg[i*LANE_W +: LANE_W];
+            assign relu_out     = (widen_lane(bias_lane_s1) < 0) ? '0 : widen_lane(bias_lane_s1);
+            assign s2_relu_next[i*LANE_W +: LANE_W] = s1_ctrl_reg[0] ? relu_out[LANE_W-1:0] : bias_lane_s1;
+
+            // Stage 3: scale logic
+            logic signed [LANE_W-1:0] relu_lane;
+            logic signed [ALU_W-1:0]  scale_out;
+
+            assign relu_lane    = s2_relu_reg[i*LANE_W +: LANE_W];
+            assign scale_out    = widen_lane(relu_lane) >>> 1;
+            assign s3_scale_next[i*LANE_W +: LANE_W] = s2_ctrl_reg[0] ? scale_out[LANE_W-1:0] : relu_lane;
         end
-    end
-
-    always_comb begin
-        logic signed [LANE_W-1:0] bias_lane;
-        logic signed [ALU_W-1:0]  relu_out;
-
-        //relu buffering logic
-        s2_relu_next = '0;
-        for (int i = 0; i < LANES; i++) begin
-            bias_lane = s1_bias_reg[i*LANE_W +: LANE_W];
-            if (widen_lane(bias_lane) < 0)
-                relu_out = '0;
-            else
-                relu_out = widen_lane(bias_lane);
-
-            if (s1_ctrl_reg[0])
-                s2_relu_next[i*LANE_W +: LANE_W] = relu_out[LANE_W-1:0];
-            else
-                s2_relu_next[i*LANE_W +: LANE_W] = bias_lane;
-        end
-    end
-
-    //scale buffering logic 
-    always_comb begin
-        logic signed [LANE_W-1:0] relu_lane;
-        logic signed [ALU_W-1:0]  scale_out;
-
-        s3_scale_next = '0;
-        for (int i = 0; i < LANES; i++) begin
-            relu_lane = s2_relu_reg[i*LANE_W +: LANE_W];
-            scale_out = widen_lane(relu_lane) >>> 1;
-
-            if (s2_ctrl_reg[0])
-                s3_scale_next[i*LANE_W +: LANE_W] = scale_out[LANE_W-1:0];
-            else
-                s3_scale_next[i*LANE_W +: LANE_W] = relu_lane;
-        end
-    end
+    endgenerate
     
     // logic to route the launch signal to the correct engine
-    always_comb begin
-        softmax_launch_vec = '0;
-        if (s4_valid && s4_bypass_sel_reg && !stall_pipeline) begin
-            case (launch_idx)
-                2'd0: softmax_launch_vec[0] = 1'b1;
-                2'd1: softmax_launch_vec[1] = 1'b1;
-                2'd2: softmax_launch_vec[2] = 1'b1;
-                2'd3: softmax_launch_vec[3] = 1'b1;
-            endcase
-        end
-    end
+    assign softmax_launch_vec[0] = (s4_valid && s4_bypass_sel_reg && !stall_pipeline && launch_idx == 2'd0);
+    assign softmax_launch_vec[1] = (s4_valid && s4_bypass_sel_reg && !stall_pipeline && launch_idx == 2'd1);
+    assign softmax_launch_vec[2] = (s4_valid && s4_bypass_sel_reg && !stall_pipeline && launch_idx == 2'd2);
+    assign softmax_launch_vec[3] = (s4_valid && s4_bypass_sel_reg && !stall_pipeline && launch_idx == 2'd3);
 
     // logic to determine the current active softmax result (either from register or direct output)
     logic             active_result_valid;
     logic [ROW_W-1:0] active_result_data;
 
-    always_comb begin
-        active_result_valid = 1'b0;
-        active_result_data  = '0;
-        case (collect_idx)
-            2'd0: begin
-                active_result_valid = softmax_result_valid[0] || softmax_valid_vec[0];
-                active_result_data  = softmax_result_valid[0] ? softmax_result_reg[0] : softmax_out_vec[0];
-            end
-            2'd1: begin
-                active_result_valid = softmax_result_valid[1] || softmax_valid_vec[1];
-                active_result_data  = softmax_result_valid[1] ? softmax_result_reg[1] : softmax_out_vec[1];
-            end
-            2'd2: begin
-                active_result_valid = softmax_result_valid[2] || softmax_valid_vec[2];
-                active_result_data  = softmax_result_valid[2] ? softmax_result_reg[2] : softmax_out_vec[2];
-            end
-            2'd3: begin
-                active_result_valid = softmax_result_valid[3] || softmax_valid_vec[3];
-                active_result_data  = softmax_result_valid[3] ? softmax_result_reg[3] : softmax_out_vec[3];
-            end
-        endcase
-    end
+    assign active_result_valid = (collect_idx == 2'd0) ? (softmax_result_valid[0] || softmax_valid_vec[0]) :
+                                 (collect_idx == 2'd1) ? (softmax_result_valid[1] || softmax_valid_vec[1]) :
+                                 (collect_idx == 2'd2) ? (softmax_result_valid[2] || softmax_valid_vec[2]) :
+                                 (softmax_result_valid[3] || softmax_valid_vec[3]);
+
+    assign active_result_data  = (collect_idx == 2'd0) ? (softmax_result_valid[0] ? softmax_result_reg[0] : softmax_out_vec[0]) :
+                                 (collect_idx == 2'd1) ? (softmax_result_valid[1] ? softmax_result_reg[1] : softmax_out_vec[1]) :
+                                 (collect_idx == 2'd2) ? (softmax_result_valid[2] ? softmax_result_reg[2] : softmax_out_vec[2]) :
+                                 (softmax_result_valid[3] ? softmax_result_reg[3] : softmax_out_vec[3]);
 
     assign softmax_active_valid = active_result_valid;
     assign softmax_active_data  = active_result_data;
@@ -211,15 +169,10 @@ module vxm #(
     assign quant_issue = mux_valid && quant_slot_available;
 
     logic target_in_ready;
-    always_comb begin
-        target_in_ready = 1'b0;
-        case (launch_idx)
-            2'd0: target_in_ready = softmax_in_ready_vec[0];
-            2'd1: target_in_ready = softmax_in_ready_vec[1];
-            2'd2: target_in_ready = softmax_in_ready_vec[2];
-            2'd3: target_in_ready = softmax_in_ready_vec[3];
-        endcase
-    end
+    assign target_in_ready = (launch_idx == 2'd0) ? softmax_in_ready_vec[0] :
+                             (launch_idx == 2'd1) ? softmax_in_ready_vec[1] :
+                             (launch_idx == 2'd2) ? softmax_in_ready_vec[2] :
+                             softmax_in_ready_vec[3];
 
     assign softmax_stall = s4_valid && s4_bypass_sel_reg && !target_in_ready;
     assign stall_pipeline = softmax_stall ||

@@ -19,15 +19,13 @@ logic              weight_is_signed_reg;
 logic signed [8:0] input_ext;
 logic signed [8:0] weight_ext;
 
-always_comb begin
-    input_ext = input_is_signed
-        ? $signed({input_in[7], input_in})
-        : $signed({1'b0, input_in});
+assign input_ext = input_is_signed
+    ? $signed({input_in[7], input_in})
+    : $signed({1'b0, input_in});
 
-    weight_ext = weight_is_signed_reg
-        ? $signed({weight_reg[7], weight_reg})
-        : $signed({1'b0, weight_reg});
-end
+assign weight_ext = weight_is_signed_reg
+    ? $signed({weight_reg[7], weight_reg})
+    : $signed({1'b0, weight_reg});
 
 
 

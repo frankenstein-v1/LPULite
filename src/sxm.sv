@@ -39,24 +39,90 @@ module sxm (
     superlane_t weight_d1, weight_d2, weight_d3;
 
     // -------------------------------------------------------------------------
-    // 2. TODO: transpose mode state goes here
+    // 2. Transpose mode state and logic
     // -------------------------------------------------------------------------
-    //
-    // First real transpose state to add:
-    //
-    // superlane_t transpose_rows [0:3];
-    // logic [1:0] transpose_load_idx;
-    // logic [1:0] transpose_emit_idx;
-    // logic       transpose_loading;
-    // logic       transpose_emitting;
-    //
-    // Mental model:
-    // - LOAD phase: capture 4 incoming rows into transpose_rows[0..3]
-    // - EMIT phase: output 4 transposed rows, one per cycle
-    //
-    // Keep transpose logic separate from the current router path. Do not try to
-    // force transpose into the opcode case statements directly.
-    //
+    localparam logic [11:0] OP_TRANSPOSE_LOAD = 12'h5A5;
+    localparam logic [11:0] OP_TRANSPOSE_EMIT = 12'hA5A;
+
+    superlane_t transpose_rows [0:3];
+    logic [1:0] transpose_load_idx;
+    logic [1:0] transpose_emit_idx;
+    logic       transpose_loading;
+    logic       transpose_emitting;
+
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            transpose_rows[0]  <= '0;
+            transpose_rows[1]  <= '0;
+            transpose_rows[2]  <= '0;
+            transpose_rows[3]  <= '0;
+            transpose_load_idx <= '0;
+            transpose_emit_idx <= '0;
+            transpose_loading  <= 1'b0;
+            transpose_emitting <= 1'b0;
+        end else begin
+            // LOAD phase logic
+            if (opcode_input == OP_TRANSPOSE_LOAD) begin
+                transpose_loading  <= 1'b1;
+                transpose_load_idx <= 2'd0;
+                transpose_rows[0]  <= eastbound_in;
+            end else if (transpose_loading) begin
+                transpose_rows[transpose_load_idx + 1'b1] <= eastbound_in;
+                if (transpose_load_idx == 2'd2) begin
+                    transpose_loading <= 1'b0;
+                end
+                transpose_load_idx <= transpose_load_idx + 1'b1;
+            end
+
+            // EMIT phase logic
+            if (opcode_input == OP_TRANSPOSE_EMIT) begin
+                transpose_emitting <= 1'b1;
+                transpose_emit_idx <= 2'd1;
+            end else if (transpose_emitting) begin
+                if (transpose_emit_idx == 2'd3) begin
+                    transpose_emitting <= 1'b0;
+                end
+                transpose_emit_idx <= transpose_emit_idx + 1'b1;
+            end
+        end
+    end
+
+    logic [1:0] current_emit_idx;
+    assign current_emit_idx = (opcode_input == OP_TRANSPOSE_EMIT) ? 2'd0 : transpose_emit_idx;
+
+    logic is_emitting;
+    assign is_emitting = transpose_emitting || (opcode_input == OP_TRANSPOSE_EMIT);
+
+    superlane_t transpose_emit_row;
+    always_comb begin
+        case (current_emit_idx)
+            2'd0: begin
+                transpose_emit_row[7:0]   = transpose_rows[0][7:0];
+                transpose_emit_row[15:8]  = transpose_rows[1][7:0];
+                transpose_emit_row[23:16] = transpose_rows[2][7:0];
+                transpose_emit_row[31:24] = transpose_rows[3][7:0];
+            end
+            2'd1: begin
+                transpose_emit_row[7:0]   = transpose_rows[0][15:8];
+                transpose_emit_row[15:8]  = transpose_rows[1][15:8];
+                transpose_emit_row[23:16] = transpose_rows[2][15:8];
+                transpose_emit_row[31:24] = transpose_rows[3][15:8];
+            end
+            2'd2: begin
+                transpose_emit_row[7:0]   = transpose_rows[0][23:16];
+                transpose_emit_row[15:8]  = transpose_rows[1][23:16];
+                transpose_emit_row[23:16] = transpose_rows[2][23:16];
+                transpose_emit_row[31:24] = transpose_rows[3][23:16];
+            end
+            2'd3: begin
+                transpose_emit_row[7:0]   = transpose_rows[0][31:24];
+                transpose_emit_row[15:8]  = transpose_rows[1][31:24];
+                transpose_emit_row[23:16] = transpose_rows[2][31:24];
+                transpose_emit_row[31:24] = transpose_rows[3][31:24];
+            end
+            default: transpose_emit_row = '0;
+        endcase
+    end
 
     // -------------------------------------------------------------------------
     // 3. Delay-line update
@@ -106,41 +172,35 @@ module sxm (
     endfunction
 
     // -------------------------------------------------------------------------
-    // 5. Current router outputs
+    // 5. Current router outputs & Transpose emission switch
     // -------------------------------------------------------------------------
-    //
-    // This is the existing normal SXM behavior. When you add transpose mode,
-    // this is where you will eventually choose:
-    //
-    // if (transpose_emitting) begin
-    //     eastbound_out = transpose_emit_row;
-    //     westbound_out = transpose_emit_row;
-    // end else begin
-    //     // current router behavior below
-    // end
-    //
     always_comb begin
         eastbound_out = '0;
         westbound_out = '0;
 
-        for (int lane = 0; lane < 4; lane++) begin
-            eastbound_out[lane*8 +: 8] = route_byte(
-                opcode_input[lane*3 +: 3],
-                eastbound_in,
-                input_d1,
-                input_d2,
-                input_d3,
-                lane
-            );
+        if (is_emitting) begin
+            eastbound_out = transpose_emit_row;
+            westbound_out = transpose_emit_row;
+        end else begin
+            for (int lane = 0; lane < 4; lane++) begin
+                eastbound_out[lane*8 +: 8] = route_byte(
+                    opcode_input[lane*3 +: 3],
+                    eastbound_in,
+                    input_d1,
+                    input_d2,
+                    input_d3,
+                    lane
+                );
 
-            westbound_out[lane*8 +: 8] = route_byte(
-                opcode_weight[lane*3 +: 3],
-                westbound_in,
-                weight_d1,
-                weight_d2,
-                weight_d3,
-                lane
-            );
+                westbound_out[lane*8 +: 8] = route_byte(
+                    opcode_weight[lane*3 +: 3],
+                    westbound_in,
+                    weight_d1,
+                    weight_d2,
+                    weight_d3,
+                    lane
+                );
+            end
         end
     end
 

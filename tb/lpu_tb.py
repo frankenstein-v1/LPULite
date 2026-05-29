@@ -677,6 +677,81 @@ async def test_lpu_full_mxm_to_vxm_softmax_quant_rows_to_mem0(dut):
     assert int(dut.vxm_input_overflow_dbg.value) == 0, "VXM input FIFO overflowed unexpectedly"
 
 
+@cocotb.test()
+async def test_lpu_sxm_transpose_to_mem0(dut):
+    """Verify end-to-end matrix transposition using the SXM module and buses."""
+    cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
+
+    input_matrix = [
+        [0x01, 0x02, 0x03, 0x04], # Row 0
+        [0x05, 0x06, 0x07, 0x08], # Row 1
+        [0x09, 0x0A, 0x0B, 0x0C], # Row 2
+        [0x0D, 0x0E, 0x0F, 0x10], # Row 3
+    ]
+    
+    expected_transposed = [
+        [0x01, 0x05, 0x09, 0x0D], # Col 0
+        [0x02, 0x06, 0x0A, 0x0E], # Col 1
+        [0x03, 0x07, 0x0B, 0x0F], # Col 2
+        [0x04, 0x08, 0x0C, 0x10], # Col 3
+    ]
+    
+    # Preload inputs into MEM0 at addresses 0..3
+    for r in range(4):
+        preload_mem0_word(dut, addr=r, values=input_matrix[r])
+        
+    # Program sequence:
+    # PC 0: read MEM0[0]
+    # PC 1: read MEM0[1], route MEM0[0] to SXM
+    # PC 2: read MEM0[2], route MEM0[1] to SXM, trigger SXM Transpose LOAD
+    # PC 3: read MEM0[3], route MEM0[2] to SXM
+    # PC 4: route MEM0[3] to SXM
+    # PC 5: Idle
+    # PC 6: Route SXM to MEM0[10], trigger SXM Transpose EMIT
+    # PC 7: Route SXM to MEM0[11]
+    # PC 8: Route SXM to MEM0[12]
+    # PC 9: Route SXM to MEM0[13]
+    program = [
+        # PC 0
+        build_instruction(mem0_read_en=1, mem0_addr=0),
+        # PC 1
+        build_instruction(mem0_read_en=1, mem0_addr=1, eastbound_sel=EB_MEM0, eastbound_consumer_sel=EC_SXM),
+        # PC 2
+        build_instruction(mem0_read_en=1, mem0_addr=2, eastbound_sel=EB_MEM0, eastbound_consumer_sel=EC_SXM, sxm_opcode_input=0x5A5),
+        # PC 3
+        build_instruction(mem0_read_en=1, mem0_addr=3, eastbound_sel=EB_MEM0, eastbound_consumer_sel=EC_SXM),
+        # PC 4
+        build_instruction(eastbound_sel=EB_MEM0, eastbound_consumer_sel=EC_SXM),
+        # PC 5
+        build_instruction(),
+        # PC 6
+        build_instruction(eastbound_sel=EB_SXM, eastbound_consumer_sel=EC_MEM0, mem0_write_en=1, mem0_addr=10, sxm_opcode_input=0xA5A),
+        # PC 7
+        build_instruction(eastbound_sel=EB_SXM, eastbound_consumer_sel=EC_MEM0, mem0_write_en=1, mem0_addr=11),
+        # PC 8
+        build_instruction(eastbound_sel=EB_SXM, eastbound_consumer_sel=EC_MEM0, mem0_write_en=1, mem0_addr=12),
+        # PC 9
+        build_instruction(eastbound_sel=EB_SXM, eastbound_consumer_sel=EC_MEM0, mem0_write_en=1, mem0_addr=13),
+    ]
+    
+    preload_program(dut, program)
+
+    await reset_dut(dut)
+    await tick(dut, len(program) + 4)
+
+    # Verify that transposed rows are stored in MEM0[10..13]
+    for r in range(4):
+        observed_word = int(dut.u_lpu.u_mem0.sram_array[10 + r].value)
+        expected_word = pack_bytes(expected_transposed[r])
+        assert observed_word == expected_word, (
+            f"MEM0[10+{r}] transpose mismatch: got 0x{observed_word:08x}, "
+            f"expected 0x{expected_word:08x}"
+        )
+        
+    dut._log.info("End-to-end SXM Transpose integration test passed successfully!")
+
+
+
 
 
    

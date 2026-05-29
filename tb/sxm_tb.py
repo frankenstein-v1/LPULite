@@ -328,3 +328,78 @@ async def test_sxm_complete(dut):
         
     dut._log.info("SXM Cocotb Test Suite completed successfully! Printing summary table...")
     print_summary_table(dut._log.info)
+
+
+@cocotb.test()
+async def test_sxm_transpose(dut):
+    """Verify that the SXM Transpose LOAD and EMIT functionality operates correctly."""
+    cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
+    
+    dut._log.info("Starting SXM Transpose Mode Cocotb Test...")
+    
+    # 1. Reset
+    dut.rst_n.value = 0
+    dut.opcode_input.value = 0
+    dut.opcode_weight.value = 0
+    dut.eastbound_in.value = 0
+    dut.westbound_in.value = 0
+    await Timer(20, unit="ns")
+    dut.rst_n.value = 1
+    await Timer(10, unit="ns")
+    
+    # 4 rows we want to load and transpose:
+    input_matrix = [
+        [0x01, 0x02, 0x03, 0x04], # Row 0
+        [0x05, 0x06, 0x07, 0x08], # Row 1
+        [0x09, 0x0A, 0x0B, 0x0C], # Row 2
+        [0x0D, 0x0E, 0x0F, 0x10], # Row 3
+    ]
+    
+    # Expected transposed rows:
+    expected_transposed = [
+        [0x01, 0x05, 0x09, 0x0D], # Col 0
+        [0x02, 0x06, 0x0A, 0x0E], # Col 1
+        [0x03, 0x07, 0x0B, 0x0F], # Col 2
+        [0x04, 0x08, 0x0C, 0x10], # Col 3
+    ]
+    
+    # 2. LOAD phase
+    # Cycle 0: Trigger load with OP_TRANSPOSE_LOAD (12'h5A5) and drive first row
+    dut.opcode_input.value = 0x5A5
+    dut.eastbound_in.value = pack_superlane(input_matrix[0])
+    
+    await RisingEdge(dut.clk)
+    await NextTimeStep()
+    
+    # Cycles 1, 2, 3: continue loading other rows
+    for r in range(1, 4):
+        dut.opcode_input.value = 0 # No trigger opcode needed anymore
+        dut.eastbound_in.value = pack_superlane(input_matrix[r])
+        await RisingEdge(dut.clk)
+        await NextTimeStep()
+        
+    dut._log.info("SXM Transpose matrix loaded. Starting EMIT phase...")
+    
+    # 3. EMIT phase
+    # Cycle 0: Trigger emit with OP_TRANSPOSE_EMIT (12'hA5A)
+    dut.opcode_input.value = 0xA5A
+    
+    # Sample combinational output for row 0 immediately
+    await Timer(1, unit="ns")
+    obs_row0 = unpack_superlane(int(dut.eastbound_out.value))
+    assert obs_row0 == expected_transposed[0], f"Transpose Row 0 mismatch: expected {expected_transposed[0]}, got {obs_row0}"
+    
+    await RisingEdge(dut.clk)
+    await NextTimeStep()
+    
+    # Cycles 1, 2, 3: sample combinational outputs for other rows
+    for c in range(1, 4):
+        dut.opcode_input.value = 0 # No trigger opcode
+        await Timer(1, unit="ns")
+        obs_row = unpack_superlane(int(dut.eastbound_out.value))
+        assert obs_row == expected_transposed[c], f"Transpose Row {c} mismatch: expected {expected_transposed[c]}, got {obs_row}"
+        await RisingEdge(dut.clk)
+        await NextTimeStep()
+        
+    dut._log.info("SXM Transpose verification passed successfully!")
+

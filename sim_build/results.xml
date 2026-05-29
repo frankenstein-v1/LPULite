@@ -1,6 +1,11 @@
 <testsuites name="results">
   <testsuite name="all" package="all">
-    <property name="random_seed" value="1779905147" />
-    <testcase name="test_sxm_complete" classname="sxm_tb" file="C:\Users\z005a2rv\Documents\tinyLPU\tb\sxm_tb.py" lineno="203" time="0.05338406562805176" sim_time_ns="565.0" ratio_time="10583.682478149605" />
+    <property name="random_seed" value="1780064183" />
+    <testcase name="test_lpu_wrapper_smoke" classname="lpu_tb" file="C:\Users\z005a2rv\Documents\tinyLPU\tb\lpu_tb.py" lineno="294" time="0.024021387100219727" sim_time_ns="12.0" ratio_time="499.5548321141802" />
+    <testcase name="test_lpu_minimal_program_skeleton" classname="lpu_tb" file="C:\Users\z005a2rv\Documents\tinyLPU\tb\lpu_tb.py" lineno="304" time="0.0033485889434814453" sim_time_ns="91.0" ratio_time="27175.625774296903" />
+    <testcase name="test_lpu_mxm_to_vxm_softmax_quant_to_mem0" classname="lpu_tb" file="C:\Users\z005a2rv\Documents\tinyLPU\tb\lpu_tb.py" lineno="418" time="0.010445833206176758" sim_time_ns="420.99999999999994" ratio_time="40303.15166731335" />
+    <testcase name="test_lpu_mxm_row_store_to_mem0_full_width" classname="lpu_tb" file="C:\Users\z005a2rv\Documents\tinyLPU\tb\lpu_tb.py" lineno="551" time="0.005158424377441406" sim_time_ns="161.0" ratio_time="31211.080791273802" />
+    <testcase name="test_lpu_full_mxm_to_vxm_softmax_quant_rows_to_mem0" classname="lpu_tb" file="C:\Users\z005a2rv\Documents\tinyLPU\tb\lpu_tb.py" lineno="615" time="0.02531719207763672" sim_time_ns="1000.9999999999999" ratio_time="39538.34994537989" />
+    <testcase name="test_lpu_sxm_transpose_to_mem0" classname="lpu_tb" file="C:\Users\z005a2rv\Documents\tinyLPU\tb\lpu_tb.py" lineno="680" time="0.0076944828033447266" sim_time_ns="161.0" ratio_time="20924.083413379605" />
   </testsuite>
 </testsuites>

@@ -62,42 +62,29 @@ module quant #(
         end
     end
 
-    always_comb begin
-        for (int i = 0; i < LANES; i++) begin
-            lane_in[i] = ingress_data_reg[i*LANE_W +: LANE_W];
-        end
-    end
+    generate
+        for (genvar i = 0; i < LANES; i++) begin : g_quant_lanes
+            logic signed [LANE_W-1:0] lane_in_val;
+            assign lane_in_val = ingress_data_reg[i*LANE_W +: LANE_W];
 
-    //regular quant
-    always_comb begin
-        for (int i = 0; i < LANES; i++) begin
+            // regular quant
             logic signed [LANE_W+31:0] product;
             logic signed [LANE_W+31:0] rounded;
             logic signed [LANE_W-1:0]  scaled_val;
 
-            product = lane_in[i] * MULTIPLIER;
+            assign product = lane_in_val * MULTIPLIER;
+            assign rounded = (product >= 0)
+                ? (product + ({{(LANE_W+31){1'b0}}, 1'b1} <<< (SHIFT - 1)))
+                : (product - ({{(LANE_W+31){1'b0}}, 1'b1} <<< (SHIFT - 1)));
+            assign scaled_val = rounded >>> SHIFT;
+            assign regular_lane_q[i] = clip_signed_q8(scaled_val);
 
-            if (product >= 0)
-                rounded = product + ({{(LANE_W+31){1'b0}}, 1'b1} <<< (SHIFT - 1));
-            else
-                rounded = product - ({{(LANE_W+31){1'b0}}, 1'b1} <<< (SHIFT - 1));
-
-            scaled_val = rounded >>> SHIFT;
-            regular_lane_q[i] = clip_signed_q8(scaled_val);
+            // softmax quant
+            assign softmax_lane_q[i] = (lane_in_val <= 0) ? 8'd0 :
+                                       (lane_in_val >= 32'sd255) ? 8'd255 :
+                                       lane_in_val[7:0];
         end
-    end
-
-    //softmax quant
-    always_comb begin
-        for (int i = 0; i < LANES; i++) begin
-            if (lane_in[i] <=0)
-                softmax_lane_q[i] = 8'd0;
-            else if (lane_in[i] >= 32'sd255)
-                softmax_lane_q[i] = 8'd255;
-            else 
-                softmax_lane_q[i] = lane_in[i][7:0];
-        end
-    end
+    endgenerate
 
     always_comb begin
         regular_word = '0;
