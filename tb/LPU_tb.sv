@@ -27,12 +27,35 @@ module lpu_cocotb_top (
     output logic [31:0] westbound_payload_dbg,
     output logic        westbound_valid_dbg,
     output logic        mxm_west_en_dbg,
+    output mxm_row_t    mem0_stream_in_dbg,
+    output logic        mem0_write_from_east_dbg,
+    output logic        mem0_write_en_eff_dbg,
+    output logic        vxm_input_overflow_dbg,
 
     output mxm_row_t     eastbound_payload_dbg,
     output logic        eastbound_valid_dbg,
     output logic        sxm_east_en_dbg,
     output logic [31:0] sxm_stream_out_left_dbg,
     output logic [31:0] sxm_stream_out_top_dbg,
+    output mxm_row_t    vxm_stream_in_data_dbg,
+    output logic        vxm_in_valid_dbg,
+    output logic        vxm_in_ready_dbg,
+    output logic        vxm_input_fifo_full_dbg,
+    output logic        vxm_input_fifo_empty_dbg,
+    output mxm_row_t    vxm_scale_row_dbg,
+    output logic        vxm_scale_valid_dbg,
+    output mxm_row_t    vxm_softmax_in_row_dbg,
+    output logic        vxm_softmax_in_valid_dbg,
+    output logic [3:0]  vxm_softmax_launch_dbg,
+    output logic [3:0]  vxm_softmax_done_dbg,
+    output mxm_row_t    vxm_quant_in_row_dbg,
+    output logic        vxm_quant_in_valid_dbg,
+    output logic [31:0] vxm_stream_out_live_dbg,
+    output logic        vxm_out_valid_live_dbg,
+    output logic [31:0] vxm_stream_out_buf_dbg,
+    output logic        vxm_stream_out_buf_valid_dbg,
+    output logic        vxm_output_fifo_full_dbg,
+    output logic        vxm_output_fifo_empty_dbg,
 
     output logic        input_loaded_dbg,
     output logic signed [7:0] input_buf0,
@@ -91,12 +114,35 @@ module lpu_cocotb_top (
     assign westbound_payload_dbg     = u_lpu.westbound_payload;
     assign westbound_valid_dbg       = u_lpu.westbound_valid;
     assign mxm_west_en_dbg           = u_lpu.mxm_west_en;
+    assign mem0_stream_in_dbg        = u_lpu.mem0_stream_in;
+    assign mem0_write_from_east_dbg  = u_lpu.mem0_write_from_east;
+    assign mem0_write_en_eff_dbg     = u_lpu.mem0_write_en_eff;
+    assign vxm_input_overflow_dbg    = u_lpu.vxm_input_overflow;
 
     assign eastbound_payload_dbg     = u_lpu.eastbound_payload;
     assign eastbound_valid_dbg       = u_lpu.eastbound_valid;
     assign sxm_east_en_dbg           = u_lpu.sxm_east_en;
     assign sxm_stream_out_left_dbg   = u_lpu.sxm_stream_out_to_mxm_left;
     assign sxm_stream_out_top_dbg    = u_lpu.sxm_stream_out_to_mxm_top;
+    assign vxm_stream_in_data_dbg    = u_lpu.vxm_stream_in_data;
+    assign vxm_in_valid_dbg          = u_lpu.vxm_in_valid;
+    assign vxm_in_ready_dbg          = u_lpu.vxm_in_ready;
+    assign vxm_input_fifo_full_dbg   = u_lpu.vxm_fifo_full;
+    assign vxm_input_fifo_empty_dbg  = u_lpu.vxm_fifo_empty;
+    assign vxm_scale_row_dbg         = u_lpu.u_vxm.s3_scale_reg;
+    assign vxm_scale_valid_dbg       = u_lpu.u_vxm.s3_valid;
+    assign vxm_softmax_in_row_dbg    = u_lpu.u_vxm.s4_handoff_reg;
+    assign vxm_softmax_in_valid_dbg  = u_lpu.u_vxm.s4_valid;
+    assign vxm_softmax_launch_dbg    = u_lpu.u_vxm.softmax_launch_vec;
+    assign vxm_softmax_done_dbg      = u_lpu.u_vxm.softmax_valid_vec;
+    assign vxm_quant_in_row_dbg      = u_lpu.u_vxm.mux_out;
+    assign vxm_quant_in_valid_dbg    = u_lpu.u_vxm.quant_issue;
+    assign vxm_stream_out_live_dbg   = u_lpu.vxm_stream_out_live;
+    assign vxm_out_valid_live_dbg    = u_lpu.vxm_out_valid_live;
+    assign vxm_stream_out_buf_dbg    = u_lpu.vxm_stream_out_buf;
+    assign vxm_stream_out_buf_valid_dbg = u_lpu.vxm_stream_out_buf_valid_e;
+    assign vxm_output_fifo_full_dbg  = u_lpu.vxm_result_full;
+    assign vxm_output_fifo_empty_dbg = u_lpu.vxm_result_empty;
 
     assign input_loaded_dbg          = u_lpu.u_mxm.mxm_input_ingress_loaded;
     assign input_buf0                = u_lpu.u_mxm.mxm_input_ingress_reg[0];

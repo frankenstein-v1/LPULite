@@ -13,6 +13,8 @@ module mxm#(
     input logic westbound_valid, 
     input logic mxm_west_en, 
     input logic [1:0] mxm_ingress_mode, 
+    input logic mxm_input_is_signed,
+    input logic mxm_wght_is_signed,
     input logic signed [mxm_size-1 : 0][7:0] mxm_input_in,
     input logic [mxm_size-1 : 0] wght_load,
     input logic signed [mxm_size-1 : 0][7:0] wght_val,
@@ -146,8 +148,10 @@ generate
             .rst(rst),
             .en(mxm_start),
             .input_in(mxm_input_feed[r]),
+            .input_is_signed(mxm_input_is_signed),
             .weight_load(mxm_wght_load_feed[c]),
             .weight_value(mxm_wght_feed[c]),
+            .weight_is_signed(mxm_wght_is_signed),
             .product(product_wire[r][c])
         );
 

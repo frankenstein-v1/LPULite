@@ -1,0 +1,16 @@
+SIM ?= icarus
+TOPLEVEL_LANG ?= verilog
+
+PWD=$(shell pwd)
+
+VERILOG_SOURCES = $(PWD)/../src/mac.sv \
+    $(PWD)/../src/acc.sv \
+    $(PWD)/../src/mxm.sv \
+    $(PWD)/mxm_2x2_cocotb_top.sv
+
+TOPLEVEL = mxm_2x2_cocotb_top
+COCOTB_TEST_MODULES = mxm_modes_tb
+
+export WAVES=1
+
+include $(shell cocotb-config --makefiles)/Makefile.sim

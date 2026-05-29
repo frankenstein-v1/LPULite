@@ -20,7 +20,7 @@ module icu #(
     output logic [11:0] sxm_opcode_weight,
 
     // VXM Control (4 bits)
-    output logic [2:0] vxm_ctrl,
+    output logic [3:0] vxm_ctrl,
     output logic       vxm_data_sel,
 
     // bus control (12 bits)
@@ -82,7 +82,7 @@ module icu #(
     assign sxm_opcode_weight = current_instruction[57:46];
     
     // VXM control
-    assign vxm_ctrl      = current_instruction[73:71];
+    assign vxm_ctrl      = current_instruction[74:71];
     assign vxm_data_sel  = current_instruction[76];
 
     // MXM control

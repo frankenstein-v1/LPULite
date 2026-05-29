@@ -39,9 +39,54 @@ def pack_bytes(values):
         word |= (value & 0xFF) << (8 * idx)
     return word
 
+
+def pack_mxm_row(values):
+    row = 0
+    for idx, value in enumerate(values):
+        row |= (value & 0xFFFFFFFF) << (32 * idx)
+    return row
+
 #read.  signed vector
 def signed_value(handle):
     return int(handle.value.to_signed())
+
+
+def clip_unsigned_q8(value):
+    if value <= 0:
+        return 0
+    if value >= 255:
+        return 255
+    return value & 0xFF
+
+
+def exp_expected(q_value):
+    ln2 = 177
+    coeff_a = 92
+    coeff_b = 346
+    coeff_c = 88
+
+    z_value = (-q_value) // ln2
+    p_value = q_value + (z_value * ln2)
+    t_value = p_value + coeff_b
+    t_squared = t_value * t_value
+    q_poly = ((coeff_a * t_squared) >> 16) + coeff_c
+    return q_poly >> z_value
+
+
+def softmax_expected(lanes):
+    lane_max = max(lanes)
+    lane_sub = [lane - lane_max for lane in lanes]
+    lane_exp = [exp_expected(lane) for lane in lane_sub]
+    sum_exp = sum(lane_exp)
+    quotient = (1 << 30) // sum_exp
+    shift = 30 - 8
+    return [(quotient * lane) >> shift for lane in lane_exp]
+
+
+def scale_softmax_quant_expected(lanes):
+    scaled_lanes = [lane >> 1 for lane in lanes]
+    softmax_lanes = softmax_expected(scaled_lanes)
+    return [clip_unsigned_q8(lane) for lane in softmax_lanes]
 
 
 def _set_field(word, value, lsb, width):
@@ -63,9 +108,8 @@ def build_instruction(
     mem1_addr=0,
     sxm_opcode_input=0,
     sxm_opcode_weight=0,
-    vxm_math_op=0,
-    vxm_accum_en=0,
-    vxm_flush=0,
+    vxm_ctrl=0,
+    vxm_data_sel=0,
     mxm_ingress_mode=INGRESS_NONE,
     mxm_start=0,
     mxm_clear=0,
@@ -96,10 +140,9 @@ def build_instruction(
     word = _set_field(word, sxm_opcode_input, 34, 12)
     word = _set_field(word, sxm_opcode_weight, 46, 12)
 
-    # vxm control [61:58]
-    word = _set_field(word, vxm_math_op, 58, 2)
-    word = _set_field(word, vxm_accum_en, 60, 1)
-    word = _set_field(word, vxm_flush, 61, 1)
+    # vxm control [76:71]
+    word = _set_field(word, vxm_ctrl, 71, 4)
+    word = _set_field(word, vxm_data_sel, 76, 1)
 
     # mxm control [70:62]
     word = _set_field(word, mxm_ingress_mode, 62, 2)
@@ -138,6 +181,114 @@ def preload_mem0_word(dut, addr, values):
 def preload_mem1_word(dut, addr, values):
     """Write one packed 32-bit word directly into MEM1 SRAM."""
     dut.u_lpu.u_mem1.sram_array[addr].value = pack_bytes(values)
+
+
+def preload_program(dut, instructions, *, trailing_nops=64):
+    for pc, instruction_word in enumerate(instructions):
+        preload_instruction(dut, pc, instruction_word)
+    for pc in range(len(instructions), len(instructions) + trailing_nops):
+        preload_instruction(dut, pc, build_instruction())
+
+
+def matmul_expected(a_matrix, b_matrix):
+    expected = [[0 for _ in range(4)] for _ in range(4)]
+    for row in range(4):
+        for col in range(4):
+            for k_idx in range(4):
+                expected[row][col] += a_matrix[row][k_idx] * b_matrix[k_idx][col]
+    return expected
+
+
+def read_mxm_matrix(dut):
+    return [
+        [
+            signed_value(dut.mxm_out_00_dbg),
+            signed_value(dut.mxm_out_01_dbg),
+            signed_value(dut.mxm_out_02_dbg),
+            signed_value(dut.mxm_out_03_dbg),
+        ],
+        [
+            signed_value(dut.mxm_out_10_dbg),
+            signed_value(dut.mxm_out_11_dbg),
+            signed_value(dut.mxm_out_12_dbg),
+            signed_value(dut.mxm_out_13_dbg),
+        ],
+        [
+            signed_value(dut.mxm_out_20_dbg),
+            signed_value(dut.mxm_out_21_dbg),
+            signed_value(dut.mxm_out_22_dbg),
+            signed_value(dut.mxm_out_23_dbg),
+        ],
+        [
+            signed_value(dut.mxm_out_30_dbg),
+            signed_value(dut.mxm_out_31_dbg),
+            signed_value(dut.mxm_out_32_dbg),
+            signed_value(dut.mxm_out_33_dbg),
+        ],
+    ]
+
+
+def append_mxm_k_slice(program, *, k_idx):
+    program.extend(
+        [
+            build_instruction(
+                mem1_read_en=1,
+                mem1_addr=k_idx,
+                westbound_sel=WB_MEM1,
+                westbound_consumer_sel=WC_MXM,
+                mxm_ingress_mode=INGRESS_WGHT,
+            ),
+            build_instruction(
+                westbound_sel=WB_MEM1,
+                westbound_consumer_sel=WC_MXM,
+                mxm_ingress_mode=INGRESS_WGHT,
+            ),
+            build_instruction(
+                mem0_read_en=1,
+                mem0_addr=k_idx,
+                westbound_sel=WB_MEM0,
+                westbound_consumer_sel=WC_MXM,
+                mxm_ingress_mode=INGRESS_INPUT,
+            ),
+            build_instruction(
+                westbound_sel=WB_MEM0,
+                westbound_consumer_sel=WC_MXM,
+                mxm_ingress_mode=INGRESS_INPUT,
+            ),
+            build_instruction(mxm_start=1),
+            build_instruction(mxm_start=1),
+        ]
+    )
+
+
+def append_vxm_row_store(program, *, row_idx, target_addr, wait_cycles=10, store_cycles=4):
+    program.append(
+        build_instruction(
+            eastbound_sel=EB_MXM,
+            eastbound_consumer_sel=EC_VXM,
+            mxm_e_row_sel=row_idx,
+            mxm_e_valid_in=1,
+            vxm_ctrl=0b1100,
+            vxm_data_sel=1,
+        )
+    )
+    program.append(
+        build_instruction(
+            vxm_ctrl=0b1100,
+            vxm_data_sel=1,
+        )
+    )
+    for _ in range(wait_cycles):
+        program.append(build_instruction())
+    for _ in range(store_cycles):
+        program.append(
+            build_instruction(
+                eastbound_sel=EB_VXM,
+                eastbound_consumer_sel=EC_MEM0,
+                mem0_write_en=1,
+                mem0_addr=target_addr,
+            )
+        )
 
 
 @cocotb.test()
@@ -262,6 +413,268 @@ async def test_lpu_minimal_program_skeleton(dut):
     await tick(dut, 2)
 
     assert signed_value(dut.mxm_out_00_dbg) == 6
+
+
+@cocotb.test()
+async def test_lpu_mxm_to_vxm_softmax_quant_to_mem0(dut):
+    cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
+
+    weights = [3, 0, 0, 0]
+    inputs = [2, 0, 0, 0]
+    expected_mxm_row = [6, 0, 0, 0]
+    expected_mem0_word = pack_bytes(scale_softmax_quant_expected(expected_mxm_row))
+    target_addr = 1
+
+    preload_mem1_word(dut, addr=0, values=weights)
+    preload_mem0_word(dut, addr=0, values=inputs)
+
+    program = [
+        build_instruction(
+            mem1_read_en=1,
+            mem1_addr=0,
+            westbound_sel=WB_MEM1,
+            westbound_consumer_sel=WC_MXM,
+            mxm_ingress_mode=INGRESS_WGHT,
+        ),
+        build_instruction(
+            westbound_sel=WB_MEM1,
+            westbound_consumer_sel=WC_MXM,
+            mxm_ingress_mode=INGRESS_WGHT,
+        ),
+        build_instruction(
+            mem0_read_en=1,
+            mem0_addr=0,
+            westbound_sel=WB_MEM0,
+            westbound_consumer_sel=WC_MXM,
+            mxm_ingress_mode=INGRESS_INPUT,
+        ),
+        build_instruction(
+            westbound_sel=WB_MEM0,
+            westbound_consumer_sel=WC_MXM,
+            mxm_ingress_mode=INGRESS_INPUT,
+        ),
+        build_instruction(mxm_start=1),
+        build_instruction(mxm_start=1),
+        build_instruction(),
+        build_instruction(),
+        build_instruction(),
+        build_instruction(),
+        build_instruction(
+            eastbound_sel=EB_MXM,
+            eastbound_consumer_sel=EC_VXM,
+            mxm_e_row_sel=0,
+            mxm_e_valid_in=1,
+            vxm_ctrl=0b1100,
+            vxm_data_sel=1,
+        ),
+        build_instruction(
+            vxm_ctrl=0b1100,
+            vxm_data_sel=1,
+        ),
+        build_instruction(),
+        build_instruction(),
+        build_instruction(),
+        build_instruction(),
+        build_instruction(),
+        build_instruction(),
+        build_instruction(),
+        build_instruction(),
+        build_instruction(),
+        build_instruction(),
+        build_instruction(),
+        build_instruction(),
+        build_instruction(),
+        build_instruction(),
+        build_instruction(),
+        build_instruction(
+            eastbound_sel=EB_VXM,
+            eastbound_consumer_sel=EC_MEM0,
+            mem0_write_en=1,
+            mem0_addr=target_addr,
+        ),
+        build_instruction(
+            eastbound_sel=EB_VXM,
+            eastbound_consumer_sel=EC_MEM0,
+            mem0_write_en=1,
+            mem0_addr=target_addr,
+        ),
+        build_instruction(
+            eastbound_sel=EB_VXM,
+            eastbound_consumer_sel=EC_MEM0,
+            mem0_write_en=1,
+            mem0_addr=target_addr,
+        ),
+        build_instruction(
+            eastbound_sel=EB_VXM,
+            eastbound_consumer_sel=EC_MEM0,
+            mem0_write_en=1,
+            mem0_addr=target_addr,
+        ),
+        build_instruction(
+            eastbound_sel=EB_VXM,
+            eastbound_consumer_sel=EC_MEM0,
+            mem0_write_en=1,
+            mem0_addr=target_addr,
+        ),
+        build_instruction(
+            eastbound_sel=EB_VXM,
+            eastbound_consumer_sel=EC_MEM0,
+            mem0_write_en=1,
+            mem0_addr=target_addr,
+        ),
+        build_instruction(
+            eastbound_sel=EB_VXM,
+            eastbound_consumer_sel=EC_MEM0,
+            mem0_write_en=1,
+            mem0_addr=target_addr,
+        ),
+        build_instruction(
+            eastbound_sel=EB_VXM,
+            eastbound_consumer_sel=EC_MEM0,
+            mem0_write_en=1,
+            mem0_addr=target_addr,
+        ),
+    ]
+    preload_program(dut, program)
+
+    await reset_dut(dut)
+    await tick(dut, 40)
+
+    observed_word = int(dut.u_lpu.u_mem0.sram_array[target_addr].value)
+    assert observed_word == expected_mem0_word, (
+        f"MEM0[{target_addr}] mismatch: got 0x{observed_word:08x}, "
+        f"expected 0x{expected_mem0_word:08x}"
+    )
+    assert int(dut.vxm_input_overflow_dbg.value) == 0, "VXM input FIFO overflowed unexpectedly"
+
+
+@cocotb.test()
+async def test_lpu_mxm_row_store_to_mem0_full_width(dut):
+    cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
+
+    weights = [3, 0, 0, 0]
+    inputs = [2, 0, 0, 0]
+    target_addr = 8
+    expected_row = [6, 0, 0, 0]
+    expected_row_word = pack_mxm_row(expected_row)
+
+    preload_mem1_word(dut, addr=0, values=weights)
+    preload_mem0_word(dut, addr=0, values=inputs)
+
+    program = [
+        build_instruction(
+            mem1_read_en=1,
+            mem1_addr=0,
+            westbound_sel=WB_MEM1,
+            westbound_consumer_sel=WC_MXM,
+            mxm_ingress_mode=INGRESS_WGHT,
+        ),
+        build_instruction(
+            westbound_sel=WB_MEM1,
+            westbound_consumer_sel=WC_MXM,
+            mxm_ingress_mode=INGRESS_WGHT,
+        ),
+        build_instruction(
+            mem0_read_en=1,
+            mem0_addr=0,
+            westbound_sel=WB_MEM0,
+            westbound_consumer_sel=WC_MXM,
+            mxm_ingress_mode=INGRESS_INPUT,
+        ),
+        build_instruction(
+            westbound_sel=WB_MEM0,
+            westbound_consumer_sel=WC_MXM,
+            mxm_ingress_mode=INGRESS_INPUT,
+        ),
+        build_instruction(mxm_start=1),
+        build_instruction(mxm_start=1),
+        build_instruction(),
+        build_instruction(),
+        build_instruction(
+            eastbound_sel=EB_MXM,
+            eastbound_consumer_sel=EC_MEM0,
+            mem0_write_en=1,
+            mem0_addr=target_addr,
+            mxm_e_row_sel=0,
+            mxm_e_valid_in=1,
+        ),
+        build_instruction(),
+    ]
+    preload_program(dut, program)
+
+    await reset_dut(dut)
+    await tick(dut, len(program) + 4)
+
+    observed_row_word = int(dut.u_lpu.u_mem0.sram_array[target_addr].value)
+    assert observed_row_word == expected_row_word, (
+        f"MEM0[{target_addr}] full-row mismatch: got 0x{observed_row_word:032x}, "
+        f"expected 0x{expected_row_word:032x}"
+    )
+
+
+@cocotb.test()
+async def test_lpu_full_mxm_to_vxm_softmax_quant_rows_to_mem0(dut):
+    cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
+
+    a_matrix = [
+        [1, 2, 3, 4],
+        [5, 6, 7, 8],
+        [2, 0, 1, 3],
+        [4, 1, 0, 2],
+    ]
+    b_matrix = [
+        [1, 0, 2, 1],
+        [0, 1, 1, 0],
+        [3, 1, 0, 2],
+        [2, 1, 1, 1],
+    ]
+    expected_mxm = matmul_expected(a_matrix, b_matrix)
+    mem0_store_base = 16
+
+    for k_idx in range(4):
+        preload_mem0_word(
+            dut,
+            addr=k_idx,
+            values=[a_matrix[row][k_idx] for row in range(4)],
+        )
+        preload_mem1_word(
+            dut,
+            addr=k_idx,
+            values=[b_matrix[k_idx][col] for col in range(4)],
+        )
+
+    program = []
+    for k_idx in range(4):
+        append_mxm_k_slice(program, k_idx=k_idx)
+
+    program.extend([build_instruction(), build_instruction()])
+
+    for row_idx in range(4):
+        append_vxm_row_store(
+            program,
+            row_idx=row_idx,
+            target_addr=mem0_store_base + row_idx,
+        )
+
+    preload_program(dut, program)
+
+    await reset_dut(dut)
+    await tick(dut, len(program) + 8)
+
+    observed_mxm = read_mxm_matrix(dut)
+    assert observed_mxm == expected_mxm, (
+        f"MXM 4x4 mismatch: got={observed_mxm} expected={expected_mxm}"
+    )
+
+    for row_idx, expected_row in enumerate(expected_mxm):
+        observed_word = int(dut.u_lpu.u_mem0.sram_array[mem0_store_base + row_idx].value)
+        expected_word = pack_bytes(scale_softmax_quant_expected(expected_row))
+        assert observed_word == expected_word, (
+            f"MEM0[{mem0_store_base + row_idx}] mismatch: got 0x{observed_word:08x}, "
+            f"expected 0x{expected_word:08x} for row {row_idx}"
+        )
+
+    assert int(dut.vxm_input_overflow_dbg.value) == 0, "VXM input FIFO overflowed unexpectedly"
 
 
 

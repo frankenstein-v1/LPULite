@@ -11,6 +11,12 @@ VERILOG_SOURCES = $(PWD)/../src/lpu_pkg.sv \
     $(PWD)/../src/mem.sv \
     $(PWD)/../src/mxm.sv \
     $(PWD)/../src/sxm.sv \
+    $(PWD)/../src/row_fifo.sv \
+    $(PWD)/../src/lut_softmax_exp.sv \
+    $(PWD)/../src/lut_softmax_div.sv \
+    $(PWD)/../src/softmax.sv \
+    $(PWD)/../src/quant.sv \
+    $(PWD)/../src/vxm.sv \
     $(PWD)/../src/icu.sv \
     $(PWD)/../src/westbound_bus/westbound_bus.sv \
     $(PWD)/../src/westbound_bus/westbound_consumer_decode.sv \
@@ -21,7 +27,7 @@ VERILOG_SOURCES = $(PWD)/../src/lpu_pkg.sv \
     $(PWD)/LPU_tb.sv
 
 TOPLEVEL = lpu_cocotb_top
-MODULE = lpu_sxm_tb
+COCOTB_TEST_MODULES = lpu_tb
 
 # Enable VCD waveform dumping
 export WAVES=1

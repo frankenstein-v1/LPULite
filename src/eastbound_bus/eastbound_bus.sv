@@ -54,6 +54,10 @@ module eastbound_bus #(
             eastbound_valid = mem0_valid_e;
         end 
 
+        default: begin
+            eastbound_payload = '0;
+            eastbound_valid = 1'b0;
+        end
     endcase
     end 
 

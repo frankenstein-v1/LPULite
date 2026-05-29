@@ -1,12 +1,14 @@
 import lpu_pkg::*;
 
-module mem (
+module mem #(
+    parameter int DATA_W = $bits(superlane_t)
+) (
     input  logic clk,
     input  logic rst_n,       // Active-low reset signal
 
     // The Conveyor Belt (Streams)
-    input  superlane_t stream_in,
-    output superlane_t stream_out,
+    input  logic [DATA_W-1:0] stream_in,
+    output logic [DATA_W-1:0] stream_out,
 
     // Control Signals
     input  logic read_en,
@@ -14,8 +16,8 @@ module mem (
     input  logic [8:0] addr   // 9 bits to address 320 slots (0 to 511)
 );
 
-    // The actual SRAM vault (320 slots, each 32 bits wide)
-    superlane_t sram_array [0:MEM_DEPTH-1];
+    // The actual SRAM vault. Width is parameterized so LPU can use row-wide storage.
+    logic [DATA_W-1:0] sram_array [0:MEM_DEPTH-1];
 
     // Sequential logic: Everything happens strictly on the clock edge
     always_ff @(posedge clk or negedge rst_n) begin

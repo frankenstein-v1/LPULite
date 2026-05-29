@@ -1,13 +1,3 @@
-// ==============================================================================
-// LUT-based reciprocal approximation for the softmax normalization step.
-//
-// The block approximates:
-//     quotient ~= dividend / divisor
-//
-// by first approximating 1/divisor with a normalized mantissa LUT and then
-// scaling by dividend. It is tuned for the current softmax use case where
-// dividend = 1 << 30 and divisor = sum(exp_i) > 0.
-// ==============================================================================
 `default_nettype none
 `timescale 1ns/1ns
 

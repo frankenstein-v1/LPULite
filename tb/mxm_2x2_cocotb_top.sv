@@ -5,22 +5,24 @@ module mxm_2x2_cocotb_top (
     input  logic              rst,
     input  logic              mxm_clear,
     input  logic              mxm_start,
-    input  logic signed [7:0] input0,
-    input  logic signed [7:0] input1,
+    input  logic       [7:0]  input0,
+    input  logic       [7:0]  input1,
+    input  logic              input_is_signed,
     input  logic              wght_load0,
     input  logic              wght_load1,
-    input  logic signed [7:0] wght_val0,
-    input  logic signed [7:0] wght_val1,
+    input  logic       [7:0]  wght_val0,
+    input  logic       [7:0]  wght_val1,
+    input  logic              weight_is_signed,
     output logic signed [31:0] c00,
     output logic signed [31:0] c01,
     output logic signed [31:0] c10,
     output logic signed [31:0] c11
 );
 
-    logic signed [7:0] mxm_input_in [1:0];
-    logic              wght_load  [1:0];
-    logic signed [7:0] wght_val   [1:0];
-    logic signed [31:0] mxm_out   [1:0][1:0];
+    logic signed [1:0][7:0]  mxm_input_in;
+    logic        [1:0]       wght_load;
+    logic signed [1:0][7:0]  wght_val;
+    logic signed [1:0][1:0][31:0] mxm_out;
 
     assign mxm_input_in[0] = input0;
     assign mxm_input_in[1] = input1;
@@ -41,6 +43,12 @@ module mxm_2x2_cocotb_top (
         .rst(rst),
         .mxm_clear(mxm_clear),
         .mxm_start(mxm_start),
+        .westbound_payload('0),
+        .westbound_valid(1'b0),
+        .mxm_west_en(1'b0),
+        .mxm_ingress_mode(2'b00),
+        .mxm_input_is_signed(input_is_signed),
+        .mxm_wght_is_signed(weight_is_signed),
         .mxm_input_in(mxm_input_in),
         .wght_load(wght_load),
         .wght_val(wght_val),
