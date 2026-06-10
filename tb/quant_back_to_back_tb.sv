@@ -11,6 +11,7 @@ module quant_back_to_back_tb;
     logic signed [LANES*LANE_W-1:0]  x_input;
     logic                            out_valid;
     logic signed [LANES*8-1:0]       q_row_out;
+    logic [31:0]                     q_scale_out;
 
     quant #(
         .LANES(LANES),
@@ -22,7 +23,8 @@ module quant_back_to_back_tb;
         .mode_softmax(mode_softmax),
         .x_input(x_input),
         .out_valid(out_valid),
-        .q_row_out(q_row_out)
+        .q_row_out(q_row_out),
+        .q_scale_out(q_scale_out)
     );
 
     always #5 clk = ~clk;

@@ -35,6 +35,8 @@ logic mxm_clear;
 logic [1:0] mxm_e_row_sel;
 logic [1:0] mxm_e_col_sel;
 logic mxm_e_valid_in;
+logic mxm_input_is_signed;
+logic mxm_wght_is_signed;
 
 // typed bus select views
 westbound_consumer_e westbound_consumer_sel_t;
@@ -94,7 +96,9 @@ icu u_icu(
     .mxm_clear(mxm_clear),
     .mxm_e_row_sel(mxm_e_row_sel),
     .mxm_e_col_sel(mxm_e_col_sel),
-    .mxm_e_valid_in(mxm_e_valid_in)
+    .mxm_e_valid_in(mxm_e_valid_in),
+    .mxm_input_is_signed(mxm_input_is_signed),
+    .mxm_wght_is_signed(mxm_wght_is_signed)
 );
 
 //mux logic for mem0 input
@@ -166,8 +170,10 @@ always_ff @(posedge clk or negedge rst_n) begin
 end
 
 logic [31:0] vxm_stream_out_live;
+logic [31:0] vxm_stream_out_scale_live;
 logic        vxm_out_valid_live;
 logic [31:0] vxm_stream_out_buf;
+logic [31:0] vxm_stream_out_scale_buf;
 logic        vxm_stream_out_buf_valid_w;
 logic        vxm_stream_out_buf_valid_e;
 logic        vxm_out_ready;
@@ -177,6 +183,10 @@ logic        vxm_result_full;
 logic        vxm_result_empty;
 logic        vxm_result_take_west;
 logic        vxm_result_take_east;
+superlane_t  sxm_stream_out_to_mxm_left;
+superlane_t  sxm_stream_out_to_mxm_top;
+logic        sxm_emit_valid;
+logic        sxm_load_from_west;
 
 westbound_bus u_westbound_bus(
     .producer_sel(westbound_sel_t),
@@ -184,9 +194,9 @@ westbound_bus u_westbound_bus(
     .mem1_payload(mem1_stream_out[31:0]),
     .mem0_valid(mem0_valid),
     .mem1_valid(mem1_valid),
-    // SXM output is wired to the westbound bus to support matrix transposition writebacks
+    // SXM emits transpose rows onto westbound for downstream scheduling.
     .sxm_payload(sxm_stream_out_to_mxm_top),
-    .sxm_valid(1'b1), 
+    .sxm_valid(sxm_emit_valid),
     .vxm_payload(vxm_stream_out_buf),
     .vxm_valid(vxm_stream_out_buf_valid_w),
     .westbound_payload(westbound_payload),
@@ -216,6 +226,7 @@ always_comb begin
     mem0_payload_e_bus = '0;
 
     vxm_payload_e_bus[31:0] = vxm_stream_out_buf;
+    vxm_payload_e_bus[63:32] = vxm_stream_out_scale_buf;
     sxm_payload_e_bus[31:0] = sxm_stream_out_to_mxm_left;
     mem0_payload_e_bus = mem0_stream_out;
 end
@@ -240,9 +251,8 @@ eastbound_bus #(
     .mxm_valid_e(mxm_valid_e),
     .vxm_payload_e(vxm_payload_e_bus),
     .vxm_valid_e(vxm_stream_out_buf_valid_e),
-    // SXM output is wired to the eastbound bus to support matrix transposition writebacks
     .sxm_payload_e(sxm_payload_e_bus),
-    .sxm_valid_e(1'b1),
+    .sxm_valid_e(sxm_emit_valid),
     .mem0_payload_e(mem0_payload_e_bus),
     .mem0_valid_e(mem0_valid),
     .eastbound_payload(eastbound_payload),
@@ -278,18 +288,19 @@ always_ff @(posedge clk or negedge rst_n) begin
     end
 end
 
-superlane_t sxm_stream_out_to_mxm_left;
-superlane_t sxm_stream_out_to_mxm_top;
+assign sxm_load_from_west = sxm_west_en && westbound_valid;
 
 sxm u_sxm(
     .clk(clk),
     .rst_n(rst_n),
     .opcode_input(sxm_opcode_input),
     .opcode_weight(sxm_opcode_weight),
+    .load_from_west(sxm_load_from_west),
     .eastbound_in(sxm_e_payload_reg),
     .westbound_in(sxm_w_payload_reg),
     .eastbound_out(sxm_stream_out_to_mxm_left),
-    .westbound_out(sxm_stream_out_to_mxm_top)
+    .westbound_out(sxm_stream_out_to_mxm_top),
+    .emit_valid(sxm_emit_valid)
 );
 
 generate
@@ -309,8 +320,9 @@ mxm u_mxm(
     .westbound_valid(westbound_valid),
     .mxm_west_en(mxm_west_en),
     .mxm_ingress_mode(mxm_ingress_mode),
-    .mxm_input_is_signed(1'b1),
-    .mxm_wght_is_signed(1'b1),
+    .mxm_use_fp(1'b0),
+    .mxm_input_is_signed(mxm_input_is_signed),
+    .mxm_wght_is_signed(mxm_wght_is_signed),
     .mxm_input_in(mxm_input_in),
     .wght_load(wght_load),
     .wght_val(wght_val),
@@ -385,6 +397,20 @@ row_fifo #(
     .empty(vxm_result_empty)
 );
 
+row_fifo #(
+    .DATA_W(32),
+    .DEPTH(4)
+) u_vxm_output_scale_fifo (
+    .clk(clk),
+    .rst_n(rst_n),
+    .wr_en(vxm_result_wr_en),
+    .rd_en(vxm_result_rd_en),
+    .data_in(vxm_stream_out_scale_live),
+    .data_out(vxm_stream_out_scale_buf),
+    .full(),
+    .empty()
+);
+
 vxm #(
     .LANES(4),
     .LANE_W(32),
@@ -398,6 +424,7 @@ vxm #(
     .in_ready(vxm_in_ready),
     .vxm_ctrl(vxm_ctrl),
     .stream_out(vxm_stream_out_live),
+    .stream_out_scale(vxm_stream_out_scale_live),
     .out_valid(vxm_out_valid_live),
     .out_ready(vxm_out_ready)
 );

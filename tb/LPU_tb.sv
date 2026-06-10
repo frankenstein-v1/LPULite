@@ -51,8 +51,10 @@ module lpu_cocotb_top (
     output mxm_row_t    vxm_quant_in_row_dbg,
     output logic        vxm_quant_in_valid_dbg,
     output logic [31:0] vxm_stream_out_live_dbg,
+    output logic [31:0] vxm_stream_out_scale_live_dbg,
     output logic        vxm_out_valid_live_dbg,
     output logic [31:0] vxm_stream_out_buf_dbg,
+    output logic [31:0] vxm_stream_out_scale_buf_dbg,
     output logic        vxm_stream_out_buf_valid_dbg,
     output logic        vxm_output_fifo_full_dbg,
     output logic        vxm_output_fifo_empty_dbg,
@@ -138,8 +140,10 @@ module lpu_cocotb_top (
     assign vxm_quant_in_row_dbg      = u_lpu.u_vxm.mux_out;
     assign vxm_quant_in_valid_dbg    = u_lpu.u_vxm.quant_issue;
     assign vxm_stream_out_live_dbg   = u_lpu.vxm_stream_out_live;
+    assign vxm_stream_out_scale_live_dbg = u_lpu.vxm_stream_out_scale_live;
     assign vxm_out_valid_live_dbg    = u_lpu.vxm_out_valid_live;
     assign vxm_stream_out_buf_dbg    = u_lpu.vxm_stream_out_buf;
+    assign vxm_stream_out_scale_buf_dbg = u_lpu.vxm_stream_out_scale_buf;
     assign vxm_stream_out_buf_valid_dbg = u_lpu.vxm_stream_out_buf_valid_e;
     assign vxm_output_fifo_full_dbg  = u_lpu.vxm_result_full;
     assign vxm_output_fifo_empty_dbg = u_lpu.vxm_result_empty;

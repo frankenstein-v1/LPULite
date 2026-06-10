@@ -1,0 +1,33 @@
+SHELL := /usr/bin/env bash
+
+VERILATOR ?= verilator
+
+PWD := $(shell pwd)
+ROOT := $(PWD)/..
+CVFPU := $(ROOT)/third_party/cvfpu
+COMMON := $(CVFPU)/src/common_cells/src
+DIVSQRT := $(CVFPU)/src/fpu_div_sqrt_mvp/hdl
+
+include $(PWD)/cvfpu_sources.mk
+
+VFLAGS := --lint-only --sv -Wall -Wno-fatal -DHAVE_CVFPU -I$(CVFPU)/src/common_cells/include
+
+TOP := cvfpu_compile_smoke_top
+
+LOCAL_SOURCES = \
+	$(ROOT)/src/cvfpu_fp8_to_fp32_cast.sv \
+	$(ROOT)/src/cvfpu_fp32_fma.sv \
+	$(PWD)/cvfpu_compile_smoke_top.sv
+
+ALL_SOURCES = \
+	$(CVFPU_ALL_SOURCES) \
+	$(LOCAL_SOURCES)
+
+.PHONY: compile clean
+
+compile:
+	mkdir -p $(PWD)/sim_build_cvfpu_smoke
+	$(VERILATOR) $(VFLAGS) --top-module $(TOP) $(ALL_SOURCES)
+
+clean:
+	rm -rf $(PWD)/sim_build_cvfpu_smoke

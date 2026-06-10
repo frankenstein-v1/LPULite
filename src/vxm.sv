@@ -25,6 +25,7 @@ module vxm #(
 
     // Outputs
     output logic [31:0] stream_out,
+    output logic [31:0] stream_out_scale,
     output logic                    out_valid,
     input  logic                    out_ready
 );
@@ -63,6 +64,7 @@ module vxm #(
 
     //outputs for quantize & softmax & muxes
     logic [31:0]              quantize_out;
+    logic [31:0]              quantize_scale_out;
     logic                     quantize_valid;
     logic [3:0][ROW_W-1:0]    softmax_out_vec;
     logic [3:0]               softmax_valid_vec;
@@ -96,6 +98,7 @@ module vxm #(
     logic                     quant_inflight;
     logic                     quant_slot_available;
     logic [31:0]              stream_out_reg;
+    logic [31:0]              stream_out_scale_reg;
     logic                     stream_out_valid_reg;
 
     //extend from 1 lane to 4 lanes
@@ -209,6 +212,7 @@ module vxm #(
             softmax_result_valid[3] <= 1'b0;
             quant_inflight      <= 1'b0;
             stream_out_reg      <= '0;
+            stream_out_scale_reg <= '0;
             stream_out_valid_reg <= 1'b0;
         end else begin
             // Launch idx update
@@ -268,6 +272,7 @@ module vxm #(
 
             if (quantize_valid) begin
                 stream_out_reg       <= quantize_out;
+                stream_out_scale_reg <= quantize_scale_out;
                 stream_out_valid_reg <= 1'b1;
             end else if (stream_out_valid_reg && out_ready) begin
                 stream_out_valid_reg <= 1'b0;
@@ -331,10 +336,12 @@ module vxm #(
         .mode_softmax(quant_mode_softmax),
         .x_input(mux_out),
         .out_valid(quantize_valid),
-        .q_row_out(quantize_out)
+        .q_row_out(quantize_out),
+        .q_scale_out(quantize_scale_out)
     );
 
     assign stream_out = stream_out_reg;
+    assign stream_out_scale = stream_out_scale_reg;
     assign out_valid = stream_out_valid_reg;
     assign in_ready = !stall_pipeline;
 

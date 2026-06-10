@@ -29,13 +29,15 @@ module icu #(
     output logic [2:0] westbound_consumer_sel,
     output logic [2:0] eastbound_consumer_sel,
 
-    // mxm control (9 bits)
+    // mxm control (11 bits)
     output logic [1:0] mxm_ingress_mode,
     output logic      mxm_start,
     output logic      mxm_clear,
     output logic [1:0] mxm_e_row_sel,
     output logic [1:0] mxm_e_col_sel,
-    output logic      mxm_e_valid_in
+    output logic      mxm_e_valid_in,
+    output logic      mxm_input_is_signed,
+    output logic      mxm_wght_is_signed
 );
 
     // 1. THE INSTRUCTION MEMORY (IMEM)
@@ -92,5 +94,7 @@ module icu #(
     assign mxm_e_row_sel    = current_instruction[67:66];
     assign mxm_e_col_sel    = current_instruction[69:68];
     assign mxm_e_valid_in   = current_instruction[70];
+    assign mxm_input_is_signed = current_instruction[77];
+    assign mxm_wght_is_signed  = current_instruction[78];
 
 endmodule

@@ -2,6 +2,9 @@
 
 `include "../src/lpu_pkg.sv"
 `include "../src/mac.sv"
+`include "../src/int_mac.sv"
+`include "../src/cvfpu_fp8_to_fp32_cast.sv"
+`include "../src/cvfpu_fp32_fma.sv"
 `include "../src/acc.sv"
 `include "../src/mem.sv"
 `include "../src/mxm.sv"

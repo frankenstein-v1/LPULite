@@ -1,0 +1,34 @@
+SIM ?= verilator
+TOPLEVEL_LANG ?= verilog
+
+PWD := $(shell pwd)
+ROOT := $(PWD)/..
+CVFPU := $(ROOT)/third_party/cvfpu
+COMMON := $(CVFPU)/src/common_cells/src
+DIVSQRT := $(CVFPU)/src/fpu_div_sqrt_mvp/hdl
+
+include $(PWD)/cvfpu_sources.mk
+
+VERILOG_SOURCES = \
+	$(CVFPU_ALL_SOURCES) \
+	$(ROOT)/src/cvfpu_fp8_to_fp32_cast.sv \
+	$(ROOT)/src/cvfpu_fp32_fma.sv \
+	$(ROOT)/src/mac.sv \
+	$(ROOT)/src/int_mac.sv \
+	$(ROOT)/src/acc.sv \
+	$(ROOT)/src/mxm.sv \
+	$(PWD)/mxm_fp_2x2_cocotb_top.sv
+
+TOPLEVEL = mxm_fp_2x2_cocotb_top
+COCOTB_TEST_MODULES = mxm_fp_tb
+
+COMPILE_ARGS += -DHAVE_CVFPU
+COMPILE_ARGS += -I$(CVFPU)/src/common_cells/include
+EXTRA_ARGS += --Wno-fatal
+EXTRA_ARGS += --trace-vcd
+SIM_ARGS += --trace
+SIM_ARGS += --trace-file $(SIM_BUILD)/mxm_fp.vcd
+
+export WAVES = 1
+
+include $(shell cocotb-config --makefiles)/Makefile.sim

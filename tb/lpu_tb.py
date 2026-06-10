@@ -116,6 +116,8 @@ def build_instruction(
     mxm_e_row_sel=0,
     mxm_e_col_sel=0,
     mxm_e_valid_in=0,
+    mxm_input_is_signed=1,
+    mxm_wght_is_signed=1,
 ):
     
     word = 0
@@ -151,6 +153,8 @@ def build_instruction(
     word = _set_field(word, mxm_e_row_sel, 66, 2)
     word = _set_field(word, mxm_e_col_sel, 68, 2)
     word = _set_field(word, mxm_e_valid_in, 70, 1)
+    word = _set_field(word, mxm_input_is_signed, 77, 1)
+    word = _set_field(word, mxm_wght_is_signed, 78, 1)
 
     return word
 
@@ -677,11 +681,7 @@ async def test_lpu_full_mxm_to_vxm_softmax_quant_rows_to_mem0(dut):
     assert int(dut.vxm_input_overflow_dbg.value) == 0, "VXM input FIFO overflowed unexpectedly"
 
 
-@cocotb.test()
-async def test_lpu_sxm_transpose_to_mem0(dut):
-    """Verify end-to-end matrix transposition using the SXM module and buses."""
-    cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
-
+async def run_lpu_sxm_transpose_case(dut, *, use_westbound: bool):
     input_matrix = [
         [0x01, 0x02, 0x03, 0x04], # Row 0
         [0x05, 0x06, 0x07, 0x08], # Row 1
@@ -711,28 +711,32 @@ async def test_lpu_sxm_transpose_to_mem0(dut):
     # PC 7: Route SXM to MEM0[11]
     # PC 8: Route SXM to MEM0[12]
     # PC 9: Route SXM to MEM0[13]
-    program = [
-        # PC 0
-        build_instruction(mem0_read_en=1, mem0_addr=0),
-        # PC 1
-        build_instruction(mem0_read_en=1, mem0_addr=1, eastbound_sel=EB_MEM0, eastbound_consumer_sel=EC_SXM),
-        # PC 2
-        build_instruction(mem0_read_en=1, mem0_addr=2, eastbound_sel=EB_MEM0, eastbound_consumer_sel=EC_SXM, sxm_opcode_input=0x5A5),
-        # PC 3
-        build_instruction(mem0_read_en=1, mem0_addr=3, eastbound_sel=EB_MEM0, eastbound_consumer_sel=EC_SXM),
-        # PC 4
-        build_instruction(eastbound_sel=EB_MEM0, eastbound_consumer_sel=EC_SXM),
-        # PC 5
-        build_instruction(),
-        # PC 6
-        build_instruction(eastbound_sel=EB_SXM, eastbound_consumer_sel=EC_MEM0, mem0_write_en=1, mem0_addr=10, sxm_opcode_input=0xA5A),
-        # PC 7
-        build_instruction(eastbound_sel=EB_SXM, eastbound_consumer_sel=EC_MEM0, mem0_write_en=1, mem0_addr=11),
-        # PC 8
-        build_instruction(eastbound_sel=EB_SXM, eastbound_consumer_sel=EC_MEM0, mem0_write_en=1, mem0_addr=12),
-        # PC 9
-        build_instruction(eastbound_sel=EB_SXM, eastbound_consumer_sel=EC_MEM0, mem0_write_en=1, mem0_addr=13),
-    ]
+    if use_westbound:
+        program = [
+            build_instruction(mem0_read_en=1, mem0_addr=0),
+            build_instruction(mem0_read_en=1, mem0_addr=1, westbound_sel=WB_MEM0, westbound_consumer_sel=WC_SXM),
+            build_instruction(mem0_read_en=1, mem0_addr=2, westbound_sel=WB_MEM0, westbound_consumer_sel=WC_SXM, sxm_opcode_input=0x5A5),
+            build_instruction(mem0_read_en=1, mem0_addr=3, westbound_sel=WB_MEM0, westbound_consumer_sel=WC_SXM),
+            build_instruction(westbound_sel=WB_MEM0, westbound_consumer_sel=WC_SXM),
+            build_instruction(),
+            build_instruction(westbound_sel=WB_SXM, westbound_consumer_sel=WC_MEM0, mem0_write_en=1, mem0_addr=10, sxm_opcode_input=0xA5A),
+            build_instruction(westbound_sel=WB_SXM, westbound_consumer_sel=WC_MEM0, mem0_write_en=1, mem0_addr=11),
+            build_instruction(westbound_sel=WB_SXM, westbound_consumer_sel=WC_MEM0, mem0_write_en=1, mem0_addr=12),
+            build_instruction(westbound_sel=WB_SXM, westbound_consumer_sel=WC_MEM0, mem0_write_en=1, mem0_addr=13),
+        ]
+    else:
+        program = [
+            build_instruction(mem0_read_en=1, mem0_addr=0),
+            build_instruction(mem0_read_en=1, mem0_addr=1, eastbound_sel=EB_MEM0, eastbound_consumer_sel=EC_SXM),
+            build_instruction(mem0_read_en=1, mem0_addr=2, eastbound_sel=EB_MEM0, eastbound_consumer_sel=EC_SXM, sxm_opcode_input=0x5A5),
+            build_instruction(mem0_read_en=1, mem0_addr=3, eastbound_sel=EB_MEM0, eastbound_consumer_sel=EC_SXM),
+            build_instruction(eastbound_sel=EB_MEM0, eastbound_consumer_sel=EC_SXM),
+            build_instruction(),
+            build_instruction(eastbound_sel=EB_SXM, eastbound_consumer_sel=EC_MEM0, mem0_write_en=1, mem0_addr=10, sxm_opcode_input=0xA5A),
+            build_instruction(eastbound_sel=EB_SXM, eastbound_consumer_sel=EC_MEM0, mem0_write_en=1, mem0_addr=11),
+            build_instruction(eastbound_sel=EB_SXM, eastbound_consumer_sel=EC_MEM0, mem0_write_en=1, mem0_addr=12),
+            build_instruction(eastbound_sel=EB_SXM, eastbound_consumer_sel=EC_MEM0, mem0_write_en=1, mem0_addr=13),
+        ]
     
     preload_program(dut, program)
 
@@ -749,6 +753,20 @@ async def test_lpu_sxm_transpose_to_mem0(dut):
         )
         
     dut._log.info("End-to-end SXM Transpose integration test passed successfully!")
+
+
+@cocotb.test()
+async def test_lpu_sxm_transpose_to_mem0(dut):
+    """Verify end-to-end matrix transposition through the eastbound SXM path."""
+    cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
+    await run_lpu_sxm_transpose_case(dut, use_westbound=False)
+
+
+@cocotb.test()
+async def test_lpu_sxm_transpose_westbound_to_mem0(dut):
+    """Verify end-to-end matrix transposition through the westbound SXM path."""
+    cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
+    await run_lpu_sxm_transpose_case(dut, use_westbound=True)
 
 
 

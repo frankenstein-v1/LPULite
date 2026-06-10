@@ -13,6 +13,7 @@ module mxm#(
     input logic westbound_valid, 
     input logic mxm_west_en, 
     input logic [1:0] mxm_ingress_mode, 
+    input logic mxm_use_fp,
     input logic mxm_input_is_signed,
     input logic mxm_wght_is_signed,
     input logic signed [mxm_size-1 : 0][7:0] mxm_input_in,
@@ -26,6 +27,10 @@ module mxm#(
 
 //wires that hold the product of each MAC units 
 logic signed [19:0] product_wire [mxm_size-1:0][mxm_size-1:0];
+logic signed [31:0] int_accum_wire [mxm_size-1:0][mxm_size-1:0];
+logic [31:0]        fp_accum_wire  [mxm_size-1:0][mxm_size-1:0];
+logic               fp_result_valid_wire [mxm_size-1:0][mxm_size-1:0];
+logic               fp_busy_wire         [mxm_size-1:0][mxm_size-1:0];
 
 //wire that holds the input vector that came in from the wb bus
 logic signed [7:0] mxm_input_ingress_reg [mxm_size-1:0];
@@ -143,28 +148,48 @@ genvar r, c;
 generate
     for(r = 0; r < mxm_size; r++) begin: row
         for(c = 0; c<mxm_size; c++) begin : col
-        mac u_mac(
-            .clk(clk),
-            .rst(rst),
-            .en(mxm_start),
-            .input_in(mxm_input_feed[r]),
-            .input_is_signed(mxm_input_is_signed),
-            .weight_load(mxm_wght_load_feed[c]),
-            .weight_value(mxm_wght_feed[c]),
-            .weight_is_signed(mxm_wght_is_signed),
-            .product(product_wire[r][c])
-        );
+            int_mac u_int_mac(
+                .clk(clk),
+                .rst(rst),
+                .en(mxm_start),
+                .input_in(mxm_input_feed[r]),
+                .input_is_signed(mxm_input_is_signed),
+                .weight_load(mxm_wght_load_feed[c]),
+                .weight_value(mxm_wght_feed[c]),
+                .weight_is_signed(mxm_wght_is_signed),
+                .product(product_wire[r][c])
+            );
 
-        acc u_acc(
-            .clk(clk),
-            .rst(rst),
-            .en(mxm_start),
-            .clear(mxm_clear),
-            .product_in(product_wire[r][c]),
-            .sum_out(mxm_out[r][c])
-        );
+            acc u_int_acc(
+                .clk(clk),
+                .rst(rst),
+                .en(mxm_start),
+                .clear(mxm_clear),
+                .product_in(product_wire[r][c]),
+                .sum_out(int_accum_wire[r][c])
+            );
 
+            mac u_fp_mac(
+                .clk(clk),
+                .rst(rst),
+                .en(mxm_start),
+                .clear(mxm_clear),
+                .input_in(mxm_input_feed[r]),
+                .input_is_signed(mxm_input_is_signed),
+                .weight_load(mxm_wght_load_feed[c]),
+                .weight_value(mxm_wght_feed[c]),
+                .weight_is_signed(mxm_wght_is_signed),
+                .accum_out(fp_accum_wire[r][c]),
+                .result_valid(fp_result_valid_wire[r][c]),
+                .busy(fp_busy_wire[r][c])
+            );
 
+            always_comb begin
+                if (mxm_use_fp)
+                    mxm_out[r][c] = fp_accum_wire[r][c];
+                else
+                    mxm_out[r][c] = int_accum_wire[r][c];
+            end
         end 
     end 
 
