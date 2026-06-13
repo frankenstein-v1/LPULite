@@ -1,5 +1,5 @@
 `timescale 1ns/1ps
-import lpu_pkg::*;
+`include "lpu_pkg.sv"
 
 module westbound_bus #(
     parameter int PAYLOAD_W = 32

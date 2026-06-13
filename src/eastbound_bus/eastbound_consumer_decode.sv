@@ -1,5 +1,5 @@
 `timescale 1ns/1ps
-import lpu_pkg::*;
+`include "lpu_pkg.sv"
 
 module eastbound_consumer_decode(
     input eastbound_consumer_e consumer_sel,

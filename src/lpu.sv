@@ -1,5 +1,5 @@
 `timescale 1ns/1ps
-import lpu_pkg::*;
+`include "lpu_pkg.sv"
 
 module lpu (
     input logic clk,
@@ -38,12 +38,12 @@ logic mxm_e_valid_in;
 logic mxm_input_is_signed;
 logic mxm_wght_is_signed;
 
-// typed bus select views
-westbound_consumer_e westbound_consumer_sel_t;
-eastbound_consumer_e eastbound_consumer_sel_t;
+// Encoded bus select views. Keep these as plain vectors for Icarus compatibility.
+logic [2:0] westbound_consumer_sel_t;
+logic [2:0] eastbound_consumer_sel_t;
 
-westbound_producer_e westbound_sel_t;
-eastbound_producer_e eastbound_sel_t;
+logic [2:0] westbound_sel_t;
+logic [2:0] eastbound_sel_t;
 
 // shared bus signals (to be driven by bus fabric later)
 superlane_t westbound_payload;
@@ -66,6 +66,9 @@ logic mxm_west_en;
 logic sxm_west_en;
 logic mem0_west_en;
 logic vxm_west_en;
+
+superlane_t sxm_stream_out_to_mxm_left;
+superlane_t sxm_stream_out_to_mxm_top;
 
 // mxm datapath
 logic signed [3:0][7:0]  mxm_input_in;
@@ -103,8 +106,8 @@ icu u_icu(
 
 //mux logic for mem0 input
 
-assign westbound_consumer_sel_t = westbound_consumer_e'(westbound_consumer_sel);
-assign eastbound_consumer_sel_t = eastbound_consumer_e'(eastbound_consumer_sel);
+assign westbound_consumer_sel_t = westbound_consumer_sel;
+assign eastbound_consumer_sel_t = eastbound_consumer_sel;
 
 assign mem0_write_from_west =
     mem0_write_en && (westbound_consumer_sel_t == WC_MEM0) && westbound_valid;
@@ -142,9 +145,9 @@ logic mem1_write_en_eff;
 
 assign mem1_write_en_eff = mem1_write_en && (eastbound_consumer_sel_t == EC_MEM1) && eastbound_valid;
 
-assign westbound_sel_t = westbound_producer_e'(westbound_sel);
+assign westbound_sel_t = westbound_sel;
 
-assign eastbound_sel_t = eastbound_producer_e'(eastbound_sel);
+assign eastbound_sel_t = eastbound_sel;
 
 mem #(
     .DATA_W($bits(mxm_row_t))
@@ -183,8 +186,6 @@ logic        vxm_result_full;
 logic        vxm_result_empty;
 logic        vxm_result_take_west;
 logic        vxm_result_take_east;
-superlane_t  sxm_stream_out_to_mxm_left;
-superlane_t  sxm_stream_out_to_mxm_top;
 logic        sxm_emit_valid;
 logic        sxm_load_from_west;
 

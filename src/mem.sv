@@ -1,4 +1,4 @@
-import lpu_pkg::*;
+`include "lpu_pkg.sv"
 
 module mem #(
     parameter int DATA_W = $bits(superlane_t)
