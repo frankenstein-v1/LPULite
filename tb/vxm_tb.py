@@ -117,6 +117,10 @@ async def reset_dut(dut):
     dut.in_valid.value = 0
     dut.vxm_ctrl.value = 0
     dut.out_ready.value = 1
+    if hasattr(dut, "layernorm_bypass"):
+        dut.layernorm_bypass.value = 1
+        dut.layernorm_gamma.value = pack_lanes([1, 1, 1, 1])
+        dut.layernorm_beta.value = pack_lanes([0, 0, 0, 0])
     await RisingEdge(dut.clk)
     await RisingEdge(dut.clk)
     dut.rst_n.value = 1
@@ -448,3 +452,49 @@ async def test_four_row_scale_softmax_quant_observe(dut):
     await Timer(2500, unit="ns")
     driver_task.cancel()
     dut.in_valid.value = 0
+
+
+@cocotb.test()
+async def test_layernorm_normal(dut):
+    cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
+    await reset_dut(dut)
+
+    # Enable LayerNorm (bypass = 0)
+    dut.layernorm_bypass.value = 0
+    # Set gamma = [2, 2, 2, 2], beta = [3, 3, 3, 3]
+    dut.layernorm_gamma.value = pack_lanes([2, 2, 2, 2])
+    dut.layernorm_beta.value = pack_lanes([3, 3, 3, 3])
+
+    # Input: [20, 10, 5, 1], bias: [0, 0, 0, 0]
+    # Expect output: [6, 3, 1, 0]
+    observed = await run_vxm_row(
+        dut,
+        [20, 10, 5, 1],
+        [0, 0, 0, 0],
+        ctrl=0b0000, # no bias, no relu, no scale, no softmax
+        signed_output=True,
+    )
+    assert observed == [6, 3, 1, 0], f"LayerNorm output mismatch: got {observed}, expected [6, 3, 1, 0]"
+
+
+@cocotb.test()
+async def test_layernorm_zero_variance(dut):
+    cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
+    await reset_dut(dut)
+
+    # Enable LayerNorm (bypass = 0)
+    dut.layernorm_bypass.value = 0
+    # Set gamma = [2, 2, 2, 2], beta = [3, 3, 3, 3]
+    dut.layernorm_gamma.value = pack_lanes([2, 2, 2, 2])
+    dut.layernorm_beta.value = pack_lanes([3, 3, 3, 3])
+
+    # Input with 0 variance: [5, 5, 5, 5]
+    observed = await run_vxm_row(
+        dut,
+        [5, 5, 5, 5],
+        [0, 0, 0, 0],
+        ctrl=0b0000,
+        signed_output=True,
+    )
+    assert observed == [3, 3, 3, 3], f"LayerNorm zero variance output mismatch: got {observed}, expected [3, 3, 3, 3]"
+

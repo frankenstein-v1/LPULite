@@ -23,6 +23,11 @@ module vxm #(
     // [3]: Softmax Bypass Sel (0: Quantize, 1: Softmax)
     input  logic [3:0]              vxm_ctrl,
 
+    // LayerNorm control and parameters
+    input  logic                    layernorm_bypass,
+    input  logic [LANES*LANE_W-1:0] layernorm_gamma,
+    input  logic [LANES*LANE_W-1:0] layernorm_beta,
+
     // Outputs
     output logic [31:0] stream_out,
     output logic [31:0] stream_out_scale,
@@ -326,6 +331,21 @@ module vxm #(
         end
     endgenerate
 
+    logic [LANES*LANE_W-1:0] layernorm_out;
+    logic [LANES*LANE_W-1:0] layernorm_mux_out;
+
+    lut_layernorm #(
+        .LANES(LANES),
+        .LANE_W(LANE_W)
+    ) layernorm_inst (
+        .x_in(mux_out),
+        .gamma(layernorm_gamma),
+        .beta(layernorm_beta),
+        .y_out(layernorm_out)
+    );
+
+    assign layernorm_mux_out = layernorm_bypass ? mux_out : layernorm_out;
+
     quant #(
         .LANES(LANES),
         .LANE_W(LANE_W)
@@ -334,7 +354,7 @@ module vxm #(
         .rst_n(rst_n),
         .in_valid(quant_issue),
         .mode_softmax(quant_mode_softmax),
-        .x_input(mux_out),
+        .x_input(layernorm_mux_out),
         .out_valid(quantize_valid),
         .q_row_out(quantize_out),
         .q_scale_out(quantize_scale_out)

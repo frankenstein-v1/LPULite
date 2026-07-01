@@ -13,11 +13,15 @@ def test_lpu():
         src_dir / "mem.sv",
         src_dir / "mxm.sv",
         src_dir / "sxm.sv",
+        src_dir / "int_mac.sv",
+        src_dir / "cvfpu_fp32_fma.sv",
+        src_dir / "cvfpu_fp8_to_fp32_cast.sv",
         src_dir / "row_fifo.sv",
         src_dir / "lut_softmax_exp.sv",
         src_dir / "lut_softmax_div.sv",
         src_dir / "softmax.sv",
         src_dir / "quant.sv",
+        src_dir / "lut_layernorm.sv",
         src_dir / "vxm.sv",
         src_dir / "icu.sv",
         src_dir / "westbound_bus/westbound_bus.sv",
@@ -33,6 +37,7 @@ def test_lpu():
     
     runner.build(
         sources=sources,
+        includes=[src_dir],
         hdl_toplevel="lpu_cocotb_top",
         always=True,
         waves=True,

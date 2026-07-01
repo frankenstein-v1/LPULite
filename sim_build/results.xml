@@ -1,11 +1,16 @@
 <testsuites name="results">
   <testsuite name="all" package="all">
-    <property name="random_seed" value="1780079866" />
-    <testcase name="test_lpu_wrapper_smoke" classname="lpu_tb" file="C:\Users\z005a2rv\Documents\tinyLPU\tb\lpu_tb.py" lineno="294" time="0.03159499168395996" sim_time_ns="12.0" ratio_time="379.8070314445476" />
-    <testcase name="test_lpu_minimal_program_skeleton" classname="lpu_tb" file="C:\Users\z005a2rv\Documents\tinyLPU\tb\lpu_tb.py" lineno="304" time="0.003328084945678711" sim_time_ns="91.0" ratio_time="27343.052081094633" />
-    <testcase name="test_lpu_mxm_to_vxm_softmax_quant_to_mem0" classname="lpu_tb" file="C:\Users\z005a2rv\Documents\tinyLPU\tb\lpu_tb.py" lineno="418" time="0.009855508804321289" sim_time_ns="420.99999999999994" ratio_time="42717.22631056922" />
-    <testcase name="test_lpu_mxm_row_store_to_mem0_full_width" classname="lpu_tb" file="C:\Users\z005a2rv\Documents\tinyLPU\tb\lpu_tb.py" lineno="551" time="0.005197286605834961" sim_time_ns="161.0" ratio_time="30977.702830405065" />
-    <testcase name="test_lpu_full_mxm_to_vxm_softmax_quant_rows_to_mem0" classname="lpu_tb" file="C:\Users\z005a2rv\Documents\tinyLPU\tb\lpu_tb.py" lineno="615" time="0.025099515914916992" sim_time_ns="1000.9999999999999" ratio_time="39881.24724768463" />
-    <testcase name="test_lpu_sxm_transpose_to_mem0" classname="lpu_tb" file="C:\Users\z005a2rv\Documents\tinyLPU\tb\lpu_tb.py" lineno="680" time="0.006703853607177734" sim_time_ns="161.0" ratio_time="24016.03755601394" />
+    <property name="random_seed" value="1782932697" />
+    <testcase name="test_lpu_wrapper_smoke" classname="lpu_tb" file="C:\Users\micha\Documents(Local)\Projects\tinyLPU\tb\lpu_tb.py" lineno="298" time="0.12142252922058105" sim_time_ns="12.0" ratio_time="98.82844705203198" />
+    <testcase name="test_lpu_minimal_program_skeleton" classname="lpu_tb" file="C:\Users\micha\Documents(Local)\Projects\tinyLPU\tb\lpu_tb.py" lineno="308" time="0.0025801658630371094" sim_time_ns="91.0" ratio_time="35269.05045278137" />
+    <testcase name="test_lpu_mxm_to_vxm_softmax_quant_to_mem0" classname="lpu_tb" file="C:\Users\micha\Documents(Local)\Projects\tinyLPU\tb\lpu_tb.py" lineno="422" time="0.006363630294799805" sim_time_ns="420.99999999999994" ratio_time="66157.20594957101" />
+    <testcase name="test_lpu_mxm_row_store_to_mem0_full_width" classname="lpu_tb" file="C:\Users\micha\Documents(Local)\Projects\tinyLPU\tb\lpu_tb.py" lineno="555" time="0.002910137176513672" sim_time_ns="161.0" ratio_time="55323.85253154187" />
+    <testcase name="test_lpu_full_mxm_to_vxm_softmax_quant_rows_to_mem0" classname="lpu_tb" file="C:\Users\micha\Documents(Local)\Projects\tinyLPU\tb\lpu_tb.py" lineno="619" time="0.019110679626464844" sim_time_ns="1000.9999999999999" ratio_time="52379.08957532811" />
+    <testcase name="test_lpu_sxm_transpose_to_mem0" classname="lpu_tb" file="C:\Users\micha\Documents(Local)\Projects\tinyLPU\tb\lpu_tb.py" lineno="758" time="0.00524592399597168" sim_time_ns="161.0" ratio_time="30690.494205335635">
+      <failure error_type="AssertionError" error_msg="MEM0[10+0] transpose mismatch: got 0x0105090d, expected 0x0d090501&#10;assert 17107213 == 218694913" />
+    </testcase>
+    <testcase name="test_lpu_sxm_transpose_westbound_to_mem0" classname="lpu_tb" file="C:\Users\micha\Documents(Local)\Projects\tinyLPU\tb\lpu_tb.py" lineno="765" time="0.004662275314331055" sim_time_ns="161.0" ratio_time="34532.49521861417">
+      <failure error_type="AssertionError" error_msg="MEM0[10+0] transpose mismatch: got 0x0105090d, expected 0x0d090501&#10;assert 17107213 == 218694913" />
+    </testcase>
   </testsuite>
 </testsuites>

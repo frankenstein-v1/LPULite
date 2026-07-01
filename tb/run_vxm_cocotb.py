@@ -7,6 +7,7 @@ def test_vxm():
     src_dir = (Path(__file__).parent / "../src").resolve()
     sources = [
         src_dir / "vxm.sv",
+        src_dir / "lut_layernorm.sv",
         src_dir / "softmax.sv",
         src_dir / "quant.sv",
         src_dir / "lut_softmax_exp.sv",

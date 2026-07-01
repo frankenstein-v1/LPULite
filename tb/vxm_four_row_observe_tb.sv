@@ -28,6 +28,9 @@ module vxm_four_row_observe_tb;
         .in_valid(in_valid),
         .in_ready(in_ready),
         .vxm_ctrl(vxm_ctrl),
+        .layernorm_bypass(1'b1),
+        .layernorm_gamma(128'h00000001000000010000000100000001),
+        .layernorm_beta(128'h00000000000000000000000000000000),
         .stream_out(stream_out),
         .out_valid(out_valid),
         .out_ready(out_ready)
