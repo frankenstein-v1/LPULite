@@ -498,3 +498,96 @@ async def test_layernorm_zero_variance(dut):
     )
     assert observed == [3, 3, 3, 3], f"LayerNorm zero variance output mismatch: got {observed}, expected [3, 3, 3, 3]"
 
+
+import random
+import math
+
+@cocotb.test()
+async def test_layernorm_random(dut):
+    cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
+    await reset_dut(dut)
+
+    # 1. Generate random inputs
+    data_lanes = [random.randint(-40, 40) for _ in range(LANES)]
+    gamma_lanes = [random.randint(1, 5) for _ in range(LANES)]
+    beta_lanes = [random.randint(-10, 10) for _ in range(LANES)]
+
+    # 2. Python reference calculation matching hardware logic exactly
+    sum_x = sum(data_lanes)
+    mean_u = sum_x >> 2 # signed arithmetic shift
+    
+    diffs = [x - mean_u for x in data_lanes]
+    sqs = [d * d for d in diffs]
+    sum_sq = sum(sqs)
+    variance = sum_sq >> 2 # signed arithmetic shift
+    
+    sigma2_idx = min(variance, 65535)
+    
+    # inv sqrt LUT calculation
+    if sigma2_idx == 0:
+        val = 0.00001
+    else:
+        val = float(sigma2_idx)
+    
+    # Compute using the exact same rounding as our SV code
+    inv_sqrt = 1.0 / math.sqrt(val)
+    lut_val = int(inv_sqrt * 65536.0 + 0.5)
+    
+    expected_before_quant = []
+    for d, g, b in zip(diffs, gamma_lanes, beta_lanes):
+        x_hat_large = d * lut_val
+        scaled_large = x_hat_large * g
+        scaled_shifted = scaled_large >> 16
+        out_lane = scaled_shifted + b
+        expected_before_quant.append(out_lane)
+
+    # Now calculate regular quantization of expected_before_quant
+    max_abs = max(abs(val) for val in expected_before_quant)
+    row_shift = 0
+    shifted_max = max_abs
+    while shifted_max > 127:
+        shifted_max >>= 1
+        row_shift += 1
+        
+    def round_shift_signed(val, shift):
+        if shift == 0:
+            return val
+        rounding = 1 << (shift - 1)
+        adjusted = (val + rounding) if val >= 0 else (val - rounding)
+        return adjusted >> shift
+
+    quantized = []
+    for val in expected_before_quant:
+        shifted = round_shift_signed(val, row_shift)
+        clipped = max(-127, min(127, shifted))
+        quantized.append(clipped)
+
+    # Print inputs and calculations to console
+    print(f"\n==============================================")
+    print(f"--- LAYER NORM RANDOM TEST ---")
+    print(f"Random Inputs: {data_lanes}")
+    print(f"Random Gamma:  {gamma_lanes}")
+    print(f"Random Beta:   {beta_lanes}")
+    print(f"Calculated Mean (u): {mean_u}")
+    print(f"Calculated Variance: {variance} (Index: {sigma2_idx})")
+    print(f"Calculated LUT Val:  {lut_val}")
+    print(f"Expected Out (Pre-Quant):  {expected_before_quant}")
+    print(f"Expected Out (Post-Quant): {quantized}")
+    print(f"==============================================\n")
+
+    # 3. Drive DUT
+    dut.layernorm_bypass.value = 0
+    dut.layernorm_gamma.value = pack_lanes(gamma_lanes)
+    dut.layernorm_beta.value = pack_lanes(beta_lanes)
+
+    observed = await run_vxm_row(
+        dut,
+        data_lanes,
+        [0, 0, 0, 0],
+        ctrl=0b0000, # no bias, no relu, no scale, no softmax
+        signed_output=True,
+    )
+
+    assert observed == quantized, f"Random test mismatch: got {observed}, expected {quantized}"
+
+
