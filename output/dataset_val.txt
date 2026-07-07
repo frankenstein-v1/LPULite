@@ -1,855 +1,546 @@
-leo finds the boat .
-leo finds an cookie .
-anna finds a stone .
-bob is the pilot .
-ranvijay likes a shirt .
-anna finds an bike .
-lily likes a desk .
-cloud is slow .
-anna has an bike .
-kai sees the horse .
-sky is yellow .
-omar finds an chair .
-frog wears slow shirt .
-zoe has an cup .
-messi likes a park .
-lebron has an car .
-mia likes the tree .
-bob likes the pizza .
-ronaldo has a apple .
-zoe finds a tree .
-leo finds the shoe .
-bear wears yellow shirt .
-bob likes the shoe .
-kai likes the stone .
-kai finds an pizza .
-messi likes the car .
-messi likes an game .
-tim has the bed .
-mia has a cookie .
-tim finds the cookie .
-kai has a book .
-tim likes the box .
-ivy has an apple .
-zoe finds an pizza .
-anna has the coin .
-mia is a king .
-zoe has a house .
-ranvijay likes the cup .
-ranvijay finds the car .
-mia likes an map .
-leo finds the shirt .
-lebron finds a hat .
-messi has a flower .
-kai likes the book .
-ranvijay sees a bear .
-ronaldo has a robot .
-ronaldo has an boat .
-ranvijay finds an box .
-zoe likes the robot .
-messi helps lily .
-anna has an map .
-leo likes a ball .
-car is small .
-anna has an cup .
-zoe helps omar .
-kai is the goat .
-ivy sees the frog .
-mia has the cup .
-nina finds a car .
-goat sees the duck .
-goat wears sad shirt .
-nina finds a train .
-mia has the coin .
-messi likes the tree .
-omar likes a chair .
-kai finds an phone .
-ronaldo has a box .
-ranvijay finds a house .
-omar sees a dog .
-leo finds the key .
-tim finds an robot .
-anna has the park .
-tim finds a boat .
-kai has the chair .
-omar likes the shoe .
-sam likes a kite .
-tim sees the horse .
-anna sees a goat .
-cat wears yellow shirt .
-nina has a cup .
-ronaldo likes a stone .
-messi is an artist .
-zoe has a boat .
-lily has an hat .
-lebron likes the book .
-toy is loud .
-bear wears tiny bag .
-anna finds a game .
-zoe finds the ball .
-duck wears big bag .
-tim finds a coin .
-mia has a map .
-ranvijay likes the bed .
-leo likes the plane .
-ivy likes a ball .
-tim finds the cake .
-water is happy .
-anna has a boat .
-nina likes an apple .
-mia has an bag .
-anna has a map .
-leo finds an robot .
-ronaldo finds an shirt .
-ronaldo helps max .
-lebron sees a cat .
-messi likes the key .
-tim has an book .
-zoe helps leo .
-messi finds a map .
-bob likes the robot .
-mouse wears big shirt .
-max has the ball .
-ivy finds an chair .
-nina likes a park .
-sam likes a hat .
-ivy has a game .
-ivy finds a bag .
-sam likes an cup .
-lily has an chair .
-max sees a bear .
-goat sees the cat .
-anna finds an stone .
-nina is a teacher .
-kai finds a book .
-mia likes the cup .
-lion wears sad shirt .
-mia has a bike .
-anna helps ronaldo .
-omar finds a park .
-ranvijay finds a phone .
-frog wears green shirt .
-anna has a bag .
-max finds an hat .
-leo has an house .
-messi likes the boat .
-anna likes an stone .
-lily has an tree .
-tim finds a phone .
-anna has the pizza .
-omar helps ranvijay .
-ranvijay has a bed .
-mouse sees the mouse .
-lebron finds an book .
-ronaldo finds a door .
-zoe likes an toy .
-max finds a map .
-anna likes the robot .
-tim helps anna .
-leo is the champion .
-dog wears quiet hat .
-lebron sees a frog .
-ivy likes the plane .
-anna likes the apple .
-frog sees a horse .
-kai sees a goat .
-leo has a ball .
-lion wears green hat .
-messi likes a key .
-anna has an box .
-lion sees a duck .
-mia finds the stone .
-bob likes an cup .
-fish wears fast shoe .
-ivy finds the flower .
-messi likes the coin .
-nina is the student .
-bob has the ball .
-duck sees the lion .
-max has a bike .
-lebron sees the mouse .
-leo likes a robot .
-mia has a cup .
-omar finds a cup .
-leo is a merchant .
-bear wears quiet shoe .
-ranvijay is the rookie .
-bird sees the bird .
-lebron finds an map .
-fish wears small shirt .
-max has an coin .
-omar has the cup .
-max sees a dog .
-messi is a winner .
-sam likes the door .
-messi sees the lion .
-tim likes an cake .
-max is a pilot .
-lebron has a robot .
-sam finds the train .
-max has an bike .
-max finds the park .
-ranvijay has an food .
-mia is the merchant .
-dog sees a goat .
-lebron has a toy .
-omar finds the train .
-zoe sees a duck .
-omar finds an box .
-lebron has a park .
-leo has an food .
-leo is a king .
-lebron is the goat .
-sam has the toy .
-messi has the robot .
-anna finds the pizza .
-ranvijay sees the goat .
-dog wears blue shoe .
-kai likes an chair .
-tim has a hat .
-mia has a kite .
-mia has an shirt .
-tim finds a kite .
-anna likes the bike .
-bear sees the cat .
-lion wears round bag .
-bob finds an coin .
-ronaldo is the friend .
-ronaldo has a pen .
-frog wears loud bag .
-messi is the king .
-max sees the duck .
-omar has an map .
-omar finds an train .
-tim has a train .
-ivy has a phone .
-sam likes the plane .
-ivy finds the pizza .
-kai finds a robot .
-lebron likes an cookie .
-tim is the merchant .
-max has an tree .
-ranvijay finds the pizza .
-mia helps leo .
-max likes a hat .
-nina likes a bag .
-ronaldo has a pizza .
-leo finds a game .
-ronaldo finds an door .
-leo sees a mouse .
-lebron has an desk .
-fish sees a mouse .
-ranvijay finds an phone .
-tim sees a duck .
-sam has a cookie .
-ranvijay has the food .
-omar likes an train .
-bob likes the bed .
-dog sees the horse .
-ronaldo has the book .
-ivy has the shoe .
-lebron likes a shirt .
-ronaldo has a hat .
-zoe likes the boat .
-lily likes an apple .
-lily has a pizza .
-ronaldo is a player .
-omar finds an ball .
-nina likes a box .
-leo likes an shoe .
-nina finds a plane .
-cat sees an horse .
-messi likes an hat .
-lily has an map .
-tim finds a bike .
-tim has a door .
-anna likes a book .
-messi has a boat .
-max sees an bear .
-sky is slow .
-messi is a legend .
-anna sees an bear .
-lebron has a apple .
-nina likes an book .
-tim has a toy .
-mouse sees the duck .
-anna finds the shirt .
-ronaldo helps sam .
-anna has the desk .
-lebron finds the pen .
-max finds a phone .
-zoe likes an bag .
-leo finds a car .
-fish wears yellow bag .
-max has an food .
-max has the bag .
-messi sees a lion .
-ronaldo has a key .
-nina finds the shirt .
-ivy finds a pen .
-anna sees an fish .
-duck wears slow shoe .
-mouse wears red bag .
-messi has an shoe .
-water is soft .
-omar has a bike .
-bird sees an horse .
-lion wears sad bag .
-leo finds a pen .
-bob likes an bag .
-messi sees an goat .
-ranvijay has an hat .
-tim likes an box .
-zoe finds the stone .
-mia has an box .
-fish wears round shoe .
-zoe has the train .
-kai has the bag .
-zoe finds a key .
-zoe sees a lion .
-mouse wears small hat .
-horse wears blue shoe .
-leo likes a pizza .
-kai finds an box .
-zoe has an stone .
-lily likes an shirt .
-nina finds a game .
-bob finds the shoe .
-messi finds an hat .
-bob likes an pen .
-nina likes the cake .
-lion wears soft bag .
-bob likes the tree .
-lily has the kite .
-kai likes a toy .
-sam likes an door .
-bob finds a bag .
-leo is the pilot .
-anna finds a door .
-lily finds the apple .
-nina has a apple .
-lily is a pilot .
-zoe sees an dog .
-park is slow .
-ivy likes a house .
-frog sees an cow .
-ranvijay finds the desk .
-max has a food .
-omar is a player .
-bob likes an shoe .
-ivy finds the apple .
-lebron finds a car .
-water is bright .
-zoe has an bag .
-bob likes the train .
-lily finds the kite .
-max finds a robot .
-bear sees the dog .
-anna has a cookie .
-lebron sees the goat .
-leo has an cup .
-goat sees the bear .
-lebron likes the cup .
-bear wears tiny shirt .
-bird wears sad shirt .
-duck sees a fish .
-zoe has an house .
-messi finds the apple .
-fish sees an frog .
-kai finds a bike .
-ronaldo is a leader .
-lion wears fast hat .
-frog wears blue bag .
-lebron is the teacher .
-max finds a cup .
-fish wears blue shoe .
-nina sees a fish .
-robot is big .
-lily is a runner .
-max finds an coin .
-anna finds an tree .
-max likes the bed .
-anna has a desk .
-ivy has an cookie .
-zoe finds the house .
-lebron likes an coin .
-lebron has the ball .
-max likes the desk .
-lebron has a key .
-messi finds an train .
-kai has an plane .
-leo likes a game .
-messi finds the pizza .
-river is red .
-tim is the rookie .
-anna has the kite .
-nina likes a book .
-mouse wears small shoe .
-zoe likes an phone .
-kai likes the car .
-messi finds an key .
-kai likes a tree .
-chair is tiny .
-anna has an cookie .
-tim has a flower .
-horse wears tiny bag .
-anna helps nina .
-ivy finds an toy .
-lebron likes an box .
-zoe finds a hat .
-dog sees a cow .
-messi has a box .
-ronaldo is the legend .
-ronaldo finds a car .
-mouse wears big hat .
-bob has an toy .
-bird sees an cow .
-ranvijay has the boat .
-mia finds a house .
-tim finds a stone .
-kai has an kite .
-omar likes a park .
-ivy likes a game .
-lebron has a car .
-ranvijay has a shirt .
-lebron finds an cup .
-tim likes a coin .
-lebron likes an desk .
-leo finds an flower .
-frog wears bright shoe .
-omar is a runner .
-ranvijay likes a house .
-duck wears big shirt .
-chair is bright .
-ranvijay likes the food .
-dog wears slow hat .
-ivy has a food .
-nina finds a cake .
-messi has the pizza .
-leo likes a flower .
-max finds an bike .
-messi is a goat .
-max likes an map .
-fire is quiet .
-zoe likes an plane .
-lion wears round hat .
-zoe is the pilot .
-ivy finds an park .
-lebron helps bob .
-ivy sees the goat .
-omar has the shoe .
-bob has a map .
-kai is a merchant .
-ivy likes a park .
-bird wears happy shirt .
-cat sees the mouse .
-duck wears loud shirt .
-sam is the pilot .
-kai likes an apple .
-sam finds the boat .
-ball is slow .
-lebron is an artist .
-messi is the hero .
-lebron likes the house .
-lebron sees a fish .
-tim finds a plane .
-ranvijay has the shoe .
-anna finds an house .
-ivy sees an cow .
-omar is a leader .
-sam likes a toy .
-omar has a chair .
-fire is bright .
-lily is a champion .
-kai has a pen .
-sam likes an game .
-lily is a leader .
-frog wears bright shirt .
-fish sees an mouse .
-anna sees a duck .
-sky is fast .
-ronaldo has a bed .
-omar is a goat .
-sam has the house .
-omar finds an flower .
-zoe has a cookie .
-bird wears small bag .
-ronaldo sees a bird .
-zoe has an bike .
-bird sees the cat .
-dog sees a dog .
-lily sees an fish .
-ivy likes a desk .
-ivy finds a door .
-kai helps lebron .
-food is green .
-kai helps zoe .
-ivy finds an phone .
-lebron likes a kite .
-nina finds an tree .
-omar has an bag .
-ranvijay likes an shirt .
-max likes the phone .
-max is a teacher .
-kai is a legend .
-omar likes an pen .
-kai finds an train .
-kai likes a shirt .
-max finds the box .
-max has a apple .
-bob finds the flower .
-ivy sees the duck .
-nina has an kite .
-ronaldo likes an flower .
-lily likes a plane .
-zoe has the book .
-anna finds the park .
-zoe has an boat .
-omar sees an horse .
-lebron likes an stone .
-nina likes the kite .
-kai finds an book .
-leo finds a food .
-nina has the pizza .
-ranvijay finds a bed .
-bob likes the food .
-ivy finds an house .
-tim has an phone .
-sam finds the house .
-sam finds a car .
-anna has the train .
-mia has the book .
-lion wears happy shirt .
-robot is loud .
-bob has the key .
-bob likes the pen .
-ronaldo finds a robot .
-zoe has a bike .
-ivy likes the cookie .
-mia helps sam .
-kai finds a toy .
-leo has a cake .
-ranvijay likes an car .
-sam likes an pizza .
-sam helps lily .
-nina has the bag .
-ranvijay likes a apple .
-lebron has a door .
-messi has an hat .
-zoe finds an chair .
-max helps mia .
-ivy finds the toy .
-mia likes a kite .
-ivy sees a horse .
-nina likes an shoe .
-river is quiet .
-dog wears sad bag .
-kai finds a desk .
-ranvijay finds a tree .
-lily sees an cat .
-mia likes a house .
-messi likes a chair .
-ranvijay likes an book .
-bob likes the kite .
-sam has an robot .
-zoe has an door .
-robot is tiny .
-max finds an park .
-ranvijay finds the stone .
-ranvijay likes the book .
-nina likes an toy .
-mia has an cup .
-lebron likes the robot .
-anna has a flower .
-tim sees the bird .
-nina finds the car .
-lily likes an desk .
-kai has the phone .
-frog sees the mouse .
-max finds the bed .
-bob likes an toy .
-bird sees the fish .
-ranvijay is the king .
-leo helps omar .
-leo is the hero .
-anna likes an cookie .
-goat wears quiet hat .
-omar finds the book .
-ronaldo has an car .
-ivy sees a lion .
-nina has a train .
-bear sees a frog .
-leo likes a door .
-ranvijay likes an bag .
-sam helps zoe .
-sam finds the game .
-tim helps lebron .
-zoe helps messi .
-mia sees a frog .
-dog wears quiet shoe .
-mia sees an fish .
-dog wears happy hat .
-robot is yellow .
-apple is loud .
-zoe finds the kite .
-water is red .
-omar has a pen .
-ronaldo finds an bed .
-nina has a cookie .
-duck sees a cow .
-mia is the leader .
-park is big .
-lily has a book .
-bob has a cake .
-lebron finds an shirt .
-ivy finds a desk .
-bob has a ball .
-messi likes an robot .
-kai likes the desk .
-ball is tiny .
-bob finds a cookie .
-cat wears bright bag .
-kai is a runner .
-frog wears round hat .
-omar has an park .
-ronaldo sees the frog .
-ronaldo has the kite .
-ivy has a bike .
-duck wears sad hat .
-anna likes the desk .
-leo finds the robot .
-book is round .
-kai likes a hat .
-bear sees an cat .
-leo finds a coin .
-fish wears big hat .
-messi likes an plane .
-lion wears quiet hat .
-bear wears loud bag .
-mia likes an park .
-ronaldo has the park .
-max finds the hat .
-omar likes the map .
-lily is the friend .
-lily helps tim .
-ivy likes a flower .
-mia finds a park .
-nina finds a apple .
-goat sees a horse .
-duck wears yellow hat .
-sam has an book .
-frog wears sad shirt .
-leo has the phone .
-bird sees a cat .
-ivy finds the food .
-sam is a rookie .
-lily likes a train .
-tim likes the shoe .
-mia helps lebron .
-zoe likes a ball .
-ranvijay finds the box .
-lily finds a bag .
-horse wears red shirt .
-anna is a winner .
-anna finds an boat .
-bob finds an phone .
-horse sees an mouse .
-zoe has an shirt .
-omar sees an bird .
-omar has a house .
-lily likes a coin .
-ronaldo has a house .
-tim likes a box .
-anna likes the door .
-goat sees the bird .
-bob helps ronaldo .
-ronaldo has the flower .
-mouse wears red hat .
-lily likes a park .
-anna finds the flower .
-anna is a rookie .
-car is bright .
-lily likes the cup .
-max has the stone .
-anna has a cake .
-ronaldo sees a mouse .
-lion wears sad shoe .
-max finds the kite .
-tim finds a box .
-bob finds an shirt .
-duck sees the bear .
-ronaldo likes a robot .
-lebron has a phone .
-park is sad .
-ivy has a shoe .
-messi finds an cup .
-frog sees an horse .
-max finds an cake .
-max finds the plane .
-tim finds an phone .
-nina likes the tree .
-max likes an box .
-cow wears red bag .
-bear wears bright shoe .
-ranvijay finds the game .
-mouse sees a fish .
-ronaldo sees the dog .
-zoe likes an robot .
-ivy has the cup .
-tim has a coin .
-anna finds a book .
-lebron is a teacher .
-omar likes a car .
-zoe has the coin .
-lebron likes a flower .
-omar likes a bike .
-kai likes the plane .
-frog sees an mouse .
-anna is the leader .
-lily is a student .
-lebron likes an phone .
-sam has an tree .
-cat wears sad bag .
-leo finds a cup .
-bob helps lebron .
-lily finds a book .
-lebron likes the map .
-max has a game .
-tim finds the train .
-messi helps zoe .
-ranvijay finds a flower .
-mia helps omar .
-messi has an stone .
-water is green .
-lily sees an lion .
-tim sees the cat .
-bob has a chair .
-ranvijay likes an pizza .
-sam sees the frog .
-anna finds a phone .
-ronaldo has the pizza .
-horse wears big shirt .
-bob has the toy .
-max sees a goat .
-anna finds the map .
-sam sees a goat .
-omar has a cup .
-door is soft .
-road is fast .
-anna likes the car .
-ranvijay finds the cake .
-lebron helps messi .
-ranvijay sees an dog .
-omar has a flower .
-leo finds an game .
-mia likes a game .
-anna likes an shoe .
-anna has an park .
-ivy finds the stone .
-lily sees a frog .
-sam has an toy .
-bear wears sad hat .
-kai finds an food .
-sam finds the ball .
-zoe sees an cat .
-sun is blue .
-lebron is the champion .
-max finds an ball .
-mia has a ball .
-zoe is the goat .
-max finds a boat .
-tim finds an car .
-leo has a kite .
-tim is a pilot .
-kai finds an chair .
-bear sees a bird .
-dog sees the lion .
-ivy finds a robot .
-kai likes an kite .
-ranvijay sees an cow .
-lily has an pen .
-omar has a toy .
-sam likes the cup .
-kai is the pilot .
-anna is the artist .
-max sees an cat .
-ivy finds a coin .
-nina finds an apple .
-nina likes a flower .
-tim sees a bird .
-nina likes the bag .
-zoe finds an house .
-zoe sees a mouse .
-ivy has a robot .
-grass is green .
-cow sees a lion .
-ranvijay sees a frog .
-lily has an robot .
-bear sees a horse .
-duck wears loud shoe .
-messi finds the bike .
-ronaldo finds an cookie .
-ivy likes a kite .
-omar has the bike .
-lily likes the tree .
-messi likes an cup .
-mia has a house .
-max has the door .
-ranvijay has a chair .
-lebron likes the box .
-ronaldo has the shoe .
-lebron sees a mouse .
-ranvijay helps nina .
-frog wears loud shirt .
-ronaldo likes the bag .
-duck wears tiny shirt .
-bear sees the duck .
-tim finds an game .
-nina finds the toy .
-sam finds the pen .
-sam finds a pizza .
-omar finds the phone .
-sam finds the tree .
-sam finds an tree .
-nina is a champion .
-frog wears blue shirt .
-max finds the apple .
-omar sees an dog .
-lebron finds the train .
-max has the cake .
-lily likes a tree .
-bob likes an chair .
-omar is a artist .
-omar has a car .
-ranvijay has an pizza .
-nina has the phone .
-max likes an bag .
-ronaldo finds the park .
-omar is the winner .
-mia finds a apple .
-anna has the bag .
-nina helps sam .
-bob helps omar .
-ivy sees the dog .
-leo finds an cake .
-leo finds the chair .
-lebron likes a boat .
-moon is red .
-mia sees the lion .
-cat sees an bear .
-lebron has the pen .
+cat likes shoe .
+sam likes bag .
+sam likes pizza .
+sun likes map .
+car is fast .
+tim is loud .
+door is tiny .
+bob finds cake .
+lion eats food .
+messi is rookie .
+lebron helps nina .
+tim has desk .
+nina is blue .
+kai has chair .
+lebron finds chair .
+river sees bear .
+lion sees dog .
 sky is green .
-ivy has a door .
-lebron has the cookie .
-ranvijay is the leader .
-mia sees an bear .
-lebron likes an chair .
-nina has the cup .
-zoe likes the plane .
-max finds the stone .
-fish wears small shoe .
+ranvijay likes cookie .
+sam is red .
+dog eats robot .
+cat eats stone .
+mia is pilot .
+lion eats key .
+omar is red .
+messi sees frog .
+max finds pen .
+dog likes bike .
+leo is slow .
+dog likes phone .
+book is bright .
+ivy likes flower .
+bird eats cookie .
+door likes hat .
+cow eats shoe .
+max has pizza .
+horse likes phone .
+leo helps ronaldo .
+lebron sees fish .
+lebron has apple .
+cloud likes plane .
+max has book .
+food likes bike .
+sam has flower .
+robot sees goat .
+robot likes toy .
+bear eats cup .
+river likes bed .
+tim has tree .
+bird sees cow .
+messi likes cookie .
+anna likes phone .
+duck sees frog .
+lily finds apple .
+anna finds shirt .
+sam has cup .
+mia is goat .
+omar is champion .
+ranvijay likes key .
+cloud is green .
+grass is fast .
+tim sees mouse .
+food sees frog .
+bob is student .
+ronaldo likes book .
+dog eats box .
+ranvijay sees bird .
+ranvijay finds bag .
+omar finds robot .
+sun sees mouse .
+cloud likes phone .
+bob helps sam .
+moon likes door .
+kai sees cow .
+bear sees mouse .
 grass is yellow .
-dog wears fast shirt .
-zoe has a car .
-messi sees an bird .
-tim finds an door .
+bob likes pizza .
+max finds map .
+anna has pen .
+zoe is champion .
+toy is round .
+lebron helps messi .
+box likes bag .
+zoe is leader .
+bear likes shoe .
+zoe has shoe .
+cow likes bag .
+anna finds shoe .
+kai has tree .
+park sees fish .
+mouse likes box .
+ranvijay has cake .
+road likes plane .
+sam has stone .
+lily finds car .
+duck likes ball .
+ranvijay has plane .
+max finds stone .
+lily likes door .
+omar is quiet .
+park sees dog .
+fire likes shirt .
+ronaldo finds park .
+mia has phone .
+house is bright .
+mia helps bob .
+mouse likes game .
+box likes shirt .
+ranvijay has bag .
+anna finds stone .
+max likes house .
+ranvijay likes toy .
+mia likes stone .
+sun sees fish .
+bird likes flower .
+sam finds bag .
+tree is big .
+ball is happy .
+messi likes cup .
+water sees horse .
+mouse eats cup .
+door sees cow .
+kai finds bag .
+ivy finds desk .
+max finds plane .
+toy likes ball .
+anna likes box .
+nina likes boat .
+bob sees horse .
+toy sees duck .
+sky is fast .
+water likes boat .
+lebron helps tim .
+omar helps zoe .
+leo has flower .
+tree likes desk .
+tim is legend .
+river likes coin .
+cow likes boat .
+ranvijay likes door .
+bird likes tree .
+sam finds car .
+bob finds toy .
+chair is blue .
+omar has shirt .
+sam sees duck .
+leo has house .
+cat sees horse .
+anna has robot .
+nina finds toy .
+food likes stone .
+road sees horse .
+kai is sad .
+ronaldo has bed .
+bob is yellow .
+frog likes box .
+max has hat .
+nina has ball .
+lily finds bed .
+ranvijay likes bed .
+lily likes key .
+ivy finds train .
+bird eats stone .
+zoe helps leo .
+messi helps lily .
+cow likes bike .
+moon sees bird .
+bear sees goat .
+bird eats chair .
+max has house .
+house likes cup .
+ranvijay likes bike .
+tree is tiny .
+anna finds tree .
+sam finds train .
+fish eats park .
+zoe likes door .
+zoe has phone .
+cow sees frog .
+cat likes phone .
+tree likes bag .
+frog likes car .
+anna helps ronaldo .
+messi finds park .
+ivy is merchant .
+max is hero .
+ivy helps sam .
+chair likes map .
+dog sees fish .
+mouse eats food .
+ranvijay likes cake .
+lion likes toy .
+tim is bright .
+tim has door .
+frog likes pizza .
+book is big .
+frog eats cake .
+hat likes train .
+duck eats park .
+lion likes door .
+food likes train .
+zoe helps omar .
+tim finds tree .
+leo likes hat .
+ranvijay likes chair .
+anna likes game .
+nina finds pen .
+horse likes box .
+ronaldo is alpha .
+fire is slow .
+mia finds kite .
+house likes desk .
+goat eats plane .
+mia finds tree .
+leo likes book .
+tim sees dog .
+bird likes key .
+anna helps ivy .
+apple likes bike .
+tim has coin .
+ronaldo likes cake .
+cow sees cat .
+river likes robot .
+toy likes book .
+river likes chair .
+sam is runner .
+max is big .
+fish likes house .
+ranvijay has cookie .
+nina sees frog .
+max has map .
+max is soft .
+bird likes park .
+food likes box .
+river is green .
+ivy has map .
+cat likes robot .
+messi finds cookie .
+lebron is legend .
+robot is loud .
+sky likes flower .
+anna likes map .
+ranvijay helps leo .
+cow eats game .
+tim likes desk .
+bob sees lion .
+river sees fish .
+cow eats phone .
+box sees mouse .
+anna finds cake .
+lily likes chair .
+house sees bear .
+chair likes park .
+car sees frog .
+mia is merchant .
+tim sees bird .
+max sees mouse .
+goat likes pizza .
+robot likes desk .
+leo likes bag .
+bird eats key .
+anna likes train .
+sam has shoe .
+sam is fast .
+dog likes key .
+moon likes car .
+mia is round .
+cow likes bed .
+frog eats shirt .
+mouse eats flower .
+lion eats bag .
+sam likes tree .
+duck likes cup .
+box likes box .
+zoe is round .
+box is bright .
+ivy helps nina .
+zoe finds cookie .
+ball sees bear .
+fish wears bag .
+omar has box .
+messi finds apple .
+car sees cat .
+max likes bike .
+lebron finds park .
+anna has book .
+box is round .
+ranvijay likes food .
+lion likes ball .
+max is yellow .
+zoe likes phone .
+zoe has book .
+fish eats phone .
+grass is green .
+cow eats house .
+bear sees lion .
+park likes pen .
+sky sees bird .
+book likes game .
+ronaldo helps mia .
+fish eats box .
+robot likes bag .
+toy likes key .
+bear eats train .
+kai finds shirt .
+max helps bob .
+hat likes shoe .
+bob finds apple .
+frog eats book .
+kai likes chair .
+leo likes bike .
+omar likes flower .
+apple sees dog .
+omar finds shoe .
+fire likes food .
+goat eats house .
+leo sees dog .
+messi finds train .
+cat eats train .
+messi has flower .
+lily is small .
+door is bright .
+ball likes door .
+anna likes pen .
+ivy is blue .
+tim finds bike .
+door sees cat .
+toy likes toy .
+goat eats park .
+fire is big .
+horse sees dog .
+moon sees frog .
+toy likes park .
+fish eats cookie .
+cat eats plane .
+duck likes house .
+anna sees duck .
+lebron likes ball .
+bob sees bear .
+ronaldo finds desk .
+leo is king .
+ranvijay has toy .
+messi has key .
+ronaldo likes game .
+hat likes ball .
+bird likes desk .
+omar is student .
+cloud likes flower .
+house likes map .
+goat likes plane .
+duck likes robot .
+ronaldo finds key .
+toy sees bear .
+fish eats door .
+apple likes cookie .
+horse sees horse .
+ronaldo is player .
+nina finds bike .
+frog wears bag .
+bob likes pen .
+lebron finds door .
+fire likes flower .
+dog wears shoe .
+bird wears shoe .
+cow eats desk .
+hat is green .
+leo is teacher .
+messi is leader .
+nina finds book .
+nina is goat .
+tim sees cow .
+zoe sees bird .
+mia helps leo .
+lion eats ball .
+pizza likes coin .
+tim has cookie .
+horse wears shirt .
+mouse eats apple .
+cat eats tree .
+cow likes game .
+max is legend .
+dog eats chair .
+apple sees cow .
+messi is sad .
+sam finds hat .
+lily is student .
+book likes food .
+box sees bear .
+box likes apple .
+leo finds food .
+max has stone .
+cow likes kite .
+messi has bed .
+max helps lily .
+ball sees cat .
+zoe helps mia .
+mia is fast .
+messi likes bag .
+lebron finds plane .
+leo has robot .
+anna helps max .
+sam likes bike .
+tim finds kite .
+kai likes cookie .
+fish sees bear .
+mouse likes cup .
+ball likes map .
+park likes coin .
+cat sees duck .
+bird eats book .
+leo is yellow .
+ranvijay finds ball .
+horse eats park .
+ball is loud .
+cat eats house .
+bob has boat .
+bear likes pen .
+sky likes bike .
+kai likes house .
+hat is fast .
+duck eats cup .
+omar sees bear .
+ball sees mouse .
+tim likes pen .
+moon likes hat .
+mia has house .
+sky is soft .
+anna is teacher .
+bird wears bag .
+anna is goat .
+dog eats shoe .
+dog eats hat .
+frog eats car .
+omar helps nina .
+hat likes key .
+nina likes tree .
+max finds flower .
+frog eats phone .
+leo sees cow .
+fish eats key .
+cat sees dog .
+zoe is goat .
+horse eats train .
+apple likes book .
+lily is bright .
+river is quiet .
+goat sees duck .
+omar helps lebron .
+lion likes apple .
+park likes bed .
+leo finds desk .
+robot sees dog .
+frog likes key .
+bob has car .
+sun is sad .
+apple likes food .
+nina sees bird .
+anna has toy .
+messi is king .
+tim is goat .
+kai finds coin .
+tim is alpha .
+lily likes stone .
+bob likes cup .
+kai likes phone .
+river likes car .
+tim likes robot .
+kai finds boat .
+max has bike .
+ivy has house .
+horse wears shoe .
+omar finds phone .
+car likes map .
+mia is rookie .
+bob finds chair .
+fish eats cup .
+lebron has cake .
+sam likes coin .
+messi has stone .
+frog likes bike .
+lily is runner .
+road is red .
+leo has cake .
+sam has box .
+anna helps tim .
+omar finds apple .
+kai is player .
+tim helps anna .
+messi likes bike .
+sun likes flower .
+car likes ball .
+zoe finds desk .
+cow likes food .
+fire sees duck .
+ball likes food .
+omar is small .
+zoe has park .
+tim likes game .
+leo is blue .
+leo finds cookie .
+sky is tiny .
+lebron is alpha .
+goat sees cat .
+ronaldo has cake .
+max likes stone .
+ball likes kite .
+mia has apple .
+max is fast .
+bob likes bag .
+lebron has bike .
+apple likes car .
+mouse eats door .
+messi finds map .
+lebron finds phone .
+omar finds map .
+kai likes door .
+ranvijay likes house .
+lily is big .
+anna is alpha .
+fire likes cookie .
+mouse likes pizza .
+fire likes cake .
+duck eats boat .
+ranvijay likes pizza .
+mouse likes bike .
+road is sad .
+apple sees mouse .
+hat is yellow .
+omar finds bed .
+tree likes tree .
+leo likes pen .
+mia finds desk .
+ranvijay is king .
+omar has coin .
+zoe likes plane .
+ivy has coin .
+hat likes map .
+nina finds coin .
+mouse likes flower .
+leo is sad .
+book likes kite .
+messi finds flower .
+cow likes shoe .
+mia has cookie .
+duck wears shoe .
+anna helps lebron .
