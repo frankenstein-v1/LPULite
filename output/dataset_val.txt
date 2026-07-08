@@ -291,7 +291,7 @@ max is yellow .
 zoe likes phone .
 zoe has book .
 fish eats phone .
-grass is green .
+messi is king .
 cow eats house .
 bear sees lion .
 park likes pen .
@@ -456,7 +456,7 @@ sun is sad .
 apple likes food .
 nina sees bird .
 anna has toy .
-messi is king .
+tim helps anna .
 tim is goat .
 kai finds coin .
 tim is alpha .
@@ -485,7 +485,7 @@ sam has box .
 anna helps tim .
 omar finds apple .
 kai is player .
-tim helps anna .
+grass is green .
 messi likes bike .
 sun likes flower .
 car likes ball .

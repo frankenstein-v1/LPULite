@@ -36,7 +36,7 @@ EXPORT_PATH = Path("tiny_lm_weights_export.json")
 
 # Model target from your spec
 VOCAB_SIZE = 256
-DIM = 8
+DIM = 4
 SEQ_LEN = 4
 LAYERS = 1
 HEADS = 1
