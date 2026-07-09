@@ -1,6 +1,21 @@
 <testsuites name="results">
   <testsuite name="all" package="all">
-    <property name="random_seed" value="1783098949" />
-    <testcase name="test_decode_mat_selection" classname="tb_decode" file="C:\Users\micha\Documents(Local)\Projects\tinyLPU\tb\tb_decode.py" lineno="109" time="0.1469719409942627" sim_time_ns="1301.0" ratio_time="8852.029790167817" />
+    <property name="random_seed" value="1783558105" />
+    <testcase name="test_tiny_lm_prefill_decode_golden" classname="lpu_test" file="C:\Users\z005a2rv\Documents\tinyLPU\tb\lpu_test.py" lineno="351" time="0" sim_time_ns="0" ratio_time="0">
+      <skipped />
+    </testcase>
+    <testcase name="test_lpu_vxm_hardware_relu_softmax_layernorm_paths" classname="lpu_test" file="C:\Users\z005a2rv\Documents\tinyLPU\tb\lpu_test.py" lineno="378" time="0" sim_time_ns="0" ratio_time="0">
+      <skipped />
+    </testcase>
+    <testcase name="test_tiny_lm_ranvijay_prompt_probe" classname="lpu_test" file="C:\Users\z005a2rv\Documents\tinyLPU\tb\lpu_test.py" lineno="431" time="0" sim_time_ns="0" ratio_time="0">
+      <skipped />
+    </testcase>
+    <testcase name="test_lpu_ranvijay_prompt_timing" classname="lpu_test" file="C:\Users\z005a2rv\Documents\tinyLPU\tb\lpu_test.py" lineno="446" time="0" sim_time_ns="0" ratio_time="0">
+      <skipped />
+    </testcase>
+    <testcase name="test_lpu_tiny_lm_prefill_decode_tiles_and_lm_head" classname="lpu_test" file="C:\Users\z005a2rv\Documents\tinyLPU\tb\lpu_test.py" lineno="540" time="0" sim_time_ns="0" ratio_time="0">
+      <skipped />
+    </testcase>
+    <testcase name="test_interactive_prompt" classname="lpu_test" file="C:\Users\z005a2rv\Documents\tinyLPU\tb\lpu_test.py" lineno="665" time="225.25309133529663" sim_time_ns="0.0" ratio_time="0.0" />
   </testsuite>
 </testsuites>

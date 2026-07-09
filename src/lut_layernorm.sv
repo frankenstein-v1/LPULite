@@ -1,5 +1,7 @@
 `timescale 1ns/1ns
 
+`include "cvfpu_compat.svh"
+
 // FP32 row layernorm for VXM.
 //
 // Lanes are raw IEEE-754 FP32 bit patterns. This keeps the existing module
@@ -18,7 +20,11 @@ module lut_layernorm #(
 
     localparam real EPSILON = 0.00001;
 
-    always_comb begin
+    function automatic logic [LANES*LANE_W-1:0] compute_layernorm(
+        input logic [LANES*LANE_W-1:0] x_in_val,
+        input logic [LANES*LANE_W-1:0] gamma_val,
+        input logic [LANES*LANE_W-1:0] beta_val
+    );
         real x_lane [0:LANES-1];
         real gamma_lane [0:LANES-1];
         real beta_lane [0:LANES-1];
@@ -30,37 +36,45 @@ module lut_layernorm #(
         logic [31:0] x_bits;
         logic [31:0] gamma_bits;
         logic [31:0] beta_bits;
+        logic [LANES*LANE_W-1:0] result;
+        begin
+            mean = 0.0;
+            variance = 0.0;
+            result = '0;
 
-        mean = 0.0;
-        variance = 0.0;
-        y_out = '0;
+            for (int i = 0; i < LANES; i++) begin
+                x_bits = x_in_val[i*LANE_W +: LANE_W];
+                gamma_bits = gamma_val[i*LANE_W +: LANE_W];
+                beta_bits = beta_val[i*LANE_W +: LANE_W];
 
-        for (int i = 0; i < LANES; i++) begin
-            x_bits = x_in[i*LANE_W +: LANE_W];
-            gamma_bits = gamma[i*LANE_W +: LANE_W];
-            beta_bits = beta[i*LANE_W +: LANE_W];
+                x_lane[i] = $bitstoreal(f32_to_f64_bits(x_bits));
+                gamma_lane[i] = $bitstoreal(f32_to_f64_bits(gamma_bits));
+                beta_lane[i] = $bitstoreal(f32_to_f64_bits(beta_bits));
+                mean = mean + x_lane[i];
+            end
 
-            x_lane[i] = $bitstoshortreal(x_bits);
-            gamma_lane[i] = $bitstoshortreal(gamma_bits);
-            beta_lane[i] = $bitstoshortreal(beta_bits);
-            mean = mean + x_lane[i];
+            mean = mean / LANES;
+
+            for (int i = 0; i < LANES; i++) begin
+                centered = x_lane[i] - mean;
+                variance = variance + (centered * centered);
+            end
+
+            variance = variance / LANES;
+            inv_std = 1.0 / $sqrt(variance + EPSILON);
+
+            for (int i = 0; i < LANES; i++) begin
+                centered = x_lane[i] - mean;
+                y_lane = (centered * inv_std * gamma_lane[i]) + beta_lane[i];
+                result[i*LANE_W +: LANE_W] = f64_to_f32_bits($realtobits(y_lane));
+            end
+            
+            compute_layernorm = result;
         end
+    endfunction
 
-        mean = mean / LANES;
-
-        for (int i = 0; i < LANES; i++) begin
-            centered = x_lane[i] - mean;
-            variance = variance + (centered * centered);
-        end
-
-        variance = variance / LANES;
-        inv_std = 1.0 / $sqrt(variance + EPSILON);
-
-        for (int i = 0; i < LANES; i++) begin
-            centered = x_lane[i] - mean;
-            y_lane = (centered * inv_std * gamma_lane[i]) + beta_lane[i];
-            y_out[i*LANE_W +: LANE_W] = $shortrealtobits(shortreal'(y_lane));
-        end
+    always @(x_in or gamma or beta) begin
+        y_out = compute_layernorm(x_in, gamma, beta);
     end
 
 endmodule

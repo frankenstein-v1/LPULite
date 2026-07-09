@@ -648,3 +648,151 @@ async def test_lpu_tiny_lm_prefill_decode_tiles_and_lm_head(dut):
     dut._log.info("golden decode next-token top5: %s", top_tokens(decode["logits"][-1], id_to_token))
     dut._log.info("LPU-backed quantized LM-head top5: %s", top_tokens(hw_logits, id_to_token))
     dut._log.info('LPU-backed next token for "%s" is "%s"', token_rows_to_string(PROMPT_DECODE), hw_next_token)
+
+
+@cocotb.task.bridge
+def get_user_input(prompt: str) -> str:
+    import sys
+    try:
+        sys.stdout.flush()
+        return input(prompt)
+    except (KeyboardInterrupt, EOFError):
+        return "exit"
+    except Exception:
+        return "exit"
+
+
+@cocotb.test()
+async def test_interactive_prompt(dut):
+    import os
+    import sys
+    
+    if os.getenv("INTERACTIVE") != "1":
+        dut._log.info("Skipping interactive prompt test. Set INTERACTIVE=1 to run.")
+        await Timer(1, unit="ns")
+        return
+
+    cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
+
+    config, vocab, id_to_token, weights = load_tiny_lm_export()
+    assert config == MODEL_CONFIG
+
+    print("\n" + "="*60)
+    print("Welcome to the Continuous Interactive LPU Inference Console!")
+    print("Type your prompt (up to 3 words) and press Enter.")
+    print("Type 'exit' or 'quit' to stop.")
+    print("="*60 + "\n")
+
+    while True:
+        prompt_str = await get_user_input("LPU-Prompt> ")
+        prompt_str = prompt_str.strip()
+        if not prompt_str:
+            continue
+        if prompt_str.lower() in ["exit", "quit"]:
+            break
+
+        words = prompt_str.split()
+        if not words:
+            continue
+
+        # Truncate prompt if it exceeds the maximum supported sequence length (4 tokens total, so 3 prompt tokens max)
+        if len(words) > 3:
+            words = words[-3:]
+            print(f"[*] Note: Prompt truncated to last 3 tokens: {words}")
+
+        # Run forward pass on the simulated LPU chip
+        try:
+            prompt_ids = encode_prompt(words, vocab)
+            golden = tiny_lm_forward(prompt_ids, weights)
+
+            # Prefill/Decode Attn & FFN projections on LPU
+            for projection, weight_name in [
+                ("Q projection", "blocks.0.attn.q_proj.weight"),
+                ("K projection", "blocks.0.attn.k_proj.weight"),
+                ("V projection", "blocks.0.attn.v_proj.weight"),
+            ]:
+                await run_lpu_mxm_tile(
+                    dut,
+                    left_rows=golden["ln1"],
+                    right_rows=weights[weight_name],
+                    label=projection,
+                )
+
+            await run_lpu_mxm_tile(
+                dut,
+                left_rows=golden["q"],
+                right_rows=golden["k"],
+                label="causal attention Q @ K^T raw scores",
+            )
+
+            v_by_hidden = transpose(golden["v"])
+            await run_lpu_mxm_tile(
+                dut,
+                left_rows=golden["probs"],
+                right_rows=v_by_hidden,
+                label="attention probabilities @ V",
+            )
+
+            await run_lpu_mxm_tile(
+                dut,
+                left_rows=golden["attn"],
+                right_rows=weights["blocks.0.attn.out_proj.weight"],
+                label="attention output projection",
+            )
+
+            for start in range(0, MODEL_CONFIG["ffn_dim"], 4):
+                await run_lpu_mxm_tile(
+                    dut,
+                    left_rows=golden["ln2"],
+                    right_rows=weights["blocks.0.ffn.0.weight"][start:start + 4],
+                    label=f"FFN W1 tile {start}:{start + 4}",
+                )
+
+            for start in range(0, MODEL_CONFIG["ffn_dim"], 4):
+                hidden_chunk = [row[start:start + 4] for row in golden["ffn_hidden"]]
+                w2_chunk = [row[start:start + 4] for row in weights["blocks.0.ffn.2.weight"]]
+                await run_lpu_mxm_tile(
+                    dut,
+                    left_rows=hidden_chunk,
+                    right_rows=w2_chunk,
+                    label=f"FFN W2 partial tile {start}:{start + 4}",
+                )
+
+            # LM Head on LPU
+            last_hidden = golden["final"][-1]
+            hw_logits = [0.0 for _ in range(MODEL_CONFIG["vocab_size"])]
+            for vocab_start in range(0, MODEL_CONFIG["vocab_size"], 4):
+                observed = await run_lpu_mxm_tile(
+                    dut,
+                    left_rows=[last_hidden],
+                    right_rows=weights["lm_head.weight"][vocab_start:vocab_start + 4],
+                    label=f"LM head tile {vocab_start}:{vocab_start + 4}",
+                )
+                for lane in range(4):
+                    token_id = vocab_start + lane
+                    hw_logits[token_id] = lpu.to_f32(observed[0][lane] + weights["lm_head.bias"][token_id])
+
+            # Process outputs
+            pred_id = argmax(hw_logits)
+            pred_token = id_to_token[pred_id]
+            probs = softmax_rows([hw_logits])[0]
+
+            top5_indices = sorted(range(len(hw_logits)), key=lambda idx: hw_logits[idx], reverse=True)[:5]
+
+            # Print required format:
+            # "the only thing I want in the response is the prompt + prediction and the top 5 highest predictions with scores"
+            print("\n" + "="*50)
+            print(f"Prompt: {' '.join(words)}")
+            print(f"Prediction: {pred_token}")
+            print("\nTop 5 predictions:")
+            for rank, idx in enumerate(top5_indices):
+                token_str = id_to_token[idx]
+                score = hw_logits[idx]
+                prob = probs[idx]
+                print(f"  {rank+1}. {token_str:<15} (score: {score:8.3f}, prob: {prob*100:5.1f}%)")
+            print("="*50 + "\n")
+
+        except Exception as e:
+            print(f"\n[!] Error during LPU inference: {e}\n", file=sys.stderr)
+
+    print("\nExiting interactive mode.\n")

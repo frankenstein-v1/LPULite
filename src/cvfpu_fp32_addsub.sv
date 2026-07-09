@@ -1,5 +1,7 @@
 `timescale 1ns/1ps
 
+`include "cvfpu_compat.svh"
+
 // Wrapper around CVFPU fpnew_top for scalar FP32 add/subtract:
 //   result = a (+/-) b
 //
@@ -84,10 +86,12 @@ module cvfpu_fp32_addsub (
         end else begin
             start_q <= start_i;
             if (start_i) begin
-                result_o <= $shortrealtobits(
-                    sub_i
-                        ? ($bitstoshortreal(a_i) - $bitstoshortreal(b_i))
-                        : ($bitstoshortreal(a_i) + $bitstoshortreal(b_i))
+                result_o <= f64_to_f32_bits(
+                    $realtobits(
+                        sub_i
+                            ? ($bitstoreal(f32_to_f64_bits(a_i)) - $bitstoreal(f32_to_f64_bits(b_i)))
+                            : ($bitstoreal(f32_to_f64_bits(a_i)) + $bitstoreal(f32_to_f64_bits(b_i)))
+                    )
                 );
             end
         end

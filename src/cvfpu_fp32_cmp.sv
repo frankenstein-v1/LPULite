@@ -1,5 +1,7 @@
 `timescale 1ns/1ps
 
+`include "cvfpu_compat.svh"
+
 // Wrapper around CVFPU fpnew_top for scalar FP32 comparisons.
 //
 // Compare mode encoding:
@@ -91,20 +93,32 @@ module cvfpu_fp32_cmp (
 
 `else
     logic start_q;
-    shortreal a_value;
-    shortreal b_value;
-    logic cmp_result;
+    logic cmp_result_out;
 
-    always_comb begin
-        a_value = $bitstoshortreal(a_i);
-        b_value = $bitstoshortreal(b_i);
-        unique case (cmp_mode_i)
-            2'b00:   cmp_result = (a_value <= b_value);
-            2'b01:   cmp_result = (a_value <  b_value);
-            2'b10:   cmp_result = (a_value == b_value);
-            default: cmp_result = 1'b0;
-        endcase
-        cmp_result = cmp_result ^ invert_i;
+    function automatic logic get_cmp_result(
+        input logic [31:0] a_val_bits,
+        input logic [31:0] b_val_bits,
+        input logic [1:0] mode,
+        input logic inv
+    );
+        real a_value;
+        real b_value;
+        logic cmp_res;
+        begin
+            a_value = $bitstoreal(f32_to_f64_bits(a_val_bits));
+            b_value = $bitstoreal(f32_to_f64_bits(b_val_bits));
+            unique case (mode)
+                2'b00:   cmp_res = (a_value <= b_value);
+                2'b01:   cmp_res = (a_value <  b_value);
+                2'b10:   cmp_res = (a_value == b_value);
+                default: cmp_res = 1'b0;
+            endcase
+            get_cmp_result = cmp_res ^ inv;
+        end
+    endfunction
+
+    always @(a_i or b_i or cmp_mode_i or invert_i) begin
+        cmp_result_out = get_cmp_result(a_i, b_i, cmp_mode_i, invert_i);
     end
 
     always_ff @(posedge clk_i or negedge rst_ni) begin
@@ -114,7 +128,7 @@ module cvfpu_fp32_cmp (
         end else begin
             start_q <= start_i;
             if (start_i)
-                result_o <= cmp_result;
+                result_o <= cmp_result_out;
         end
     end
 
