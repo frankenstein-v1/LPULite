@@ -10,7 +10,7 @@ def test_vxm():
 
     sources = [
         src_dir / "vxm.sv",
-        src_dir / "lut_layernorm.sv",
+        src_dir / "lut_rmsnorm.sv",
         src_dir / "cvfpu_fp32_addsub.sv",
         src_dir / "cvfpu_fp32_div.sv",
         src_dir / "cvfpu_fp32_cmp.sv",
@@ -25,6 +25,7 @@ def test_vxm():
 
     build_kwargs = dict(
         sources=sources,
+        includes=[src_dir],
         hdl_toplevel="vxm",
         always=True,
         build_dir=build_dir,

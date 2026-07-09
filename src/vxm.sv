@@ -24,10 +24,14 @@ module vxm #(
     input  logic [3:0]              vxm_ctrl,
     input  logic                    fp_quant_mode,
 
-    // LayerNorm control and parameters
-    input  logic                    layernorm_bypass,
-    input  logic [LANES*LANE_W-1:0] layernorm_gamma,
-    input  logic [LANES*LANE_W-1:0] layernorm_beta,
+    // // LayerNorm control and parameters
+    // RMSNorm control and parameters
+    // input  logic                    layernorm_bypass,
+    // input  logic [LANES*LANE_W-1:0] layernorm_gamma,
+    // input  logic [LANES*LANE_W-1:0] layernorm_beta,
+    input  logic                    rmsnorm_bypass,
+    input  logic [LANES*LANE_W-1:0] rmsnorm_gamma,
+    input  logic [LANES*LANE_W-1:0] rmsnorm_beta,
 
     // Outputs
     output logic [31:0] stream_out,
@@ -453,20 +457,32 @@ module vxm #(
         end
     endgenerate
 
-    logic [LANES*LANE_W-1:0] layernorm_out;
-    logic [LANES*LANE_W-1:0] layernorm_mux_out;
+    // logic [LANES*LANE_W-1:0] layernorm_out;
+    // logic [LANES*LANE_W-1:0] layernorm_mux_out;
+    logic [LANES*LANE_W-1:0] rmsnorm_out;
+    logic [LANES*LANE_W-1:0] rmsnorm_mux_out;
 
-    lut_layernorm #(
+    // lut_layernorm #(
+    //     .LANES(LANES),
+    //     .LANE_W(LANE_W)
+    // ) layernorm_inst (
+    //     .x_in(mux_out),
+    //     .gamma(layernorm_gamma),
+    //     .beta(layernorm_beta),
+    //     .y_out(layernorm_out)
+    // );
+    lut_rmsnorm #(
         .LANES(LANES),
         .LANE_W(LANE_W)
-    ) layernorm_inst (
+    ) rmsnorm_inst (
         .x_in(mux_out),
-        .gamma(layernorm_gamma),
-        .beta(layernorm_beta),
-        .y_out(layernorm_out)
+        .gamma(rmsnorm_gamma),
+        .beta(rmsnorm_beta),
+        .y_out(rmsnorm_out)
     );
 
-    assign layernorm_mux_out = layernorm_bypass ? mux_out : layernorm_out;
+    // assign layernorm_mux_out = layernorm_bypass ? mux_out : layernorm_out;
+    assign rmsnorm_mux_out = rmsnorm_bypass ? mux_out : rmsnorm_out;
 
     quant #(
         .LANES(LANES),
@@ -478,7 +494,8 @@ module vxm #(
         .mode_softmax(quant_mode_softmax),
         .fp_quant_mode(quant_fp_mode),
         .softmax_input_is_fp(softmax_active_is_fp),
-        .x_input(layernorm_mux_out),
+        // .x_input(layernorm_mux_out),
+        .x_input(rmsnorm_mux_out),
         .out_valid(quantize_valid),
         .q_row_out(quantize_out),
         .q_scale_out(quantize_scale_out)

@@ -41,7 +41,8 @@ logic mxm_wght_is_signed;
 logic mxm_use_fp;
 logic fp_quant_mode;
 logic [1:0] mem_store_fmt;
-logic vxm_layernorm_en;
+// logic vxm_layernorm_en;
+logic vxm_rmsnorm_en;
 
 localparam logic [1:0] VXM_OPERAND_DATA  = 2'd0;
 localparam logic [1:0] VXM_OPERAND_BIAS  = 2'd1;
@@ -116,7 +117,8 @@ icu u_icu(
     .mxm_use_fp(mxm_use_fp),
     .fp_quant_mode(fp_quant_mode),
     .mem_store_fmt(mem_store_fmt),
-    .vxm_layernorm_en(vxm_layernorm_en)
+    // .vxm_layernorm_en(vxm_layernorm_en)
+    .vxm_rmsnorm_en(vxm_rmsnorm_en)
 );
 
 //mux logic for mem0 input
@@ -350,8 +352,10 @@ mxm u_mxm(
 mxm_row_t vxm_stream_in_data;
 mxm_row_t vxm_stream_in_bias;
 mxm_row_t vxm_bias_reg;
-mxm_row_t vxm_layernorm_gamma_reg;
-mxm_row_t vxm_layernorm_beta_reg;
+// mxm_row_t vxm_layernorm_gamma_reg;
+// mxm_row_t vxm_layernorm_beta_reg;
+mxm_row_t vxm_rmsnorm_gamma_reg;
+mxm_row_t vxm_rmsnorm_beta_reg;
 logic     vxm_in_valid;
 logic     vxm_in_ready;
 logic     vxm_fifo_wr_en;
@@ -399,9 +403,10 @@ row_fifo #(
 always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
         vxm_input_overflow <= 1'b0;
-        vxm_bias_reg <= '0;
-        vxm_layernorm_gamma_reg <= {32'h3f800000, 32'h3f800000, 32'h3f800000, 32'h3f800000};
-        vxm_layernorm_beta_reg <= '0;
+        // vxm_layernorm_gamma_reg <= {32'h3f800000, 32'h3f800000, 32'h3f800000, 32'h3f800000};
+        // vxm_layernorm_beta_reg <= '0;
+        vxm_rmsnorm_gamma_reg <= {32'h3f800000, 32'h3f800000, 32'h3f800000, 32'h3f800000};
+        vxm_rmsnorm_beta_reg <= '0;
     end else begin
         if (vxm_fifo_wr_en && vxm_fifo_full) begin
             vxm_input_overflow <= 1'b1;
@@ -413,10 +418,12 @@ always_ff @(posedge clk or negedge rst_n) begin
                     vxm_bias_reg <= eastbound_payload;
                 end
                 VXM_OPERAND_GAMMA: begin
-                    vxm_layernorm_gamma_reg <= eastbound_payload;
+                    // vxm_layernorm_gamma_reg <= eastbound_payload;
+                    vxm_rmsnorm_gamma_reg <= eastbound_payload;
                 end
                 VXM_OPERAND_BETA: begin
-                    vxm_layernorm_beta_reg <= eastbound_payload;
+                    // vxm_layernorm_beta_reg <= eastbound_payload;
+                    vxm_rmsnorm_beta_reg <= eastbound_payload;
                 end
                 default: begin
                     // Data operands are queued by u_vxm_input_fifo above.
@@ -466,9 +473,12 @@ vxm #(
     .in_valid(vxm_in_valid),
     .in_ready(vxm_in_ready),
     .vxm_ctrl(vxm_ctrl),
-    .layernorm_bypass(~vxm_layernorm_en),
-    .layernorm_gamma(vxm_layernorm_gamma_reg),
-    .layernorm_beta(vxm_layernorm_beta_reg),
+    // .layernorm_bypass(~vxm_layernorm_en),
+    // .layernorm_gamma(vxm_layernorm_gamma_reg),
+    // .layernorm_beta(vxm_layernorm_beta_reg),
+    .rmsnorm_bypass(~vxm_rmsnorm_en),
+    .rmsnorm_gamma(vxm_rmsnorm_gamma_reg),
+    .rmsnorm_beta(vxm_rmsnorm_beta_reg),
     .fp_quant_mode(fp_quant_mode),
     .stream_out(vxm_stream_out_live),
     .stream_out_scale(vxm_stream_out_scale_live),

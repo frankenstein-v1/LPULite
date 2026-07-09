@@ -1,5 +1,6 @@
 import math
 import struct
+import random
 
 import cocotb
 from cocotb.clock import Clock
@@ -130,17 +131,28 @@ def to_f32(value):
     return bits_to_float(float_to_bits(value))
 
 
-def layernorm_fp32_expected(row, gamma=None, beta=None, eps=1e-5):
+# def layernorm_fp32_expected(row, gamma=None, beta=None, eps=1e-5):
+#     if gamma is None:
+#         gamma = [1.0 for _ in row]
+#     if beta is None:
+#         beta = [0.0 for _ in row]
+#     mean = to_f32(sum(row) / len(row))
+#     variance = to_f32(sum(to_f32((value - mean) * (value - mean)) for value in row) / len(row))
+#     inv_std = to_f32(1.0 / math.sqrt(variance + eps))
+#     return [
+#         to_f32(to_f32(to_f32(value - mean) * inv_std) * gamma_i + beta_i)
+#         for value, gamma_i, beta_i in zip(row, gamma, beta)
+#     ]
+
+
+def rmsnorm_fp32_expected(row, gamma=None, eps=1e-5):
     if gamma is None:
         gamma = [1.0 for _ in row]
-    if beta is None:
-        beta = [0.0 for _ in row]
-    mean = to_f32(sum(row) / len(row))
-    variance = to_f32(sum(to_f32((value - mean) * (value - mean)) for value in row) / len(row))
-    inv_std = to_f32(1.0 / math.sqrt(variance + eps))
+    rms_sq = to_f32(sum(to_f32(value * value) for value in row) / len(row))
+    inv_rms = to_f32(1.0 / math.sqrt(rms_sq + eps))
     return [
-        to_f32(to_f32(to_f32(value - mean) * inv_std) * gamma_i + beta_i)
-        for value, gamma_i, beta_i in zip(row, gamma, beta)
+        to_f32(to_f32(value * inv_rms) * gamma_i)
+        for value, gamma_i in zip(row, gamma)
     ]
 
 
@@ -787,21 +799,111 @@ async def test_four_row_scale_softmax_quant_observe(dut):
     dut.in_valid.value = 0
 
 
+# @cocotb.test()
+# async def test_layernorm_normal(dut):
+#     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
+#     await reset_dut(dut)
+# 
+#     data_lanes = [0.35, -0.72, 1.18, 0.49]
+#     gamma_lanes = [1.0, 1.0, 1.0, 1.0]
+#     beta_lanes = [0.0, 0.0, 0.0, 0.0]
+#     expected_lanes, _ = regular_fp8_row_quant_expected(
+#         layernorm_fp32_expected(data_lanes, gamma_lanes, beta_lanes)
+#     )
+# 
+#     dut.layernorm_bypass.value = 0
+#     dut.layernorm_gamma.value = pack_float_lanes(gamma_lanes)
+#     dut.layernorm_beta.value = pack_float_lanes(beta_lanes)
+# 
+#     observed = await run_vxm_row(
+#         dut,
+#         [float_to_bits(value) for value in data_lanes],
+#         [float_to_bits(0.0) for _ in range(LANES)],
+#         ctrl=0b0000, # no bias, no relu, no scale, no softmax
+#         signed_output=False,
+#         fp_quant_mode=1,
+#     )
+#     assert observed == expected_lanes, (
+#         f"FP32 LayerNorm output mismatch: got {observed}, expected {expected_lanes}"
+#     )
+# 
+# 
+# @cocotb.test()
+# async def test_layernorm_zero_variance(dut):
+#     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
+#     await reset_dut(dut)
+# 
+#     data_lanes = [0.73, 0.73, 0.73, 0.73]
+#     gamma_lanes = [1.5, 0.75, 1.25, 0.5]
+#     beta_lanes = [0.13, -0.21, 0.37, -0.49]
+#     expected_lanes, _ = regular_fp8_row_quant_expected(
+#         layernorm_fp32_expected(data_lanes, gamma_lanes, beta_lanes)
+#     )
+# 
+#     dut.layernorm_bypass.value = 0
+#     dut.layernorm_gamma.value = pack_float_lanes(gamma_lanes)
+#     dut.layernorm_beta.value = pack_float_lanes(beta_lanes)
+# 
+#     observed = await run_vxm_row(
+#         dut,
+#         [float_to_bits(value) for value in data_lanes],
+#         [float_to_bits(0.0) for _ in range(LANES)],
+#         ctrl=0b0000,
+#         signed_output=False,
+#         fp_quant_mode=1,
+#     )
+#     assert observed == expected_lanes, (
+#         f"FP32 LayerNorm zero variance output mismatch: got {observed}, expected {expected_lanes}"
+#     )
+# 
+# 
+# import random
+# import math
+# 
+# @cocotb.test()
+# async def test_layernorm_random(dut):
+#     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
+#     await reset_dut(dut)
+# 
+#     random.seed(42)
+#     data_lanes = [random.uniform(-1.75, 1.75) for _ in range(LANES)]
+#     gamma_lanes = [random.uniform(0.35, 1.65) for _ in range(LANES)]
+#     beta_lanes = [random.uniform(-0.55, 0.55) for _ in range(LANES)]
+#     expected_lanes, _ = regular_fp8_row_quant_expected(
+#         layernorm_fp32_expected(data_lanes, gamma_lanes, beta_lanes)
+#     )
+# 
+#     dut.layernorm_bypass.value = 0
+#     dut.layernorm_gamma.value = pack_float_lanes(gamma_lanes)
+#     dut.layernorm_beta.value = pack_float_lanes(beta_lanes)
+# 
+#     observed = await run_vxm_row(
+#         dut,
+#         [float_to_bits(value) for value in data_lanes],
+#         [float_to_bits(0.0) for _ in range(LANES)],
+#         ctrl=0b0000, # no bias, no relu, no scale, no softmax
+#         signed_output=False,
+#         fp_quant_mode=1,
+#     )
+# 
+#     assert observed == expected_lanes, (
+#         f"FP32 LayerNorm random mismatch: got {observed}, expected {expected_lanes}"
+#     )
+
 @cocotb.test()
-async def test_layernorm_normal(dut):
+async def test_rmsnorm_normal(dut):
     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
     await reset_dut(dut)
 
     data_lanes = [0.35, -0.72, 1.18, 0.49]
     gamma_lanes = [1.0, 1.0, 1.0, 1.0]
-    beta_lanes = [0.0, 0.0, 0.0, 0.0]
     expected_lanes, _ = regular_fp8_row_quant_expected(
-        layernorm_fp32_expected(data_lanes, gamma_lanes, beta_lanes)
+        rmsnorm_fp32_expected(data_lanes, gamma_lanes)
     )
 
-    dut.layernorm_bypass.value = 0
-    dut.layernorm_gamma.value = pack_float_lanes(gamma_lanes)
-    dut.layernorm_beta.value = pack_float_lanes(beta_lanes)
+    dut.rmsnorm_bypass.value = 0
+    dut.rmsnorm_gamma.value = pack_float_lanes(gamma_lanes)
+    dut.rmsnorm_beta.value = pack_float_lanes([0.0, 0.0, 0.0, 0.0])
 
     observed = await run_vxm_row(
         dut,
@@ -812,25 +914,24 @@ async def test_layernorm_normal(dut):
         fp_quant_mode=1,
     )
     assert observed == expected_lanes, (
-        f"FP32 LayerNorm output mismatch: got {observed}, expected {expected_lanes}"
+        f"FP32 RMSNorm output mismatch: got {observed}, expected {expected_lanes}"
     )
 
 
 @cocotb.test()
-async def test_layernorm_zero_variance(dut):
+async def test_rmsnorm_zero_variance(dut):
     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
     await reset_dut(dut)
 
-    data_lanes = [0.73, 0.73, 0.73, 0.73]
+    data_lanes = [0.0, 0.0, 0.0, 0.0]
     gamma_lanes = [1.5, 0.75, 1.25, 0.5]
-    beta_lanes = [0.13, -0.21, 0.37, -0.49]
     expected_lanes, _ = regular_fp8_row_quant_expected(
-        layernorm_fp32_expected(data_lanes, gamma_lanes, beta_lanes)
+        rmsnorm_fp32_expected(data_lanes, gamma_lanes)
     )
 
-    dut.layernorm_bypass.value = 0
-    dut.layernorm_gamma.value = pack_float_lanes(gamma_lanes)
-    dut.layernorm_beta.value = pack_float_lanes(beta_lanes)
+    dut.rmsnorm_bypass.value = 0
+    dut.rmsnorm_gamma.value = pack_float_lanes(gamma_lanes)
+    dut.rmsnorm_beta.value = pack_float_lanes([0.0, 0.0, 0.0, 0.0])
 
     observed = await run_vxm_row(
         dut,
@@ -841,29 +942,25 @@ async def test_layernorm_zero_variance(dut):
         fp_quant_mode=1,
     )
     assert observed == expected_lanes, (
-        f"FP32 LayerNorm zero variance output mismatch: got {observed}, expected {expected_lanes}"
+        f"FP32 RMSNorm zero variance output mismatch: got {observed}, expected {expected_lanes}"
     )
 
 
-import random
-import math
-
 @cocotb.test()
-async def test_layernorm_random(dut):
+async def test_rmsnorm_random(dut):
     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
     await reset_dut(dut)
 
     random.seed(42)
     data_lanes = [random.uniform(-1.75, 1.75) for _ in range(LANES)]
     gamma_lanes = [random.uniform(0.35, 1.65) for _ in range(LANES)]
-    beta_lanes = [random.uniform(-0.55, 0.55) for _ in range(LANES)]
     expected_lanes, _ = regular_fp8_row_quant_expected(
-        layernorm_fp32_expected(data_lanes, gamma_lanes, beta_lanes)
+        rmsnorm_fp32_expected(data_lanes, gamma_lanes)
     )
 
-    dut.layernorm_bypass.value = 0
-    dut.layernorm_gamma.value = pack_float_lanes(gamma_lanes)
-    dut.layernorm_beta.value = pack_float_lanes(beta_lanes)
+    dut.rmsnorm_bypass.value = 0
+    dut.rmsnorm_gamma.value = pack_float_lanes(gamma_lanes)
+    dut.rmsnorm_beta.value = pack_float_lanes([0.0, 0.0, 0.0, 0.0])
 
     observed = await run_vxm_row(
         dut,
@@ -875,5 +972,5 @@ async def test_layernorm_random(dut):
     )
 
     assert observed == expected_lanes, (
-        f"FP32 LayerNorm random mismatch: got {observed}, expected {expected_lanes}"
+        f"FP32 RMSNorm random mismatch: got {observed}, expected {expected_lanes}"
     )
