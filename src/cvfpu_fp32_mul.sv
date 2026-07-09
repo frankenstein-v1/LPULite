@@ -1,17 +1,13 @@
 `timescale 1ns/1ps
 
-// Wrapper around CVFPU fpnew_top for scalar FP32 fused multiply-add:
-//   result = multiplicand * multiplier + addend
-//
-// The wrapper is compile-safe without CVFPU; it becomes a real binding when
-// HAVE_CVFPU is defined and the fpnew sources are added to the build.
-module cvfpu_fp32_fma (
+// Wrapper around CVFPU fpnew_top for scalar FP32 multiply:
+//   result = a * b
+module cvfpu_fp32_mul (
     input  logic        clk_i,
     input  logic        rst_ni,
     input  logic        start_i,
-    input  logic [31:0] multiplicand_i,
-    input  logic [31:0] multiplier_i,
-    input  logic [31:0] addend_i,
+    input  logic [31:0] a_i,
+    input  logic [31:0] b_i,
     output logic [31:0] result_o,
     output logic        done_o,
     output logic        busy_o
@@ -28,20 +24,20 @@ module cvfpu_fp32_fma (
     logic [31:0]      fpnew_result_o;
     logic             done_q;
 
-    assign operands_i[0] = multiplicand_i;
-    assign operands_i[1] = multiplier_i;
-    assign operands_i[2] = addend_i;
+    assign operands_i[0] = a_i;
+    assign operands_i[1] = b_i;
+    assign operands_i[2] = '0;
 
     fpnew_top #(
         .Features       (FPU_FEATURES),
         .Implementation (FPU_IMPL),
         .TagType        (logic)
-    ) i_fp32_fma (
+    ) i_fp32_mul (
         .clk_i,
         .rst_ni,
         .operands_i,
         .rnd_mode_i     (fpnew_pkg::RNE),
-        .op_i           (fpnew_pkg::FMADD),
+        .op_i           (fpnew_pkg::MUL),
         .op_mod_i       (1'b0),
         .src_fmt_i      (fpnew_pkg::FP32),
         .dst_fmt_i      (fpnew_pkg::FP32),
@@ -83,12 +79,10 @@ module cvfpu_fp32_fma (
             start_q  <= 1'b0;
             result_o <= 32'h0000_0000;
         end else begin
-            start_q  <= start_i;
+            start_q <= start_i;
             if (start_i) begin
                 result_o <= $shortrealtobits(
-                    $bitstoshortreal(multiplicand_i) *
-                    $bitstoshortreal(multiplier_i) +
-                    $bitstoshortreal(addend_i)
+                    $bitstoshortreal(a_i) * $bitstoshortreal(b_i)
                 );
             end
         end

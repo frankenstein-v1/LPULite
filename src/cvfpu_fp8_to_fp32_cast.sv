@@ -82,13 +82,53 @@ module cvfpu_fp8_to_fp32_cast (
 `else
     logic start_q;
 
+    function automatic logic [31:0] fp8_e5m2_to_fp32_bits(
+        input logic [7:0] fp8_bits
+    );
+        logic       sign_bit;
+        logic [4:0] exp_bits;
+        logic [1:0] frac_bits;
+        integer     exp_unbiased;
+        shortreal   value;
+        shortreal   scale;
+        begin
+            sign_bit = fp8_bits[7];
+            exp_bits = fp8_bits[6:2];
+            frac_bits = fp8_bits[1:0];
+
+            if ((exp_bits == 5'd0) && (frac_bits == 2'd0)) begin
+                fp8_e5m2_to_fp32_bits = sign_bit ? 32'h8000_0000 : 32'h0000_0000;
+            end else if (exp_bits == 5'h1f) begin
+                if (frac_bits == 2'd0)
+                    fp8_e5m2_to_fp32_bits = sign_bit ? 32'hff80_0000 : 32'h7f80_0000;
+                else
+                    fp8_e5m2_to_fp32_bits = 32'h7fc0_0000;
+            end else begin
+                if (exp_bits == 5'd0) begin
+                    scale = 2.0 ** (-16.0);
+                    value = frac_bits * scale;
+                end else begin
+                    exp_unbiased = exp_bits - 15;
+                    scale = 2.0 ** exp_unbiased;
+                    value = (1.0 + (frac_bits / 4.0)) * scale;
+                end
+
+                if (sign_bit)
+                    value = -value;
+
+                fp8_e5m2_to_fp32_bits = $shortrealtobits(value);
+            end
+        end
+    endfunction
+
     always_ff @(posedge clk_i or negedge rst_ni) begin
         if (!rst_ni) begin
             start_q  <= 1'b0;
             result_o <= 32'h0000_0000;
         end else begin
             start_q  <= start_i;
-            result_o <= 32'h0000_0000;
+            if (start_i)
+                result_o <= fp8_e5m2_to_fp32_bits(fp8_bits_i);
         end
     end
 

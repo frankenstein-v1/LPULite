@@ -28,36 +28,33 @@ module westbound_bus #(
     output logic                 westbound_valid
 );
 
+    logic [4:0][PAYLOAD_W-1:0] producer_payloads;
+    logic [4:0]                producer_valids;
+
     always_comb begin
-        westbound_payload = '0;
-        westbound_valid   = 1'b0;
+        producer_payloads = '0;
+        producer_valids   = '0;
 
-        unique case (producer_sel)
-            WB_SXM: begin
-                westbound_payload = sxm_payload;
-                westbound_valid   = sxm_valid;
-            end
-
-            WB_MEM0: begin
-                westbound_payload = mem0_payload;
-                westbound_valid   = mem0_valid;
-            end
-
-            WB_VXM: begin
-                westbound_payload = vxm_payload;
-                westbound_valid   = vxm_valid;
-            end
-
-            WB_MEM1: begin
-                westbound_payload = mem1_payload;
-                westbound_valid   = mem1_valid;
-            end
-
-            default: begin
-                westbound_payload = '0;
-                westbound_valid   = 1'b0;
-            end
-        endcase
+        producer_payloads[WB_SXM]  = sxm_payload;
+        producer_valids[WB_SXM]    = sxm_valid;
+        producer_payloads[WB_MEM0] = mem0_payload;
+        producer_valids[WB_MEM0]   = mem0_valid;
+        producer_payloads[WB_VXM]  = vxm_payload;
+        producer_valids[WB_VXM]    = vxm_valid;
+        producer_payloads[WB_MEM1] = mem1_payload;
+        producer_valids[WB_MEM1]   = mem1_valid;
     end
+
+    shared_bus_mux #(
+        .PAYLOAD_W(PAYLOAD_W),
+        .N_SOURCES(5),
+        .SEL_W($bits(westbound_producer_e))
+    ) u_shared_bus_mux (
+        .select_i(producer_sel),
+        .payload_i(producer_payloads),
+        .valid_i(producer_valids),
+        .payload_o(westbound_payload),
+        .valid_o(westbound_valid)
+    );
 
 endmodule

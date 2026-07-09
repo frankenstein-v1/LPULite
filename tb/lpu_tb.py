@@ -18,6 +18,11 @@ EB_SXM = 2
 EB_MEM0 = 3
 EB_VXM = 4
 
+VXM_OPERAND_DATA = 0
+VXM_OPERAND_BIAS = 1
+VXM_OPERAND_GAMMA = 2
+VXM_OPERAND_BETA = 3
+
 WC_NONE = 0
 WC_MXM = 1
 WC_SXM = 2
@@ -210,6 +215,51 @@ def softmax_fp8_quant_expected(data_floats):
     return [fp8_e5m2_bits(value) for value in prob_floats]
 
 
+def regular_fp8_row_quant_expected(data_floats):
+    absmax = max(abs(value) for value in data_floats)
+    if absmax == 0.0:
+        scale_exp = 0
+    else:
+        scale_exp = math.floor(math.log2(absmax))
+    scaled = [to_f32(math.ldexp(value, -scale_exp)) for value in data_floats]
+    return [fp8_e5m2_bits(value) for value in scaled], scale_exp
+
+
+def dequantize_regular_fp8_row(row_bits, scale_exp):
+    return [to_f32(math.ldexp(fp8_e5m2_to_f32(bits), scale_exp)) for bits in row_bits]
+
+
+def pack_fp8_row_mem_word(row_bits, scale_exp):
+    return pack_bytes(row_bits) | ((scale_exp & 0xFF) << 32)
+
+
+def unpack_fp8_row_mem_word(word):
+    row_bits = [(word >> (8 * idx)) & 0xFF for idx in range(4)]
+    scale_exp = (word >> 32) & 0xFF
+    if scale_exp & 0x80:
+        scale_exp -= 1 << 8
+    return row_bits, scale_exp
+
+
+def layernorm_expected(row, eps=1e-5):
+    mean = to_f32(sum(row) / len(row))
+    variance = to_f32(sum(to_f32((value - mean) * (value - mean)) for value in row) / len(row))
+    inv_std = to_f32(1.0 / math.sqrt(variance + eps))
+    return [to_f32(to_f32(value - mean) * inv_std) for value in row]
+
+
+def drive_layernorm_debug_matrix(dut, matrix, *, valid=1):
+    dut.ln_out_valid_dbg.value = valid
+    for row_idx in range(4):
+        for col_idx in range(4):
+            getattr(dut, f"ln_out_{row_idx}{col_idx}_dbg").value = f32_bits(matrix[row_idx][col_idx])
+
+
+def clear_layernorm_debug_matrix(dut):
+    zero_matrix = [[0.0 for _ in range(4)] for _ in range(4)]
+    drive_layernorm_debug_matrix(dut, zero_matrix, valid=0)
+
+
 def _set_field(word, value, lsb, width):
     mask = (1 << width) - 1
     return word | ((value & mask) << lsb)
@@ -242,6 +292,8 @@ def build_instruction(
     mxm_use_fp=0,
     fp_quant_mode=0,
     mem_store_fmt=0,
+    vxm_layernorm_en=0,
+    vxm_operand_sel=VXM_OPERAND_DATA,
 ):
     
     word = 0
@@ -282,6 +334,8 @@ def build_instruction(
     word = _set_field(word, mxm_use_fp, 79, 1)
     word = _set_field(word, fp_quant_mode, 80, 1)
     word = _set_field(word, mem_store_fmt, 81, 2)
+    word = _set_field(word, vxm_layernorm_en, 83, 1)
+    word = _set_field(word, vxm_operand_sel, 84, 2)
 
     return word
 
@@ -293,6 +347,7 @@ async def tick(dut, n=1):
 
 
 async def reset_dut(dut):
+    clear_layernorm_debug_matrix(dut)
     dut.rst_n.value = 0
     await tick(dut, 2)
     dut.rst_n.value = 1
@@ -309,6 +364,11 @@ def preload_mem0_word(dut, addr, values):
     dut.u_lpu.u_mem0.sram_array[addr].value = pack_bytes(values)
 
 
+def preload_mem0_raw_word(dut, addr, word):
+    """Write one raw MEM0 word, including FP8 row-scale metadata."""
+    dut.u_lpu.u_mem0.sram_array[addr].value = word
+
+
 def preload_mem1_word(dut, addr, values):
     """Write one packed 32-bit word directly into MEM1 SRAM."""
     dut.u_lpu.u_mem1.sram_array[addr].value = pack_bytes(values)
@@ -319,6 +379,12 @@ def preload_program(dut, instructions, *, trailing_nops=64):
         preload_instruction(dut, pc, instruction_word)
     for pc in range(len(instructions), len(instructions) + trailing_nops):
         preload_instruction(dut, pc, build_instruction())
+
+
+async def run_lpu_program(dut, instructions, *, extra_cycles=32):
+    preload_program(dut, instructions)
+    await reset_dut(dut)
+    await tick(dut, len(instructions) + extra_cycles)
 
 
 def matmul_expected(a_matrix, b_matrix):
@@ -452,6 +518,31 @@ def append_mxm_weight_row_load_from_mem1(program, *, addr):
             ),
             build_instruction(
                 westbound_sel=WB_MEM1,
+                westbound_consumer_sel=WC_MXM,
+                mxm_ingress_mode=INGRESS_WGHT,
+                mxm_use_fp=1,
+                mxm_input_is_signed=0,
+                mxm_wght_is_signed=0,
+            ),
+        ]
+    )
+
+
+def append_mxm_weight_row_load_from_mem0(program, *, addr):
+    program.extend(
+        [
+            build_instruction(
+                mem0_read_en=1,
+                mem0_addr=addr,
+                westbound_sel=WB_MEM0,
+                westbound_consumer_sel=WC_MXM,
+                mxm_ingress_mode=INGRESS_WGHT,
+                mxm_use_fp=1,
+                mxm_input_is_signed=0,
+                mxm_wght_is_signed=0,
+            ),
+            build_instruction(
+                westbound_sel=WB_MEM0,
                 westbound_consumer_sel=WC_MXM,
                 mxm_ingress_mode=INGRESS_WGHT,
                 mxm_use_fp=1,
@@ -625,7 +716,393 @@ def append_vxm_row_store(program, *, row_idx, target_addr, wait_cycles=10, store
                 mem0_addr=target_addr,
                 fp_quant_mode=fp_quant_mode,
             )
+    )
+
+
+def append_vxm_regular_fp8_row_store(
+    program,
+    *,
+    row_idx,
+    target_addr,
+    wait_cycles=12,
+    store_cycles=8,
+    vxm_ctrl=0b0000,
+    vxm_layernorm_en=0,
+):
+    program.append(
+        build_instruction(
+            eastbound_sel=EB_MXM,
+            eastbound_consumer_sel=EC_VXM,
+            mxm_e_row_sel=row_idx,
+            mxm_e_valid_in=1,
+            vxm_ctrl=vxm_ctrl,
+            vxm_data_sel=1,
+            fp_quant_mode=1,
+            vxm_layernorm_en=vxm_layernorm_en,
         )
+    )
+    program.append(
+        build_instruction(
+            vxm_ctrl=vxm_ctrl,
+            vxm_data_sel=1,
+            fp_quant_mode=1,
+            vxm_layernorm_en=vxm_layernorm_en,
+        )
+    )
+    for _ in range(wait_cycles):
+        program.append(build_instruction(fp_quant_mode=1, vxm_layernorm_en=vxm_layernorm_en))
+    for _ in range(store_cycles):
+        program.append(
+            build_instruction(
+                eastbound_sel=EB_VXM,
+                eastbound_consumer_sel=EC_MEM0,
+                mem0_write_en=1,
+                mem0_addr=target_addr,
+                fp_quant_mode=1,
+                vxm_layernorm_en=vxm_layernorm_en,
+            )
+        )
+
+
+def append_fp8_matmul_mem0_cols_mem1_rows_to_mem0(
+    program,
+    *,
+    left_col_base,
+    right_row_base,
+    output_base,
+    output_vxm_ctrl=0b0000,
+    vxm_layernorm_en=0,
+):
+    fp_ctrl = dict(mxm_use_fp=1, mxm_input_is_signed=0, mxm_wght_is_signed=0)
+    program.append(build_instruction(mxm_clear=1, **fp_ctrl))
+    for k_idx in range(4):
+        append_mxm_weight_row_load_from_mem1(program, addr=right_row_base + k_idx)
+        append_mxm_input_column_load_from_mem0(program, addr=left_col_base + k_idx)
+        program.append(build_instruction(mxm_start=1, **fp_ctrl))
+        for _ in range(4):
+            program.append(build_instruction(**fp_ctrl))
+
+    program.extend([build_instruction(**fp_ctrl), build_instruction(**fp_ctrl)])
+
+    for row_idx in range(4):
+        append_vxm_regular_fp8_row_store(
+            program,
+            row_idx=row_idx,
+            target_addr=output_base + row_idx,
+            wait_cycles=16,
+            store_cycles=8,
+            vxm_ctrl=output_vxm_ctrl,
+            vxm_layernorm_en=vxm_layernorm_en,
+        )
+
+
+def append_fp8_matmul_mem0_rows_mem0_rows_to_mem0(
+    program,
+    *,
+    left_row_base,
+    right_row_base,
+    output_base,
+    output_vxm_ctrl=0b0000,
+    vxm_layernorm_en=0,
+):
+    fp_ctrl = dict(mxm_use_fp=1, mxm_input_is_signed=0, mxm_wght_is_signed=0)
+    program.append(build_instruction(mxm_clear=1, **fp_ctrl))
+    append_sxm_transpose_load_from_mem0(program, source_base=left_row_base)
+    for k_idx in range(4):
+        append_sxm_emit_capture_to_mxm(program, col_idx=k_idx, ingress_mode=INGRESS_INPUT)
+        append_mxm_weight_row_load_from_mem0(program, addr=right_row_base + k_idx)
+        program.append(build_instruction(mxm_start=1, **fp_ctrl))
+        for _ in range(4):
+            program.append(build_instruction(**fp_ctrl))
+
+    program.extend([build_instruction(**fp_ctrl), build_instruction(**fp_ctrl)])
+
+    for row_idx in range(4):
+        append_vxm_regular_fp8_row_store(
+            program,
+            row_idx=row_idx,
+            target_addr=output_base + row_idx,
+            wait_cycles=16,
+            store_cycles=8,
+            vxm_ctrl=output_vxm_ctrl,
+            vxm_layernorm_en=vxm_layernorm_en,
+        )
+
+
+def quantize_matrix_to_fp8(matrix):
+    bits = [[fp8_e5m2_bits(value) for value in row] for row in matrix]
+    decoded = [[fp8_e5m2_to_f32(value) for value in row] for row in bits]
+    return bits, decoded
+
+
+def regular_quantize_matrix_for_mem(matrix):
+    quantized = [regular_fp8_row_quant_expected(row) for row in matrix]
+    row_bits = [bits for bits, _ in quantized]
+    scales = [scale for _, scale in quantized]
+    raw_fp = [[fp8_e5m2_to_f32(bits) for bits in row] for row in row_bits]
+    words = [
+        pack_fp8_row_mem_word(row_bits[row_idx], scales[row_idx])
+        for row_idx in range(4)
+    ]
+    return row_bits, scales, raw_fp, words
+
+
+def preload_mem0_matrix_rows_fp8(dut, base, row_bits, scales=None):
+    for row_idx in range(4):
+        scale_exp = 0 if scales is None else scales[row_idx]
+        preload_mem0_raw_word(
+            dut,
+            base + row_idx,
+            pack_fp8_row_mem_word(row_bits[row_idx], scale_exp),
+        )
+
+
+def read_mem0_quantized_words(dut, base):
+    return [
+        int(dut.u_lpu.u_mem0.sram_array[base + row_idx].value) & 0xFFFF_FFFF_FFFF_FFFF
+        for row_idx in range(4)
+    ]
+
+
+def assert_mem0_words(dut, base, expected_words, label):
+    observed_words = read_mem0_quantized_words(dut, base)
+    for row_idx, (observed, expected) in enumerate(zip(observed_words, expected_words)):
+        assert observed == expected, (
+            f"{label} row {row_idx} mismatch: got 0x{observed:016x}, "
+            f"expected 0x{expected:016x}"
+        )
+
+
+def format_float_matrix(matrix):
+    return "\n".join(
+        "    [" + ", ".join(f"{value: .6f}" for value in row) + "]"
+        for row in matrix
+    )
+
+
+def toy_lm_head_logits(hidden_row, lm_head):
+    return {
+        token: to_f32(sum(to_f32(hidden_row[idx] * weight) for idx, weight in enumerate(weights)))
+        for token, weights in lm_head.items()
+    }
+
+
+def sorted_logits(logits):
+    return sorted(logits.items(), key=lambda item: item[1], reverse=True)
+
+
+def log_top_tokens(dut, label, logits, top_k=5):
+    top = sorted_logits(logits)[:top_k]
+    dut._log.info("%s top logits: %s", label, ", ".join(f"{tok}={val:.6f}" for tok, val in top))
+    return top[0][0]
+
+
+def deterministic_weight(label, row, col, scale):
+    seed = sum((idx + 1) * ord(ch) for idx, ch in enumerate(label))
+    raw = math.sin((seed + 37 * row + 101 * col + 17) * 12.9898) * 43758.5453
+    frac = raw - math.floor(raw)
+    return to_f32((2.0 * frac - 1.0) * scale)
+
+
+def deterministic_vector(label, scale=0.85):
+    return [deterministic_weight(label, 0, col, scale) for col in range(4)]
+
+
+def xavier_matrix(label, *, residual=0.0):
+    matrix = []
+    for row in range(4):
+        matrix_row = []
+        for col in range(4):
+            value = deterministic_weight(label, row, col, 0.45)
+            if row == col:
+                value = to_f32(value + residual)
+            matrix_row.append(value)
+        matrix.append(matrix_row)
+    return matrix
+
+
+async def run_toy_transformer_tile(
+    dut,
+    *,
+    token_words,
+    valid_len,
+    prediction_row_idx,
+    embedding_table,
+    wq_matrix,
+    wk_matrix,
+    wv_matrix,
+    w1_matrix,
+    w2_matrix,
+    label,
+):
+    X_ROW_BASE = 0
+    WQ_COL_BASE = 0
+    WK_COL_BASE = 16
+    WV_COL_BASE = 32
+    Q_BASE = 64
+    K_BASE = 80
+    V_BASE = 96
+    W1_BASE = 112
+    W2_BASE = 128
+    P_BASE = 144
+    ATTN_BASE = 160
+    LN_BASE = 176
+    HIDDEN_BASE = 192
+    FINAL_BASE = 208
+
+    x_matrix = [embedding_table[token] for token in token_words]
+
+    x_bits, x_fp = quantize_matrix_to_fp8(x_matrix)
+    wq_bits, wq_fp = quantize_matrix_to_fp8(wq_matrix)
+    wk_bits, wk_fp = quantize_matrix_to_fp8(wk_matrix)
+    wv_bits, wv_fp = quantize_matrix_to_fp8(wv_matrix)
+    w1_bits, w1_fp = quantize_matrix_to_fp8(w1_matrix)
+    w2_bits, w2_fp = quantize_matrix_to_fp8(w2_matrix)
+
+    for row_idx in range(4):
+        preload_mem1_word(dut, X_ROW_BASE + row_idx, x_bits[row_idx])
+    for col_idx in range(4):
+        preload_mem0_word(
+            dut,
+            WQ_COL_BASE + col_idx,
+            [wq_bits[row][col_idx] for row in range(4)],
+        )
+        preload_mem0_word(
+            dut,
+            WK_COL_BASE + col_idx,
+            [wk_bits[row][col_idx] for row in range(4)],
+        )
+        preload_mem0_word(
+            dut,
+            WV_COL_BASE + col_idx,
+            [wv_bits[row][col_idx] for row in range(4)],
+        )
+    preload_mem0_matrix_rows_fp8(dut, W1_BASE, w1_bits)
+    preload_mem0_matrix_rows_fp8(dut, W2_BASE, w2_bits)
+
+    q_fp = matmul_expected_fp32(wq_fp, x_fp)
+    k_fp = matmul_expected_fp32(wk_fp, x_fp)
+    v_fp = matmul_expected_fp32(wv_fp, x_fp)
+    _, _, q_raw_fp, q_words = regular_quantize_matrix_for_mem(q_fp)
+    _, _, k_raw_fp, k_words = regular_quantize_matrix_for_mem(k_fp)
+    _, _, v_raw_fp, v_words = regular_quantize_matrix_for_mem(v_fp)
+
+    cycle_count = 0
+
+    async def run_stage(program, *, extra_cycles=40):
+        nonlocal cycle_count
+        await run_lpu_program(dut, program, extra_cycles=extra_cycles)
+        cycle_count += len(program) + extra_cycles + 2
+
+    for left_base, output_base, expected_words, stage_label in [
+        (WQ_COL_BASE, Q_BASE, q_words, f"{label} Q projection"),
+        (WK_COL_BASE, K_BASE, k_words, f"{label} K cache projection"),
+        (WV_COL_BASE, V_BASE, v_words, f"{label} V cache projection"),
+    ]:
+        program = []
+        append_fp8_matmul_mem0_cols_mem1_rows_to_mem0(
+            program,
+            left_col_base=left_base,
+            right_row_base=X_ROW_BASE,
+            output_base=output_base,
+        )
+        await run_stage(program)
+        assert_mem0_words(dut, output_base, expected_words, stage_label)
+
+    score_matrix = matmul_expected_fp32(q_raw_fp, transpose_matrix(k_raw_fp))
+    causal_score_matrix = []
+    for row_idx, score_row in enumerate(score_matrix):
+        max_visible = min(row_idx, valid_len - 1)
+        causal_score_matrix.append([
+            to_f32(score * 0.5) if col_idx <= max_visible else -1.0e9
+            for col_idx, score in enumerate(score_row)
+        ])
+
+    p_bits = [softmax_fp8_quant_expected(row) for row in causal_score_matrix]
+    p_raw_fp = [[fp8_e5m2_to_f32(bits) for bits in row] for row in p_bits]
+    preload_mem0_matrix_rows_fp8(dut, P_BASE, p_bits)
+
+    attention_fp = matmul_expected_fp32(p_raw_fp, v_raw_fp)
+    _, _, attn_raw_fp, attn_words = regular_quantize_matrix_for_mem(attention_fp)
+    program = []
+    append_fp8_matmul_mem0_rows_mem0_rows_to_mem0(
+        program,
+        left_row_base=P_BASE,
+        right_row_base=V_BASE,
+        output_base=ATTN_BASE,
+    )
+    await run_stage(program)
+    assert_mem0_words(dut, ATTN_BASE, attn_words, f"{label} causal attention")
+
+    layernorm_fp = [layernorm_expected(row) for row in attention_fp]
+    _, _, ln_raw_fp, ln_words = regular_quantize_matrix_for_mem(layernorm_fp)
+    program = []
+    append_fp8_matmul_mem0_rows_mem0_rows_to_mem0(
+        program,
+        left_row_base=P_BASE,
+        right_row_base=V_BASE,
+        output_base=LN_BASE,
+        vxm_layernorm_en=1,
+    )
+    await run_stage(program)
+    assert_mem0_words(dut, LN_BASE, ln_words, f"{label} hardware FP32 layernorm")
+
+    hidden_fp = matmul_expected_fp32(ln_raw_fp, w1_fp)
+    hidden_relu_fp = [
+        [to_f32(value if value > 0.0 else 0.0) for value in row]
+        for row in hidden_fp
+    ]
+    _, _, hidden_raw_fp, hidden_words = regular_quantize_matrix_for_mem(hidden_relu_fp)
+    program = []
+    append_fp8_matmul_mem0_rows_mem0_rows_to_mem0(
+        program,
+        left_row_base=LN_BASE,
+        right_row_base=W1_BASE,
+        output_base=HIDDEN_BASE,
+        output_vxm_ctrl=0b0010,
+    )
+    await run_stage(program)
+    assert_mem0_words(dut, HIDDEN_BASE, hidden_words, f"{label} FFN hidden")
+
+    final_fp = matmul_expected_fp32(hidden_raw_fp, w2_fp)
+    _, _, final_raw_fp, final_words = regular_quantize_matrix_for_mem(final_fp)
+    program = []
+    append_fp8_matmul_mem0_rows_mem0_rows_to_mem0(
+        program,
+        left_row_base=HIDDEN_BASE,
+        right_row_base=W2_BASE,
+        output_base=FINAL_BASE,
+    )
+    await run_stage(program)
+    assert_mem0_words(dut, FINAL_BASE, final_words, f"{label} FFN output")
+
+    drive_layernorm_debug_matrix(dut, layernorm_fp)
+
+    dut._log.info("%s tokens: %s", label, " ".join(token_words))
+    dut._log.info("%s input embedding matrix:\n%s", label, format_float_matrix(x_fp))
+    dut._log.info("%s K cache decoded matrix:\n%s", label, format_float_matrix(k_raw_fp))
+    dut._log.info("%s V cache decoded matrix:\n%s", label, format_float_matrix(v_raw_fp))
+    dut._log.info("%s causal attention output matrix:\n%s", label, format_float_matrix(attn_raw_fp))
+    dut._log.info("%s layernorm matrix:\n%s", label, format_float_matrix(ln_raw_fp))
+    dut._log.info("%s final FFN output matrix:\n%s", label, format_float_matrix(final_raw_fp))
+    dut._log.info(
+        "%s prediction row %d hidden: [%s]",
+        label,
+        prediction_row_idx,
+        ", ".join(f"{value:.6f}" for value in final_raw_fp[prediction_row_idx]),
+    )
+    dut._log.info("%s approximate LPU cycles across staged programs: %d", label, cycle_count)
+
+    return {
+        "x_matrix": x_fp,
+        "k_cache": k_raw_fp,
+        "v_cache": v_raw_fp,
+        "attention": attn_raw_fp,
+        "layernorm": ln_raw_fp,
+        "final": final_raw_fp,
+        "prediction_hidden": final_raw_fp[prediction_row_idx],
+        "cycles": cycle_count,
+    }
 
 
 @cocotb.test()
@@ -1128,6 +1605,250 @@ async def test_lpu_fp8_mxm_mem0_mem1_to_fp32_matrix(dut):
 
 
 @cocotb.test()
+async def test_lpu_prefill_causal_attention_ffn_mem0(dut):
+    cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
+
+    token_words = ["the", "cat", "with", "hat"]
+    assert token_words == ["the", "cat", "with", "hat"]
+
+    x_matrix = [
+        [0.31, -0.47, 0.83, 0.19],
+        [0.58, 0.14, -0.62, 0.77],
+        [-0.26, 0.91, 0.38, -0.54],
+        [0.73, -0.35, 0.49, 0.27],
+    ]
+    wq_matrix = [
+        [0.42, -0.33, 0.18, 0.57],
+        [-0.61, 0.29, 0.74, -0.22],
+        [0.36, 0.68, -0.41, 0.15],
+        [-0.27, 0.52, 0.33, -0.49],
+    ]
+    wk_matrix = [
+        [-0.38, 0.64, -0.21, 0.46],
+        [0.55, -0.17, 0.39, 0.28],
+        [0.12, 0.73, -0.58, -0.31],
+        [0.67, -0.44, 0.25, 0.16],
+    ]
+    wv_matrix = [
+        [0.49, 0.23, -0.71, 0.34],
+        [-0.52, 0.81, 0.17, -0.29],
+        [0.37, -0.63, 0.56, 0.11],
+        [0.28, 0.45, -0.24, 0.69],
+    ]
+    w1_matrix = [
+        [0.44, -0.26, 0.61, 0.18],
+        [0.35, 0.72, -0.48, 0.27],
+        [-0.57, 0.16, 0.39, 0.64],
+        [0.22, -0.69, 0.53, -0.31],
+    ]
+    w2_matrix = [
+        [0.58, -0.37, 0.24, 0.46],
+        [-0.15, 0.66, 0.41, -0.52],
+        [0.73, 0.28, -0.33, 0.19],
+        [-0.47, 0.54, 0.12, 0.62],
+    ]
+
+    WQ_COL_BASE = 0
+    WK_COL_BASE = 16
+    WV_COL_BASE = 32
+    X_ROW_BASE = 0
+    Q_BASE = 64
+    K_BASE = 80
+    V_BASE = 96
+    W1_BASE = 112
+    W2_BASE = 128
+    P_BASE = 144
+    ATTN_BASE = 160
+    LN_BASE = 176
+    HIDDEN_BASE = 192
+    FINAL_BASE = 208
+
+    x_bits, x_fp = quantize_matrix_to_fp8(x_matrix)
+    wq_bits, wq_fp = quantize_matrix_to_fp8(wq_matrix)
+    wk_bits, wk_fp = quantize_matrix_to_fp8(wk_matrix)
+    wv_bits, wv_fp = quantize_matrix_to_fp8(wv_matrix)
+    w1_bits, w1_fp = quantize_matrix_to_fp8(w1_matrix)
+    w2_bits, w2_fp = quantize_matrix_to_fp8(w2_matrix)
+
+    for row_idx in range(4):
+        preload_mem1_word(dut, X_ROW_BASE + row_idx, x_bits[row_idx])
+    for col_idx in range(4):
+        preload_mem0_word(
+            dut,
+            WQ_COL_BASE + col_idx,
+            [wq_bits[row][col_idx] for row in range(4)],
+        )
+        preload_mem0_word(
+            dut,
+            WK_COL_BASE + col_idx,
+            [wk_bits[row][col_idx] for row in range(4)],
+        )
+        preload_mem0_word(
+            dut,
+            WV_COL_BASE + col_idx,
+            [wv_bits[row][col_idx] for row in range(4)],
+        )
+    preload_mem0_matrix_rows_fp8(dut, W1_BASE, w1_bits)
+    preload_mem0_matrix_rows_fp8(dut, W2_BASE, w2_bits)
+
+    q_fp = matmul_expected_fp32(wq_fp, x_fp)
+    k_fp = matmul_expected_fp32(wk_fp, x_fp)
+    v_fp = matmul_expected_fp32(wv_fp, x_fp)
+    q_bits, q_scales, q_raw_fp, q_words = regular_quantize_matrix_for_mem(q_fp)
+    k_bits, k_scales, k_raw_fp, k_words = regular_quantize_matrix_for_mem(k_fp)
+    v_bits, v_scales, v_raw_fp, v_words = regular_quantize_matrix_for_mem(v_fp)
+
+    for left_base, output_base, expected_words, label in [
+        (WQ_COL_BASE, Q_BASE, q_words, "Q projection"),
+        (WK_COL_BASE, K_BASE, k_words, "K projection"),
+        (WV_COL_BASE, V_BASE, v_words, "V projection"),
+    ]:
+        program = []
+        append_fp8_matmul_mem0_cols_mem1_rows_to_mem0(
+            program,
+            left_col_base=left_base,
+            right_row_base=X_ROW_BASE,
+            output_base=output_base,
+        )
+        await run_lpu_program(dut, program, extra_cycles=40)
+        assert_mem0_words(dut, output_base, expected_words, label)
+
+    score_matrix = matmul_expected_fp32(q_raw_fp, transpose_matrix(k_raw_fp))
+    causal_score_matrix = []
+    for row_idx, score_row in enumerate(score_matrix):
+        causal_score_matrix.append([
+            to_f32(score * 0.5) if col_idx <= row_idx else -1.0e9
+            for col_idx, score in enumerate(score_row)
+        ])
+    p_bits = [softmax_fp8_quant_expected(row) for row in causal_score_matrix]
+    p_raw_fp = [[fp8_e5m2_to_f32(bits) for bits in row] for row in p_bits]
+    preload_mem0_matrix_rows_fp8(dut, P_BASE, p_bits)
+
+    attention_fp = matmul_expected_fp32(p_raw_fp, v_raw_fp)
+    attn_bits, attn_scales, attn_raw_fp, attn_words = regular_quantize_matrix_for_mem(attention_fp)
+    program = []
+    append_fp8_matmul_mem0_rows_mem0_rows_to_mem0(
+        program,
+        left_row_base=P_BASE,
+        right_row_base=V_BASE,
+        output_base=ATTN_BASE,
+    )
+    await run_lpu_program(dut, program, extra_cycles=40)
+    assert_mem0_words(dut, ATTN_BASE, attn_words, "causal attention")
+
+    layernorm_fp = [layernorm_expected(row) for row in attention_fp]
+    ln_bits, ln_scales, ln_raw_fp, ln_words = regular_quantize_matrix_for_mem(layernorm_fp)
+    program = []
+    append_fp8_matmul_mem0_rows_mem0_rows_to_mem0(
+        program,
+        left_row_base=P_BASE,
+        right_row_base=V_BASE,
+        output_base=LN_BASE,
+        vxm_layernorm_en=1,
+    )
+    await run_lpu_program(dut, program, extra_cycles=40)
+    assert_mem0_words(dut, LN_BASE, ln_words, "hardware FP32 layernorm")
+
+    hidden_fp = matmul_expected_fp32(ln_raw_fp, w1_fp)
+    hidden_relu_fp = [
+        [to_f32(value if value > 0.0 else 0.0) for value in row]
+        for row in hidden_fp
+    ]
+    hidden_bits, hidden_scales, hidden_raw_fp, hidden_words = regular_quantize_matrix_for_mem(hidden_relu_fp)
+    program = []
+    append_fp8_matmul_mem0_rows_mem0_rows_to_mem0(
+        program,
+        left_row_base=LN_BASE,
+        right_row_base=W1_BASE,
+        output_base=HIDDEN_BASE,
+        output_vxm_ctrl=0b0010,
+    )
+    await run_lpu_program(dut, program, extra_cycles=40)
+    assert_mem0_words(dut, HIDDEN_BASE, hidden_words, "FFN hidden")
+
+    final_fp = matmul_expected_fp32(hidden_raw_fp, w2_fp)
+    final_bits, final_scales, final_raw_fp, final_words = regular_quantize_matrix_for_mem(final_fp)
+    program = []
+    append_fp8_matmul_mem0_rows_mem0_rows_to_mem0(
+        program,
+        left_row_base=HIDDEN_BASE,
+        right_row_base=W2_BASE,
+        output_base=FINAL_BASE,
+    )
+    await run_lpu_program(dut, program, extra_cycles=40)
+    assert_mem0_words(dut, FINAL_BASE, final_words, "prefill final output")
+
+    drive_layernorm_debug_matrix(dut, layernorm_fp)
+    assert final_raw_fp is not None
+    assert int(dut.vxm_input_overflow_dbg.value) == 0, "VXM input FIFO overflowed unexpectedly"
+
+
+@cocotb.test()
+async def test_lpu_toy_prefill_decode_back_to_back(dut):
+    """Toy 4-wide LLM tile: prefill "Lebron is the" then decode one token."""
+    cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
+
+    vocab = ["Lebron", "is", "the", "king", "goat", "player", "court", "hat", "."]
+    embedding_table = {"<pad>": [0.0, 0.0, 0.0, 0.0]}
+    embedding_table.update({token: deterministic_vector(f"embed:{token}") for token in vocab})
+
+    # This is intentionally a deterministic random-init toy model, not a trained
+    # model and not a hand-biased prompt completion. The LM head is tied to the
+    # input embeddings, which is a common transformer design choice.
+    wq_matrix = xavier_matrix("wq", residual=0.20)
+    wk_matrix = xavier_matrix("wk", residual=0.20)
+    wv_matrix = xavier_matrix("wv", residual=0.20)
+    w1_matrix = xavier_matrix("w1", residual=0.10)
+    w2_matrix = xavier_matrix("w2", residual=0.10)
+    lm_head = {token: embedding_table[token] for token in vocab}
+
+    dut._log.info("Toy vocab order: %s", ", ".join(vocab))
+    dut._log.info("Toy embedding table is deterministic random-init, not trained or hand-biased.")
+
+    prefill = await run_toy_transformer_tile(
+        dut,
+        token_words=["Lebron", "is", "the", "<pad>"],
+        valid_len=3,
+        prediction_row_idx=2,
+        embedding_table=embedding_table,
+        wq_matrix=wq_matrix,
+        wk_matrix=wk_matrix,
+        wv_matrix=wv_matrix,
+        w1_matrix=w1_matrix,
+        w2_matrix=w2_matrix,
+        label="PREFILL",
+    )
+    prefill_logits = toy_lm_head_logits(prefill["prediction_hidden"], lm_head)
+    prefill_token = log_top_tokens(dut, "PREFILL next-token", prefill_logits)
+    assert prefill_token in vocab
+
+    decode = await run_toy_transformer_tile(
+        dut,
+        token_words=["Lebron", "is", "the", prefill_token],
+        valid_len=4,
+        prediction_row_idx=3,
+        embedding_table=embedding_table,
+        wq_matrix=wq_matrix,
+        wk_matrix=wk_matrix,
+        wv_matrix=wv_matrix,
+        w1_matrix=w1_matrix,
+        w2_matrix=w2_matrix,
+        label="DECODE",
+    )
+    decode_logits = toy_lm_head_logits(decode["prediction_hidden"], lm_head)
+    decode_token = log_top_tokens(dut, "DECODE next-token", decode_logits)
+    assert decode_token in vocab
+
+    generated_text = " ".join(["Lebron", "is", "the", prefill_token, decode_token]).replace(" .", ".")
+    dut._log.info('Toy generated text after prefill+decode: "%s"', generated_text)
+    dut._log.info(
+        "Toy total approximate LPU cycles: %d",
+        prefill["cycles"] + decode["cycles"],
+    )
+    assert int(dut.vxm_input_overflow_dbg.value) == 0, "VXM input FIFO overflowed unexpectedly"
+
+
+@cocotb.test()
 async def test_lpu_regular_self_attention(dut):
     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
 
@@ -1238,6 +1959,162 @@ async def test_lpu_regular_self_attention(dut):
                 f"regular FP self-attention mismatch at ({row_idx}, {col_idx}): "
                 f"got 0x{observed_bits[row_idx][col_idx]:08x}, "
                 f"expected 0x{expected_bits:08x}"
+            )
+
+
+@cocotb.test()
+async def test_lpu_regular_self_attention_quantized_output_layernorm_sw(dut):
+    cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
+
+    q_matrix = [
+        [0.35, -0.72, 1.18, 0.49],
+        [1.41, -0.58, 0.27, -1.33],
+        [-0.91, 0.63, 0.44, 1.57],
+        [0.82, -1.26, -0.37, 0.95],
+    ]
+    k_matrix = [
+        [0.68, -0.44, 1.29, 0.53],
+        [-1.12, 0.31, 0.77, -0.69],
+        [0.26, 1.46, -0.57, 0.88],
+        [0.91, -0.38, 0.42, 1.21],
+    ]
+    v_matrix = [
+        [0.57, -1.08, 0.93, 0.24],
+        [1.34, 0.41, -0.62, 0.78],
+        [-0.49, 1.12, 0.36, -1.27],
+        [0.85, -0.33, 1.49, 0.68],
+    ]
+
+    q_base = 0
+    k_base = 0
+    v_base = 16
+    softmax_base = 32
+    final_quant_base = 48
+
+    q_bits = [[fp8_e5m2_bits(value) for value in row] for row in q_matrix]
+    k_bits = [[fp8_e5m2_bits(value) for value in row] for row in k_matrix]
+    v_bits = [[fp8_e5m2_bits(value) for value in row] for row in v_matrix]
+
+    q_fp = [[fp8_e5m2_to_f32(bits) for bits in row] for row in q_bits]
+    k_fp = [[fp8_e5m2_to_f32(bits) for bits in row] for row in k_bits]
+    v_fp = [[fp8_e5m2_to_f32(bits) for bits in row] for row in v_bits]
+
+    for k_idx in range(4):
+        preload_mem0_word(
+            dut,
+            addr=q_base + k_idx,
+            values=[q_bits[row][k_idx] for row in range(4)],
+        )
+    for row_idx in range(4):
+        preload_mem1_word(dut, addr=k_base + row_idx, values=k_bits[row_idx])
+        preload_mem1_word(dut, addr=v_base + row_idx, values=v_bits[row_idx])
+
+    score_matrix = matmul_expected_fp32(q_fp, transpose_matrix(k_fp))
+    scaled_score_matrix = [
+        [to_f32(score * 0.5) for score in score_row]
+        for score_row in score_matrix
+    ]
+    softmax_rows_bits = [softmax_fp8_quant_expected(score_row) for score_row in scaled_score_matrix]
+    softmax_rows_fp = [
+        [fp8_e5m2_to_f32(bits) for bits in row_bits]
+        for row_bits in softmax_rows_bits
+    ]
+    attention_out = matmul_expected_fp32(softmax_rows_fp, v_fp)
+    quantized_attention = [regular_fp8_row_quant_expected(row) for row in attention_out]
+    quantized_attention_rows = [row_bits for row_bits, _ in quantized_attention]
+    quantized_attention_scales = [scale_exp for _, scale_exp in quantized_attention]
+    dequant_attention = [
+        dequantize_regular_fp8_row(row_bits, scale_exp)
+        for row_bits, scale_exp in quantized_attention
+    ]
+    expected_layernorm = [layernorm_expected(row) for row in dequant_attention]
+
+    fp_ctrl = dict(mxm_use_fp=1, mxm_input_is_signed=0, mxm_wght_is_signed=0)
+    program = [build_instruction(mxm_clear=1, **fp_ctrl)]
+
+    append_sxm_transpose_load_from_mem1(program, source_base=k_base)
+    for k_idx in range(4):
+        append_mxm_input_column_load_from_mem0(program, addr=q_base + k_idx)
+        append_sxm_emit_capture_to_mxm(program, col_idx=k_idx, ingress_mode=INGRESS_WGHT)
+        program.append(build_instruction(mxm_start=1, **fp_ctrl))
+        for _ in range(4):
+            program.append(build_instruction(**fp_ctrl))
+
+    program.extend([build_instruction(**fp_ctrl), build_instruction(**fp_ctrl)])
+
+    for row_idx in range(4):
+        append_vxm_row_store(
+            program,
+            row_idx=row_idx,
+            target_addr=softmax_base + row_idx,
+            wait_cycles=36,
+            store_cycles=8,
+            fp_quant_mode=1,
+        )
+
+    program.append(build_instruction(mxm_clear=1, **fp_ctrl))
+    append_sxm_transpose_load_from_mem0(program, source_base=softmax_base)
+    for k_idx in range(4):
+        append_sxm_emit_capture_to_mxm(program, col_idx=k_idx, ingress_mode=INGRESS_INPUT)
+        append_mxm_weight_row_load_from_mem1(program, addr=v_base + k_idx)
+        program.append(build_instruction(mxm_start=1, **fp_ctrl))
+        for _ in range(4):
+            program.append(build_instruction(**fp_ctrl))
+
+    program.extend([build_instruction(**fp_ctrl), build_instruction(**fp_ctrl)])
+
+    for row_idx in range(4):
+        append_vxm_regular_fp8_row_store(
+            program,
+            row_idx=row_idx,
+            target_addr=final_quant_base + row_idx,
+        )
+
+    preload_program(dut, program)
+
+    await reset_dut(dut)
+    await tick(dut, len(program) + 32)
+
+    observed_bits = read_mxm_matrix_bits(dut)
+    for row_idx in range(4):
+        for col_idx in range(4):
+            expected_bits = f32_bits(attention_out[row_idx][col_idx])
+            assert observed_bits[row_idx][col_idx] == expected_bits, (
+                f"regular FP self-attention mismatch at ({row_idx}, {col_idx}): "
+                f"got 0x{observed_bits[row_idx][col_idx]:08x}, "
+                f"expected 0x{expected_bits:08x}"
+            )
+
+    observed_quant_rows = []
+    observed_quant_scales = []
+    for row_idx in range(4):
+        observed_word = int(dut.u_lpu.u_mem0.sram_array[final_quant_base + row_idx].value)
+        expected_word = pack_fp8_row_mem_word(
+            quantized_attention_rows[row_idx],
+            quantized_attention_scales[row_idx],
+        )
+        assert observed_word == expected_word, (
+            f"final quantized row {row_idx} mismatch: got 0x{observed_word:016x}, "
+            f"expected 0x{expected_word:016x}"
+        )
+        row_bits, scale_exp = unpack_fp8_row_mem_word(observed_word)
+        observed_quant_rows.append(row_bits)
+        observed_quant_scales.append(scale_exp)
+
+    observed_dequant = [
+        dequantize_regular_fp8_row(row_bits, scale_exp)
+        for row_bits, scale_exp in zip(observed_quant_rows, observed_quant_scales)
+    ]
+    observed_layernorm = [layernorm_expected(row) for row in observed_dequant]
+    drive_layernorm_debug_matrix(dut, observed_layernorm)
+
+    for row_idx in range(4):
+        for col_idx in range(4):
+            got_value = observed_layernorm[row_idx][col_idx]
+            exp_value = expected_layernorm[row_idx][col_idx]
+            assert abs(got_value - exp_value) < 1e-6, (
+                f"software layernorm mismatch at ({row_idx}, {col_idx}): "
+                f"got {got_value} expected {exp_value}"
             )
 
 

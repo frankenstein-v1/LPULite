@@ -1,0 +1,54 @@
+SIM ?= verilator
+TOPLEVEL_LANG ?= verilog
+
+MAKEFILE_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+ROOT := $(abspath $(MAKEFILE_DIR)/..)
+CVFPU := $(ROOT)/third_party/cvfpu
+COMMON := $(CVFPU)/src/common_cells/src
+DIVSQRT := $(CVFPU)/src/fpu_div_sqrt_mvp/hdl
+
+include $(MAKEFILE_DIR)/cvfpu_sources.mk
+
+VERILOG_SOURCES = \
+	$(CVFPU_ALL_SOURCES) \
+	$(ROOT)/src/lpu_pkg.sv \
+	$(ROOT)/src/cvfpu_fp8_fp32_fma.sv \
+	$(ROOT)/src/mac.sv \
+	$(ROOT)/src/int_mac.sv \
+	$(ROOT)/src/cvfpu_fp8_to_fp32_cast.sv \
+	$(ROOT)/src/cvfpu_fp32_fma.sv \
+	$(ROOT)/src/acc.sv \
+	$(ROOT)/src/mem.sv \
+	$(ROOT)/src/mxm.sv \
+	$(ROOT)/src/sxm.sv \
+	$(ROOT)/src/row_fifo.sv \
+	$(ROOT)/src/lut_softmax_exp.sv \
+	$(ROOT)/src/lut_softmax_div.sv \
+	$(ROOT)/src/softmax.sv \
+	$(ROOT)/src/quant.sv \
+	$(ROOT)/src/vxm.sv \
+	$(ROOT)/src/icu.sv \
+	$(ROOT)/src/shared_bus_mux.sv \
+	$(ROOT)/src/westbound_bus/westbound_bus.sv \
+	$(ROOT)/src/westbound_bus/westbound_consumer_decode.sv \
+	$(ROOT)/src/eastbound_bus/eastbound_bus.sv \
+	$(ROOT)/src/eastbound_bus/eastbound_consumer_decode.sv \
+	$(ROOT)/src/eastbound_bus/mxm_eastbound_adapter.sv \
+	$(ROOT)/src/lpu.sv \
+	$(MAKEFILE_DIR)/LPU_mem_sxm_mxm_tb.sv
+
+TOPLEVEL = lpu_mem_sxm_mxm_cocotb_top
+COCOTB_TEST_MODULES = lpu_mem_sxm_mxm_tb
+
+COMPILE_ARGS += -DHAVE_CVFPU
+COMPILE_ARGS += -I$(ROOT)/src
+COMPILE_ARGS += -I$(CVFPU)/src/common_cells/include
+EXTRA_ARGS += --Wno-fatal
+EXTRA_ARGS += --trace-vcd
+SIM_ARGS += --trace
+SIM_ARGS += --trace-file $(SIM_BUILD)/lpu_mem_sxm_mxm_fp.vcd
+
+export WAVES = 1
+export PYTHONPATH := $(MAKEFILE_DIR):$(PYTHONPATH)
+
+include $(shell cocotb-config --makefiles)/Makefile.sim

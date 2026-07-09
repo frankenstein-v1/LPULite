@@ -12,7 +12,9 @@ module vxm_four_row_observe_tb;
     logic             in_valid;
     logic             in_ready;
     logic [3:0]       vxm_ctrl;
+    logic             fp_quant_mode;
     logic [31:0]      stream_out;
+    logic [31:0]      stream_out_scale;
     logic             out_valid;
     logic             out_ready;
 
@@ -31,7 +33,9 @@ module vxm_four_row_observe_tb;
         .layernorm_bypass(1'b1),
         .layernorm_gamma(128'h00000001000000010000000100000001),
         .layernorm_beta(128'h00000000000000000000000000000000),
+        .fp_quant_mode(fp_quant_mode),
         .stream_out(stream_out),
+        .stream_out_scale(stream_out_scale),
         .out_valid(out_valid),
         .out_ready(out_ready)
     );
@@ -59,6 +63,7 @@ module vxm_four_row_observe_tb;
         stream_in_bias = '0;
         in_valid = 1'b0;
         vxm_ctrl = '0;
+        fp_quant_mode = 1'b0;
         out_ready = 1'b1;
 
         $dumpfile("tb/vxm_four_row_observe.vcd");

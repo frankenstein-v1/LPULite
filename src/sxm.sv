@@ -131,28 +131,28 @@ module sxm (
     always_comb begin
         case (current_emit_idx)
             2'd0: begin
-                transpose_emit_row[7:0]   = transpose_rows8[3][0];
-                transpose_emit_row[15:8]  = transpose_rows8[2][0];
-                transpose_emit_row[23:16] = transpose_rows8[1][0];
-                transpose_emit_row[31:24] = transpose_rows8[0][0];
+                transpose_emit_row[7:0]   = transpose_rows8[0][0];
+                transpose_emit_row[15:8]  = transpose_rows8[1][0];
+                transpose_emit_row[23:16] = transpose_rows8[2][0];
+                transpose_emit_row[31:24] = transpose_rows8[3][0];
             end
             2'd1: begin
-                transpose_emit_row[7:0]   = transpose_rows8[3][1];
-                transpose_emit_row[15:8]  = transpose_rows8[2][1];
-                transpose_emit_row[23:16] = transpose_rows8[1][1];
-                transpose_emit_row[31:24] = transpose_rows8[0][1];
+                transpose_emit_row[7:0]   = transpose_rows8[0][1];
+                transpose_emit_row[15:8]  = transpose_rows8[1][1];
+                transpose_emit_row[23:16] = transpose_rows8[2][1];
+                transpose_emit_row[31:24] = transpose_rows8[3][1];
             end
             2'd2: begin
-                transpose_emit_row[7:0]   = transpose_rows8[3][2];
-                transpose_emit_row[15:8]  = transpose_rows8[2][2];
-                transpose_emit_row[23:16] = transpose_rows8[1][2];
-                transpose_emit_row[31:24] = transpose_rows8[0][2];
+                transpose_emit_row[7:0]   = transpose_rows8[0][2];
+                transpose_emit_row[15:8]  = transpose_rows8[1][2];
+                transpose_emit_row[23:16] = transpose_rows8[2][2];
+                transpose_emit_row[31:24] = transpose_rows8[3][2];
             end
             2'd3: begin
-                transpose_emit_row[7:0]   = transpose_rows8[3][3];
-                transpose_emit_row[15:8]  = transpose_rows8[2][3];
-                transpose_emit_row[23:16] = transpose_rows8[1][3];
-                transpose_emit_row[31:24] = transpose_rows8[0][3];
+                transpose_emit_row[7:0]   = transpose_rows8[0][3];
+                transpose_emit_row[15:8]  = transpose_rows8[1][3];
+                transpose_emit_row[23:16] = transpose_rows8[2][3];
+                transpose_emit_row[31:24] = transpose_rows8[3][3];
             end
             default: transpose_emit_row = '0;
         endcase

@@ -27,7 +27,7 @@ module lpu_cocotb_top (
     output logic [31:0] westbound_payload_dbg,
     output logic        westbound_valid_dbg,
     output logic        mxm_west_en_dbg,
-    output mxm_row_t    mem0_stream_in_dbg,
+    output mem_row_t    mem0_stream_in_dbg,
     output logic        mem0_write_from_east_dbg,
     output logic        mem0_write_en_eff_dbg,
     output logic        vxm_input_overflow_dbg,
@@ -86,7 +86,30 @@ module lpu_cocotb_top (
     output logic signed [31:0] mxm_out_30_dbg,
     output logic signed [31:0] mxm_out_31_dbg,
     output logic signed [31:0] mxm_out_32_dbg,
-    output logic signed [31:0] mxm_out_33_dbg
+    output logic signed [31:0] mxm_out_33_dbg,
+
+    output logic        ln_out_valid_dbg,
+    output logic [31:0] ln_out_00_dbg,
+    output logic [31:0] ln_out_01_dbg,
+    output logic [31:0] ln_out_02_dbg,
+    output logic [31:0] ln_out_03_dbg,
+    output logic [31:0] ln_out_10_dbg,
+    output logic [31:0] ln_out_11_dbg,
+    output logic [31:0] ln_out_12_dbg,
+    output logic [31:0] ln_out_13_dbg,
+    output logic [31:0] ln_out_20_dbg,
+    output logic [31:0] ln_out_21_dbg,
+    output logic [31:0] ln_out_22_dbg,
+    output logic [31:0] ln_out_23_dbg,
+    output logic [31:0] ln_out_30_dbg,
+    output logic [31:0] ln_out_31_dbg,
+    output logic [31:0] ln_out_32_dbg,
+    output logic [31:0] ln_out_33_dbg,
+
+    input  logic [255:0] ln8_x_dbg,
+    input  logic [255:0] ln8_gamma_dbg,
+    input  logic [255:0] ln8_beta_dbg,
+    output logic [255:0] ln8_y_dbg
 );
 
     lpu u_lpu (
@@ -176,6 +199,16 @@ module lpu_cocotb_top (
     assign mxm_out_31_dbg            = u_lpu.u_mxm.mxm_out[3][1];
     assign mxm_out_32_dbg            = u_lpu.u_mxm.mxm_out[3][2];
     assign mxm_out_33_dbg            = u_lpu.u_mxm.mxm_out[3][3];
+
+    lut_layernorm #(
+        .LANES(8),
+        .LANE_W(32)
+    ) u_ln8_dbg (
+        .x_in(ln8_x_dbg),
+        .gamma(ln8_gamma_dbg),
+        .beta(ln8_beta_dbg),
+        .y_out(ln8_y_dbg)
+    );
 
 `ifdef WAVEFORM
     initial begin

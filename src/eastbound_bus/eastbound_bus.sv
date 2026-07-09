@@ -29,36 +29,33 @@ module eastbound_bus #(
     output logic                 eastbound_valid
 );
 
+    logic [4:0][PAYLOAD_E-1:0] producer_payloads;
+    logic [4:0]                producer_valids;
+
     always_comb begin
-        eastbound_payload = '0;
-        eastbound_valid = 1'b0;
+        producer_payloads = '0;
+        producer_valids   = '0;
 
-        unique case(producer_sel)
-        EB_MXM: begin
-            eastbound_payload = mxm_payload_e;
-            eastbound_valid = mxm_valid_e;
-        end 
+        producer_payloads[EB_MXM]  = mxm_payload_e;
+        producer_valids[EB_MXM]    = mxm_valid_e;
+        producer_payloads[EB_SXM]  = sxm_payload_e;
+        producer_valids[EB_SXM]    = sxm_valid_e;
+        producer_payloads[EB_MEM0] = mem0_payload_e;
+        producer_valids[EB_MEM0]   = mem0_valid_e;
+        producer_payloads[EB_VXM]  = vxm_payload_e;
+        producer_valids[EB_VXM]    = vxm_valid_e;
+    end
 
-        EB_VXM: begin 
-            eastbound_payload = vxm_payload_e;
-            eastbound_valid = vxm_valid_e;
-        end 
-
-        EB_SXM: begin 
-            eastbound_payload = sxm_payload_e;
-            eastbound_valid = sxm_valid_e;
-        end 
-
-        EB_MEM0: begin 
-            eastbound_payload = mem0_payload_e;
-            eastbound_valid = mem0_valid_e;
-        end 
-
-        default: begin
-            eastbound_payload = '0;
-            eastbound_valid = 1'b0;
-        end
-    endcase
-    end 
+    shared_bus_mux #(
+        .PAYLOAD_W(PAYLOAD_E),
+        .N_SOURCES(5),
+        .SEL_W($bits(eastbound_producer_e))
+    ) u_shared_bus_mux (
+        .select_i(producer_sel),
+        .payload_i(producer_payloads),
+        .valid_i(producer_valids),
+        .payload_o(eastbound_payload),
+        .valid_o(eastbound_valid)
+    );
 
 endmodule

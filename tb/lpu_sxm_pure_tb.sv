@@ -10,6 +10,7 @@
 `include "../src/mxm.sv"
 `include "../src/sxm.sv"
 `include "../src/icu.sv"
+`include "../src/shared_bus_mux.sv"
 `include "../src/westbound_bus/westbound_bus.sv"
 `include "../src/westbound_bus/westbound_consumer_decode.sv"
 `include "../src/eastbound_bus/eastbound_bus.sv"

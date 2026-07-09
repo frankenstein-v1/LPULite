@@ -11,6 +11,7 @@ include $(PWD)/cvfpu_sources.mk
 
 VERILOG_SOURCES = \
 	$(CVFPU_ALL_SOURCES) \
+	$(ROOT)/src/cvfpu_fp8_fp32_fma.sv \
 	$(ROOT)/src/cvfpu_fp8_to_fp32_cast.sv \
 	$(ROOT)/src/cvfpu_fp32_fma.sv \
 	$(ROOT)/src/mac.sv \

@@ -1,127 +1,93 @@
+import math
+import random
+import struct
+
 import cocotb
 from cocotb.triggers import Timer
-import random
-import math
+
 
 LANES = 4
 LANE_W = 32
 
-def pack_lanes(values):
+
+def float_to_bits(value):
+    return struct.unpack(">I", struct.pack(">f", float(value)))[0]
+
+
+def bits_to_float(bits):
+    return struct.unpack(">f", struct.pack(">I", bits & 0xFFFF_FFFF))[0]
+
+
+def to_f32(value):
+    return bits_to_float(float_to_bits(value))
+
+
+def pack_float_lanes(values):
     packed = 0
     for i, value in enumerate(values):
-        packed |= (value & 0xFFFF_FFFF) << (i * LANE_W)
+        packed |= float_to_bits(value) << (i * LANE_W)
     return packed
 
-def unpack_signed_lanes(value):
+
+def unpack_float_lanes(value):
     lanes = []
-    mask = (1 << LANE_W) - 1
     for i in range(LANES):
-        lane = (int(value) >> (i * LANE_W)) & mask
-        if lane & (1 << (LANE_W - 1)):
-            lane -= 1 << LANE_W
-        lanes.append(lane)
+        bits = (int(value) >> (i * LANE_W)) & 0xFFFF_FFFF
+        lanes.append(bits_to_float(bits))
     return lanes
 
-@cocotb.test()
-async def test_layernorm_combinatorial_isolated(dut):
-    # Fixed seed for repeatable explanation display
-    random.seed(42)
 
-    # 1. Select clean test inputs
-    inputs = [15, -25, 40, -10]
-    gamma = [3, 2, 4, 1]
-    beta = [5, -5, 10, -2]
+def layernorm_reference(values, gamma, beta, eps=1e-5):
+    mean = to_f32(sum(values) / len(values))
+    variance = to_f32(sum(to_f32((x - mean) * (x - mean)) for x in values) / len(values))
+    inv_std = to_f32(1.0 / math.sqrt(variance + eps))
+    return [
+        to_f32(to_f32(to_f32(x - mean) * inv_std) * g + b)
+        for x, g, b in zip(values, gamma, beta)
+    ]
 
-    # Calculate expected values in Python
-    sum_x = sum(inputs)
-    mean_u = sum_x >> 2 # Arithmetic shift division by 4
-    
-    diffs = [x - mean_u for x in inputs]
-    sqs = [d * d for d in diffs]
-    sum_sq = sum(sqs)
-    variance = sum_sq >> 2 # Arithmetic shift division by 4
-    
-    sigma2_idx = min(variance, 65535)
-    
-    if sigma2_idx == 0:
-        val = 0.00001
-    else:
-        val = float(sigma2_idx)
-        
-    inv_sqrt = 1.0 / math.sqrt(val)
-    lut_val = int(inv_sqrt * 65536.0 + 0.5)
-    
-    expected_out = []
-    for d, g, b in zip(diffs, gamma, beta):
-        x_hat_large = d * lut_val
-        scaled_large = x_hat_large * g
-        scaled_shifted = scaled_large >> 16
-        out_lane = scaled_shifted + b
-        expected_out.append(out_lane)
 
-    # 2. Write to DUT inputs
-    dut.x_in.value = pack_lanes(inputs)
-    dut.gamma.value = pack_lanes(gamma)
-    dut.beta.value = pack_lanes(beta)
+async def check_layernorm(dut, values, gamma, beta):
+    dut.x_in.value = pack_float_lanes(values)
+    dut.gamma.value = pack_float_lanes(gamma)
+    dut.beta.value = pack_float_lanes(beta)
 
-    # Wait a small combinatorial step
     await Timer(1, unit="ns")
 
-    # Read output
-    observed = unpack_signed_lanes(dut.y_out.value)
+    observed = unpack_float_lanes(dut.y_out.value)
+    expected = layernorm_reference(values, gamma, beta)
 
-    # Print outputs clearly to console
-    print(f"\n==============================================")
-    print(f"--- ISOLATED LAYERNORM TEST ---")
-    print(f"Inputs (x):   {inputs}")
-    print(f"Gamma (g):    {gamma}")
-    print(f"Beta (b):     {beta}")
-    print(f"Calculated Mean (u): {mean_u}")
-    print(f"Calculated Variance: {variance} (Index: {sigma2_idx})")
-    print(f"Lookup Inverse Sqrt: {inv_sqrt:.6f} -> LUT Value: {lut_val}")
-    print(f"Expected Output:      {expected_out}")
-    print(f"Observed Output:      {observed}")
-    print(f"==============================================\n")
-
-    assert observed == expected_out, f"Mismatch: got {observed}, expected {expected_out}"
+    for idx, (got, exp) in enumerate(zip(observed, expected)):
+        assert abs(got - exp) < 1e-5, (
+            f"FP32 layernorm lane {idx} mismatch: got {got}, expected {exp}"
+        )
 
 
 @cocotb.test()
-async def test_layernorm_combinatorial_random_sweep(dut):
-    # Run 10 sweeps to test random configurations
-    print(f"\n--- RANDOM SWEEP RESULTS ---")
-    for sweep in range(1, 11):
-        inputs = [random.randint(-100, 100) for _ in range(4)]
-        gamma = [random.randint(1, 10) for _ in range(4)]
-        beta = [random.randint(-20, 20) for _ in range(4)]
+async def test_layernorm_fp32_combinatorial_isolated(dut):
+    await check_layernorm(
+        dut,
+        values=[0.35, -0.72, 1.18, 0.49],
+        gamma=[1.0, 1.0, 1.0, 1.0],
+        beta=[0.0, 0.0, 0.0, 0.0],
+    )
 
-        sum_x = sum(inputs)
-        mean_u = sum_x >> 2
-        diffs = [x - mean_u for x in inputs]
-        sqs = [d * d for d in diffs]
-        sum_sq = sum(sqs)
-        variance = sum_sq >> 2
-        
-        sigma2_idx = min(variance, 65535)
-        val = 0.00001 if sigma2_idx == 0 else float(sigma2_idx)
-        inv_sqrt = 1.0 / math.sqrt(val)
-        lut_val = int(inv_sqrt * 65536.0 + 0.5)
-        
-        expected_out = []
-        for d, g, b in zip(diffs, gamma, beta):
-            x_hat_large = d * lut_val
-            scaled_large = x_hat_large * g
-            scaled_shifted = scaled_large >> 16
-            out_lane = scaled_shifted + b
-            expected_out.append(out_lane)
 
-        dut.x_in.value = pack_lanes(inputs)
-        dut.gamma.value = pack_lanes(gamma)
-        dut.beta.value = pack_lanes(beta)
+@cocotb.test()
+async def test_layernorm_fp32_gamma_beta(dut):
+    await check_layernorm(
+        dut,
+        values=[1.41, -0.58, 0.27, -1.33],
+        gamma=[0.75, 1.25, -0.50, 1.50],
+        beta=[0.13, -0.21, 0.37, -0.49],
+    )
 
-        await Timer(1, unit="ns")
-        observed = unpack_signed_lanes(dut.y_out.value)
 
-        print(f"Sweep {sweep:2d}: Inputs={inputs} -> Observed={observed} | Expected={expected_out}")
-        assert observed == expected_out, f"Sweep {sweep} mismatch: got {observed}, expected {expected_out}"
-    print(f"----------------------------\n")
+@cocotb.test()
+async def test_layernorm_fp32_random_sweep(dut):
+    random.seed(42)
+    for _ in range(10):
+        values = [random.uniform(-1.75, 1.75) for _ in range(LANES)]
+        gamma = [random.uniform(0.35, 1.65) for _ in range(LANES)]
+        beta = [random.uniform(-0.55, 0.55) for _ in range(LANES)]
+        await check_layernorm(dut, values, gamma, beta)

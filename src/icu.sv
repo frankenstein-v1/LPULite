@@ -22,6 +22,7 @@ module icu #(
     // VXM Control (4 bits)
     output logic [3:0] vxm_ctrl,
     output logic       vxm_data_sel,
+    output logic [1:0] vxm_operand_sel,
 
     // bus control (12 bits)
     output logic [2:0] westbound_sel,
@@ -37,7 +38,11 @@ module icu #(
     output logic [1:0] mxm_e_col_sel,
     output logic      mxm_e_valid_in,
     output logic      mxm_input_is_signed,
-    output logic      mxm_wght_is_signed
+    output logic      mxm_wght_is_signed,
+    output logic      mxm_use_fp,
+    output logic      fp_quant_mode,
+    output logic [1:0] mem_store_fmt,
+    output logic      vxm_layernorm_en
 );
 
     // 1. THE INSTRUCTION MEMORY (IMEM)
@@ -96,5 +101,10 @@ module icu #(
     assign mxm_e_valid_in   = current_instruction[70];
     assign mxm_input_is_signed = current_instruction[77];
     assign mxm_wght_is_signed  = current_instruction[78];
+    assign mxm_use_fp          = current_instruction[79];
+    assign fp_quant_mode       = current_instruction[80];
+    assign mem_store_fmt       = current_instruction[82:81];
+    assign vxm_layernorm_en    = current_instruction[83];
+    assign vxm_operand_sel     = current_instruction[85:84];
 
 endmodule

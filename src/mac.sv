@@ -1,18 +1,7 @@
 `timescale 1ns/1ps
 
 // Floating-point MAC skeleton for the future FP MXM path.
-//
-// Intended algorithm:
-// 1. Latch one FP8 weight when weight_load is asserted.
-// 2. On en, treat input_in and the stored weight as raw FP8 bit patterns.
-// 3. Cast both FP8 operands to FP32.
-// 4. Perform one FP32 fused multiply-add:
-//      acc_reg = acc_reg + (input_fp32 * weight_fp32)
-// 5. Hold the running FP32 accumulator in acc_reg.
-//
-// This module is not wired into mxm.sv yet. The current integer datapath still
-// uses int_mac + acc. Once CVFPU wrappers are ready, mxm can swap to this cell
-// and drop the separate integer accumulator stage.
+
 module mac #(
     parameter int FP8_W  = 8,
     parameter int FP32_W = 32

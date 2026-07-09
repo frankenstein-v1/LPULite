@@ -31,6 +31,7 @@ logic signed [31:0] int_accum_wire [mxm_size-1:0][mxm_size-1:0];
 logic [31:0]        fp_accum_wire  [mxm_size-1:0][mxm_size-1:0];
 logic               fp_result_valid_wire [mxm_size-1:0][mxm_size-1:0];
 logic               fp_busy_wire         [mxm_size-1:0][mxm_size-1:0];
+logic               mxm_use_fp_active;
 
 //wire that holds the input vector that came in from the wb bus
 logic signed [7:0] mxm_input_ingress_reg [mxm_size-1:0];
@@ -106,6 +107,16 @@ always_ff @(posedge clk or posedge rst) begin
         end 
     end 
 end 
+
+always_ff @(posedge clk or posedge rst) begin
+    if (rst) begin
+        mxm_use_fp_active <= 1'b0;
+    end else if (mxm_clear || mxm_start) begin
+        // Hold the numeric mode that produced the currently visible matrix so
+        // downstream observation does not change when ICU advances to NOPs.
+        mxm_use_fp_active <= mxm_use_fp;
+    end
+end
 
 
 always_comb begin 
@@ -185,7 +196,7 @@ generate
             );
 
             always_comb begin
-                if (mxm_use_fp)
+                if (mxm_use_fp_active)
                     mxm_out[r][c] = fp_accum_wire[r][c];
                 else
                     mxm_out[r][c] = int_accum_wire[r][c];

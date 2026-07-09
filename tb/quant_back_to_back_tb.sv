@@ -8,6 +8,8 @@ module quant_back_to_back_tb;
     logic                            rst_n;
     logic                            in_valid;
     logic                            mode_softmax;
+    logic                            fp_quant_mode;
+    logic                            softmax_input_is_fp;
     logic signed [LANES*LANE_W-1:0]  x_input;
     logic                            out_valid;
     logic signed [LANES*8-1:0]       q_row_out;
@@ -21,6 +23,8 @@ module quant_back_to_back_tb;
         .rst_n(rst_n),
         .in_valid(in_valid),
         .mode_softmax(mode_softmax),
+        .fp_quant_mode(fp_quant_mode),
+        .softmax_input_is_fp(softmax_input_is_fp),
         .x_input(x_input),
         .out_valid(out_valid),
         .q_row_out(q_row_out),
@@ -48,6 +52,8 @@ module quant_back_to_back_tb;
         rst_n = 1'b0;
         in_valid = 1'b0;
         mode_softmax = 1'b0;
+        fp_quant_mode = 1'b0;
+        softmax_input_is_fp = 1'b0;
         x_input = '0;
 
         repeat (2) @(posedge clk);
@@ -57,18 +63,24 @@ module quant_back_to_back_tb;
         // Transaction 1: regular quant mode.
         in_valid = 1'b1;
         mode_softmax = 1'b0;
+        fp_quant_mode = 1'b0;
+        softmax_input_is_fp = 1'b0;
         x_input = pack_input_row(-32'sd4096, -32'sd2048, 32'sd2048, 32'sd4096);
         @(posedge clk);
 
         // Transaction 2: softmax quant mode immediately after.
         in_valid = 1'b1;
         mode_softmax = 1'b1;
+        fp_quant_mode = 1'b0;
+        softmax_input_is_fp = 1'b0;
         x_input = pack_input_row(32'sd4, 32'sd28, 32'sd96, 32'sd128);
         @(posedge clk);
 
         // Deassert ingress after the back-to-back pair.
         in_valid = 1'b0;
         mode_softmax = 1'b0;
+        fp_quant_mode = 1'b0;
+        softmax_input_is_fp = 1'b0;
         x_input = '0;
 
         repeat (4) @(posedge clk);

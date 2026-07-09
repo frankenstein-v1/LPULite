@@ -1,3 +1,6 @@
+import math
+import struct
+
 import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import NextTimeStep, ReadOnly, RisingEdge, Timer
@@ -7,14 +10,18 @@ LANES = 4
 LANE_W = 32
 BIAS_RELU_CTRL = 0b0011
 SCALE_SOFTMAX_CTRL = 0b1100
-QUANT_MULTIPLIER = 2032
-QUANT_SHIFT = 16
-
-
+SOFTMAX_ONLY_CTRL = 0b1000
 def pack_lanes(values):
     packed = 0
     for i, value in enumerate(values):
         packed |= (value & 0xFFFF_FFFF) << (i * LANE_W)
+    return packed
+
+
+def pack_float_lanes(values):
+    packed = 0
+    for i, value in enumerate(values):
+        packed |= float_to_bits(value) << (i * LANE_W)
     return packed
 
 
@@ -26,6 +33,14 @@ def unpack_signed_lanes(value):
         if lane & (1 << (LANE_W - 1)):
             lane -= 1 << LANE_W
         lanes.append(lane)
+    return lanes
+
+
+def unpack_u32_lanes(value):
+    lanes = []
+    mask = (1 << LANE_W) - 1
+    for i in range(LANES):
+        lanes.append((int(value) >> (i * LANE_W)) & mask)
     return lanes
 
 
@@ -56,36 +71,29 @@ def clip_signed_q8(value):
 
 
 def quantize_regular_expected(lanes):
+    max_abs_value = max(abs(lane) for lane in lanes)
+    row_shift = 0
+    shifted_max_abs_value = max_abs_value
+    while shifted_max_abs_value > 127:
+        shifted_max_abs_value >>= 1
+        row_shift += 1
+
     quantized = []
     for lane in lanes:
-        product = lane * QUANT_MULTIPLIER
-        if product >= 0:
-            rounded = product + (1 << (QUANT_SHIFT - 1))
+        if row_shift == 0:
+            shifted_lane = lane
         else:
-            rounded = product - (1 << (QUANT_SHIFT - 1))
-        scaled = rounded >> QUANT_SHIFT
-        quantized.append(clip_signed_q8(scaled))
+            rounding_step = 1 << (row_shift - 1)
+            adjusted_lane = lane + rounding_step if lane >= 0 else lane - rounding_step
+            shifted_lane = adjusted_lane >> row_shift
+        quantized.append(clip_signed_q8(shifted_lane))
     return quantized
-
-
-def exp_expected(q_value):
-    ln2 = 177
-    coeff_a = 92
-    coeff_b = 346
-    coeff_c = 88
-
-    z_value = (-q_value) // ln2
-    p_value = q_value + (z_value * ln2)
-    t_value = p_value + coeff_b
-    t_squared = t_value * t_value
-    q_poly = ((coeff_a * t_squared) >> 16) + coeff_c
-    return q_poly >> z_value
 
 
 def softmax_expected(lanes):
     lane_max = max(lanes)
     lane_sub = [lane - lane_max for lane in lanes]
-    lane_exp = [exp_expected(lane) for lane in lane_sub]
+    lane_exp = [lut_softmax_exp_expected(lane) for lane in lane_sub]
     sum_exp = sum(lane_exp)
     quotient = (1 << 30) // sum_exp
     shift = 30 - 8
@@ -110,27 +118,216 @@ def scale_softmax_quant_expected(data_lanes):
     return quantize_softmax_expected(softmax_lanes)
 
 
+def float_to_bits(value):
+    return struct.unpack(">I", struct.pack(">f", float(value)))[0]
+
+
+def bits_to_float(bits):
+    return struct.unpack(">f", struct.pack(">I", bits & 0xFFFF_FFFF))[0]
+
+
+def to_f32(value):
+    return bits_to_float(float_to_bits(value))
+
+
+def layernorm_fp32_expected(row, gamma=None, beta=None, eps=1e-5):
+    if gamma is None:
+        gamma = [1.0 for _ in row]
+    if beta is None:
+        beta = [0.0 for _ in row]
+    mean = to_f32(sum(row) / len(row))
+    variance = to_f32(sum(to_f32((value - mean) * (value - mean)) for value in row) / len(row))
+    inv_std = to_f32(1.0 / math.sqrt(variance + eps))
+    return [
+        to_f32(to_f32(to_f32(value - mean) * inv_std) * gamma_i + beta_i)
+        for value, gamma_i, beta_i in zip(row, gamma, beta)
+    ]
+
+
+def lut_softmax_exp_expected(q_value):
+    ln2 = 177
+    z_value = (-q_value) // ln2
+    p_value = q_value + (z_value * ln2)
+    lut_addr = -p_value
+    if lut_addr < 0 or lut_addr > 177:
+        return 0
+    lut_value = round(math.exp(-lut_addr / 256.0) * 256.0)
+    return lut_value >> z_value
+
+
+def fp32_to_q8_8_ref(fp_bits):
+    sign_bit = (fp_bits >> 31) & 0x1
+    exp_bits = (fp_bits >> 23) & 0xFF
+    frac_bits = fp_bits & 0x7FFFFF
+
+    if exp_bits == 0 and frac_bits == 0:
+        return 0
+    if exp_bits == 0xFF:
+        return -0x8000_0000 if sign_bit else 0x7FFF_FFFF
+
+    if exp_bits == 0:
+        significand = frac_bits
+        exp_unbiased = -126
+    else:
+        significand = (1 << 23) | frac_bits
+        exp_unbiased = exp_bits - 127
+
+    shift_amount = exp_unbiased - 23 + 8
+    scaled_value = significand
+    if shift_amount >= 0:
+        scaled_value = 0x7FFF_FFFF if shift_amount > 30 else (scaled_value << shift_amount)
+    else:
+        scaled_value = 0 if -shift_amount > 62 else (scaled_value >> (-shift_amount))
+
+    if sign_bit:
+        scaled_value = -scaled_value
+
+    if scaled_value > 0x7FFF_FFFF:
+        return 0x7FFF_FFFF
+    if scaled_value < -0x8000_0000:
+        return -0x8000_0000
+    return scaled_value
+
+
+def softmax_fp_quant_expected(data_floats):
+    lane_max = to_f32(max(data_floats))
+    delta_bits = [float_to_bits(to_f32(value - lane_max)) for value in data_floats]
+    exp_bits = [
+        uq8_8_to_fp32_ref(lut_softmax_exp_expected(fp32_to_q8_8_ref(bits)))
+        for bits in delta_bits
+    ]
+    exp_values = [bits_to_float(bits) for bits in exp_bits]
+    sum01 = to_f32(exp_values[0] + exp_values[1])
+    sum23 = to_f32(exp_values[2] + exp_values[3])
+    sum_exp = to_f32(sum01 + sum23)
+    probs = [float_to_bits(to_f32(value / sum_exp)) for value in exp_values]
+    return [fp32_to_uq0_8_ref(prob_bits) for prob_bits in probs]
+
+
+def fp32_to_uq0_8_ref(fp_bits):
+    if (fp_bits >> 31) & 0x1:
+        return 0
+
+    exp_bits = (fp_bits >> 23) & 0xFF
+    frac_bits = fp_bits & 0x7FFFFF
+
+    if exp_bits == 0 and frac_bits == 0:
+        return 0
+    if exp_bits == 0xFF:
+        return 255
+
+    if exp_bits == 0:
+        significand = frac_bits
+        exp_unbiased = -126
+    else:
+        significand = (1 << 23) | frac_bits
+        exp_unbiased = exp_bits - 127
+
+    shift_amount = exp_unbiased - 23 + 8
+    scaled_value = significand
+    if shift_amount >= 0:
+        rounded_value = 255 if shift_amount > 8 else (scaled_value << shift_amount)
+    elif -shift_amount > 62:
+        rounded_value = 0
+    else:
+        rounded_value = scaled_value + (1 << ((-shift_amount) - 1))
+        rounded_value >>= -shift_amount
+
+    return min(255, rounded_value)
+
+
+def uq8_8_to_fp32_ref(fixed_value):
+    if fixed_value == 0:
+        return 0
+
+    msb_idx = max(idx for idx in range(32) if (fixed_value >> idx) & 0x1)
+    exponent_bits = msb_idx + 119
+    if msb_idx <= 23:
+        normalized = fixed_value << (23 - msb_idx)
+    else:
+        normalized = fixed_value >> (msb_idx - 23)
+    return ((exponent_bits & 0xFF) << 23) | (normalized & 0x7FFFFF)
+
+
+def fp8_e5m2_bits_reference(value):
+    bits = float_to_bits(value)
+    sign = (bits >> 31) & 0x1
+    exp = (bits >> 23) & 0xFF
+    frac = bits & 0x7FFFFF
+
+    if exp == 0 and frac == 0:
+        return sign << 7
+    if exp == 0xFF:
+        return ((sign << 7) | 0x7D) if frac else ((sign << 7) | 0x7C)
+    if exp == 0:
+        return sign << 7
+
+    fp8_exp = exp - 127 + 15
+    if fp8_exp <= 0:
+        return sign << 7
+
+    mantissa_full = (1 << 23) | frac
+    mantissa_q = (mantissa_full >> 21) & 0x7
+    guard = (mantissa_full >> 20) & 0x1
+    sticky = mantissa_full & ((1 << 20) - 1)
+    if guard and (sticky or (mantissa_q & 0x1)):
+        mantissa_q += 1
+    if mantissa_q == 8:
+        mantissa_q = 4
+        fp8_exp += 1
+    if fp8_exp >= 31:
+        return (sign << 7) | 0x7C
+    return (sign << 7) | ((fp8_exp & 0x1F) << 2) | (mantissa_q & 0x3)
+
+
+def softmax_fp8_quant_expected(data_floats):
+    lane_max = to_f32(max(data_floats))
+    delta_bits = [float_to_bits(to_f32(value - lane_max)) for value in data_floats]
+    exp_bits = [
+        uq8_8_to_fp32_ref(lut_softmax_exp_expected(fp32_to_q8_8_ref(bits)))
+        for bits in delta_bits
+    ]
+    exp_values = [bits_to_float(bits) for bits in exp_bits]
+    sum01 = to_f32(exp_values[0] + exp_values[1])
+    sum23 = to_f32(exp_values[2] + exp_values[3])
+    sum_exp = to_f32(sum01 + sum23)
+    prob_floats = [to_f32(value / sum_exp) for value in exp_values]
+    return [fp8_e5m2_bits_reference(value) for value in prob_floats]
+
+
+def regular_fp8_row_quant_expected(data_floats):
+    absmax = max(abs(value) for value in data_floats)
+    if absmax == 0.0:
+        scale_exp = 0
+    else:
+        scale_exp = math.floor(math.log2(absmax))
+    scaled = [math.ldexp(value, -scale_exp) for value in data_floats]
+    return [fp8_e5m2_bits_reference(value) for value in scaled], scale_exp
+
+
 async def reset_dut(dut):
     dut.rst_n.value = 0
     dut.stream_in_data.value = 0
     dut.stream_in_bias.value = 0
     dut.in_valid.value = 0
     dut.vxm_ctrl.value = 0
+    dut.fp_quant_mode.value = 0
     dut.out_ready.value = 1
     if hasattr(dut, "layernorm_bypass"):
         dut.layernorm_bypass.value = 1
-        dut.layernorm_gamma.value = pack_lanes([1, 1, 1, 1])
-        dut.layernorm_beta.value = pack_lanes([0, 0, 0, 0])
+        dut.layernorm_gamma.value = pack_float_lanes([1.0, 1.0, 1.0, 1.0])
+        dut.layernorm_beta.value = pack_float_lanes([0.0, 0.0, 0.0, 0.0])
     await RisingEdge(dut.clk)
     await RisingEdge(dut.clk)
     dut.rst_n.value = 1
     await RisingEdge(dut.clk)
 
 
-async def drive_vector(dut, data_lanes, bias_lanes, *, valid=1, ctrl=BIAS_RELU_CTRL):
+async def drive_vector(dut, data_lanes, bias_lanes, *, valid=1, ctrl=BIAS_RELU_CTRL, fp_quant_mode=0):
     dut.stream_in_data.value = pack_lanes(data_lanes)
     dut.stream_in_bias.value = pack_lanes(bias_lanes)
     dut.vxm_ctrl.value = ctrl
+    dut.fp_quant_mode.value = fp_quant_mode
     dut.in_valid.value = valid
 
 
@@ -164,13 +361,15 @@ async def run_vxm_row(
     *,
     ctrl,
     signed_output,
+    fp_quant_mode=0,
     input_timeout_cycles=20,
     output_timeout_cycles=200,
 ):
     await wait_for_input_ready(dut, timeout_cycles=input_timeout_cycles)
-    await drive_vector(dut, data_lanes, bias_lanes, valid=1, ctrl=ctrl)
+    await drive_vector(dut, data_lanes, bias_lanes, valid=1, ctrl=ctrl, fp_quant_mode=fp_quant_mode)
     await RisingEdge(dut.clk)
     dut.in_valid.value = 0
+    dut.fp_quant_mode.value = 0
     return await wait_for_output_handshake(
         dut,
         timeout_cycles=output_timeout_cycles,
@@ -183,6 +382,7 @@ async def drive_rows_with_backpressure(
     rows,
     *,
     ctrl,
+    fp_quant_mode=0,
     timeout_cycles=1000,
 ):
     accepted_rows = 0
@@ -190,14 +390,17 @@ async def drive_rows_with_backpressure(
     expected_outputs = [scale_softmax_quant_expected(data) for data, _ in rows]
 
     for _ in range(timeout_cycles):
+        output_complete = False
         if accepted_rows < len(rows):
             data_lanes, bias_lanes = rows[accepted_rows]
             dut.stream_in_data.value = pack_lanes(data_lanes)
             dut.stream_in_bias.value = pack_lanes(bias_lanes)
             dut.vxm_ctrl.value = ctrl
+            dut.fp_quant_mode.value = fp_quant_mode
             dut.in_valid.value = 1
         else:
             dut.in_valid.value = 0
+            dut.fp_quant_mode.value = 0
 
         await RisingEdge(dut.clk)
         await ReadOnly()
@@ -208,10 +411,13 @@ async def drive_rows_with_backpressure(
         if int(dut.out_valid.value) == 1 and int(dut.out_ready.value) == 1:
             observed_outputs.append(unpack_q8_lanes(dut.stream_out.value, signed=False))
             if len(observed_outputs) == len(rows):
-                dut.in_valid.value = 0
-                break
+                output_complete = True
 
         await NextTimeStep()
+        if output_complete:
+            dut.in_valid.value = 0
+            dut.fp_quant_mode.value = 0
+            break
 
     assert accepted_rows == len(rows), (
         f"Only accepted {accepted_rows} of {len(rows)} rows before timeout"
@@ -230,6 +436,7 @@ async def observe_rows_with_backpressure(
     rows,
     *,
     ctrl,
+    fp_quant_mode=0,
     observe_cycles=250,
 ):
     accepted_rows = 0
@@ -240,9 +447,11 @@ async def observe_rows_with_backpressure(
             dut.stream_in_data.value = pack_lanes(data_lanes)
             dut.stream_in_bias.value = pack_lanes(bias_lanes)
             dut.vxm_ctrl.value = ctrl
+            dut.fp_quant_mode.value = fp_quant_mode
             dut.in_valid.value = 1
         else:
             dut.in_valid.value = 0
+            dut.fp_quant_mode.value = 0
 
         await RisingEdge(dut.clk)
         await ReadOnly()
@@ -261,6 +470,7 @@ async def drive_rows_for_observation(
     rows,
     *,
     ctrl,
+    fp_quant_mode=0,
 ):
     accepted_rows = 0
 
@@ -269,6 +479,7 @@ async def drive_rows_for_observation(
         dut.stream_in_data.value = pack_lanes(data_lanes)
         dut.stream_in_bias.value = pack_lanes(bias_lanes)
         dut.vxm_ctrl.value = ctrl
+        dut.fp_quant_mode.value = fp_quant_mode
         dut.in_valid.value = 1
 
         await RisingEdge(dut.clk)
@@ -280,6 +491,7 @@ async def drive_rows_for_observation(
         await NextTimeStep()
 
     dut.in_valid.value = 0
+    dut.fp_quant_mode.value = 0
 
 
 @cocotb.test()
@@ -412,6 +624,127 @@ async def test_full_row_scale_softmax_quant(dut):
 
 
 @cocotb.test()
+async def test_fp_row_softmax_quant(dut):
+    cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
+    await reset_dut(dut)
+
+    data_lanes = [
+        float_to_bits(1.0),
+        float_to_bits(0.5),
+        float_to_bits(-0.5),
+        float_to_bits(2.0),
+    ]
+    bias_lanes = [0, 0, 0, 0]
+    expected_lanes = softmax_fp8_quant_expected([1.0, 0.5, -0.5, 2.0])
+
+    observed_lanes = await run_vxm_row(
+        dut,
+        data_lanes,
+        bias_lanes,
+        ctrl=SOFTMAX_ONLY_CTRL,
+        signed_output=False,
+        fp_quant_mode=1,
+    )
+
+    assert observed_lanes == expected_lanes, (
+        "FP VXM softmax->quant path mismatch. "
+        f"Observed={observed_lanes}, expected={expected_lanes}"
+    )
+
+
+@cocotb.test()
+async def test_fp_bias_relu_scale_internal_registers(dut):
+    cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
+    await reset_dut(dut)
+
+    data_floats = [1.0, -2.0, 4.0, -1.0]
+    bias_floats = [0.5, 0.25, -1.0, 2.0]
+    data_lanes = [float_to_bits(value) for value in data_floats]
+    bias_lanes = [float_to_bits(value) for value in bias_floats]
+
+    expected_bias = [float_to_bits(data + bias) for data, bias in zip(data_floats, bias_floats)]
+    expected_relu = [float_to_bits(max(data + bias, 0.0)) for data, bias in zip(data_floats, bias_floats)]
+    expected_scale = [
+        float_to_bits(max(data + bias, 0.0) * 0.5)
+        for data, bias in zip(data_floats, bias_floats)
+    ]
+
+    await wait_for_input_ready(dut)
+    await drive_vector(dut, data_lanes, bias_lanes, valid=1, ctrl=0b0111, fp_quant_mode=1)
+    await RisingEdge(dut.clk)
+    dut.in_valid.value = 0
+    dut.fp_quant_mode.value = 0
+
+    observed_bias = None
+    for _ in range(20):
+        await RisingEdge(dut.clk)
+        await ReadOnly()
+        if int(dut.s1_valid.value) == 1:
+            observed_bias = unpack_u32_lanes(dut.s1_bias_reg.value)
+            break
+    assert observed_bias is not None, "FP VXM pipeline never produced a bias stage result"
+
+    observed_relu = None
+    for _ in range(20):
+        await RisingEdge(dut.clk)
+        await ReadOnly()
+        if int(dut.s2_valid.value) == 1:
+            observed_relu = unpack_u32_lanes(dut.s2_relu_reg.value)
+            break
+    assert observed_relu is not None, "FP VXM pipeline never produced a ReLU stage result"
+
+    observed_scale = None
+    for _ in range(20):
+        await RisingEdge(dut.clk)
+        await ReadOnly()
+        if int(dut.s3_valid.value) == 1:
+            observed_scale = unpack_u32_lanes(dut.s3_scale_reg.value)
+            break
+    assert observed_scale is not None, "FP VXM pipeline never produced a scaled row in s3"
+
+    assert observed_bias == expected_bias, (
+        f"FP bias-add mismatch. Observed={observed_bias}, expected={expected_bias}"
+    )
+    assert observed_relu == expected_relu, (
+        f"FP ReLU mismatch. Observed={observed_relu}, expected={expected_relu}"
+    )
+    assert observed_scale == expected_scale, (
+        f"FP scale mismatch. Observed={observed_scale}, expected={expected_scale}"
+    )
+
+
+@cocotb.test()
+async def test_fp_full_row_bias_relu_scale_quant(dut):
+    cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
+    await reset_dut(dut)
+
+    data_floats = [1.0, -2.0, 4.0, -1.0]
+    bias_floats = [0.5, 0.25, -1.0, 2.0]
+    data_lanes = [float_to_bits(value) for value in data_floats]
+    bias_lanes = [float_to_bits(value) for value in bias_floats]
+
+    final_floats = [max(data + bias, 0.0) * 0.5 for data, bias in zip(data_floats, bias_floats)]
+    expected_lanes, expected_scale = regular_fp8_row_quant_expected(final_floats)
+
+    observed_lanes = await run_vxm_row(
+        dut,
+        data_lanes,
+        bias_lanes,
+        ctrl=0b0111,
+        signed_output=False,
+        fp_quant_mode=1,
+    )
+
+    assert observed_lanes == expected_lanes, (
+        "FP VXM bias->relu->scale->quant path mismatch. "
+        f"Observed={observed_lanes}, expected={expected_lanes}"
+    )
+    assert int(dut.stream_out_scale.value) == expected_scale, (
+        f"FP VXM row scale mismatch. Observed={int(dut.stream_out_scale.value)}, expected={expected_scale}"
+    )
+
+
+@cocotb.test()
 async def test_four_row_scale_softmax_quant_stress(dut):
     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
     await reset_dut(dut)
@@ -459,22 +792,28 @@ async def test_layernorm_normal(dut):
     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
     await reset_dut(dut)
 
-    # Enable LayerNorm (bypass = 0)
-    dut.layernorm_bypass.value = 0
-    # Set gamma = [2, 2, 2, 2], beta = [3, 3, 3, 3]
-    dut.layernorm_gamma.value = pack_lanes([2, 2, 2, 2])
-    dut.layernorm_beta.value = pack_lanes([3, 3, 3, 3])
+    data_lanes = [0.35, -0.72, 1.18, 0.49]
+    gamma_lanes = [1.0, 1.0, 1.0, 1.0]
+    beta_lanes = [0.0, 0.0, 0.0, 0.0]
+    expected_lanes, _ = regular_fp8_row_quant_expected(
+        layernorm_fp32_expected(data_lanes, gamma_lanes, beta_lanes)
+    )
 
-    # Input: [20, 10, 5, 1], bias: [0, 0, 0, 0]
-    # Expect output: [6, 3, 1, 0]
+    dut.layernorm_bypass.value = 0
+    dut.layernorm_gamma.value = pack_float_lanes(gamma_lanes)
+    dut.layernorm_beta.value = pack_float_lanes(beta_lanes)
+
     observed = await run_vxm_row(
         dut,
-        [20, 10, 5, 1],
-        [0, 0, 0, 0],
+        [float_to_bits(value) for value in data_lanes],
+        [float_to_bits(0.0) for _ in range(LANES)],
         ctrl=0b0000, # no bias, no relu, no scale, no softmax
-        signed_output=True,
+        signed_output=False,
+        fp_quant_mode=1,
     )
-    assert observed == [6, 3, 1, 0], f"LayerNorm output mismatch: got {observed}, expected [6, 3, 1, 0]"
+    assert observed == expected_lanes, (
+        f"FP32 LayerNorm output mismatch: got {observed}, expected {expected_lanes}"
+    )
 
 
 @cocotb.test()
@@ -482,21 +821,28 @@ async def test_layernorm_zero_variance(dut):
     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
     await reset_dut(dut)
 
-    # Enable LayerNorm (bypass = 0)
-    dut.layernorm_bypass.value = 0
-    # Set gamma = [2, 2, 2, 2], beta = [3, 3, 3, 3]
-    dut.layernorm_gamma.value = pack_lanes([2, 2, 2, 2])
-    dut.layernorm_beta.value = pack_lanes([3, 3, 3, 3])
+    data_lanes = [0.73, 0.73, 0.73, 0.73]
+    gamma_lanes = [1.5, 0.75, 1.25, 0.5]
+    beta_lanes = [0.13, -0.21, 0.37, -0.49]
+    expected_lanes, _ = regular_fp8_row_quant_expected(
+        layernorm_fp32_expected(data_lanes, gamma_lanes, beta_lanes)
+    )
 
-    # Input with 0 variance: [5, 5, 5, 5]
+    dut.layernorm_bypass.value = 0
+    dut.layernorm_gamma.value = pack_float_lanes(gamma_lanes)
+    dut.layernorm_beta.value = pack_float_lanes(beta_lanes)
+
     observed = await run_vxm_row(
         dut,
-        [5, 5, 5, 5],
-        [0, 0, 0, 0],
+        [float_to_bits(value) for value in data_lanes],
+        [float_to_bits(0.0) for _ in range(LANES)],
         ctrl=0b0000,
-        signed_output=True,
+        signed_output=False,
+        fp_quant_mode=1,
     )
-    assert observed == [3, 3, 3, 3], f"LayerNorm zero variance output mismatch: got {observed}, expected [3, 3, 3, 3]"
+    assert observed == expected_lanes, (
+        f"FP32 LayerNorm zero variance output mismatch: got {observed}, expected {expected_lanes}"
+    )
 
 
 import random
@@ -507,87 +853,27 @@ async def test_layernorm_random(dut):
     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
     await reset_dut(dut)
 
-    # 1. Generate random inputs
-    data_lanes = [random.randint(-40, 40) for _ in range(LANES)]
-    gamma_lanes = [random.randint(1, 5) for _ in range(LANES)]
-    beta_lanes = [random.randint(-10, 10) for _ in range(LANES)]
+    random.seed(42)
+    data_lanes = [random.uniform(-1.75, 1.75) for _ in range(LANES)]
+    gamma_lanes = [random.uniform(0.35, 1.65) for _ in range(LANES)]
+    beta_lanes = [random.uniform(-0.55, 0.55) for _ in range(LANES)]
+    expected_lanes, _ = regular_fp8_row_quant_expected(
+        layernorm_fp32_expected(data_lanes, gamma_lanes, beta_lanes)
+    )
 
-    # 2. Python reference calculation matching hardware logic exactly
-    sum_x = sum(data_lanes)
-    mean_u = sum_x >> 2 # signed arithmetic shift
-    
-    diffs = [x - mean_u for x in data_lanes]
-    sqs = [d * d for d in diffs]
-    sum_sq = sum(sqs)
-    variance = sum_sq >> 2 # signed arithmetic shift
-    
-    sigma2_idx = min(variance, 65535)
-    
-    # inv sqrt LUT calculation
-    if sigma2_idx == 0:
-        val = 0.00001
-    else:
-        val = float(sigma2_idx)
-    
-    # Compute using the exact same rounding as our SV code
-    inv_sqrt = 1.0 / math.sqrt(val)
-    lut_val = int(inv_sqrt * 65536.0 + 0.5)
-    
-    expected_before_quant = []
-    for d, g, b in zip(diffs, gamma_lanes, beta_lanes):
-        x_hat_large = d * lut_val
-        scaled_large = x_hat_large * g
-        scaled_shifted = scaled_large >> 16
-        out_lane = scaled_shifted + b
-        expected_before_quant.append(out_lane)
-
-    # Now calculate regular quantization of expected_before_quant
-    max_abs = max(abs(val) for val in expected_before_quant)
-    row_shift = 0
-    shifted_max = max_abs
-    while shifted_max > 127:
-        shifted_max >>= 1
-        row_shift += 1
-        
-    def round_shift_signed(val, shift):
-        if shift == 0:
-            return val
-        rounding = 1 << (shift - 1)
-        adjusted = (val + rounding) if val >= 0 else (val - rounding)
-        return adjusted >> shift
-
-    quantized = []
-    for val in expected_before_quant:
-        shifted = round_shift_signed(val, row_shift)
-        clipped = max(-127, min(127, shifted))
-        quantized.append(clipped)
-
-    # Print inputs and calculations to console
-    print(f"\n==============================================")
-    print(f"--- LAYER NORM RANDOM TEST ---")
-    print(f"Random Inputs: {data_lanes}")
-    print(f"Random Gamma:  {gamma_lanes}")
-    print(f"Random Beta:   {beta_lanes}")
-    print(f"Calculated Mean (u): {mean_u}")
-    print(f"Calculated Variance: {variance} (Index: {sigma2_idx})")
-    print(f"Calculated LUT Val:  {lut_val}")
-    print(f"Expected Out (Pre-Quant):  {expected_before_quant}")
-    print(f"Expected Out (Post-Quant): {quantized}")
-    print(f"==============================================\n")
-
-    # 3. Drive DUT
     dut.layernorm_bypass.value = 0
-    dut.layernorm_gamma.value = pack_lanes(gamma_lanes)
-    dut.layernorm_beta.value = pack_lanes(beta_lanes)
+    dut.layernorm_gamma.value = pack_float_lanes(gamma_lanes)
+    dut.layernorm_beta.value = pack_float_lanes(beta_lanes)
 
     observed = await run_vxm_row(
         dut,
-        data_lanes,
-        [0, 0, 0, 0],
+        [float_to_bits(value) for value in data_lanes],
+        [float_to_bits(0.0) for _ in range(LANES)],
         ctrl=0b0000, # no bias, no relu, no scale, no softmax
-        signed_output=True,
+        signed_output=False,
+        fp_quant_mode=1,
     )
 
-    assert observed == quantized, f"Random test mismatch: got {observed}, expected {quantized}"
-
-
+    assert observed == expected_lanes, (
+        f"FP32 LayerNorm random mismatch: got {observed}, expected {expected_lanes}"
+    )

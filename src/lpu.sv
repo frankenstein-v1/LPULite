@@ -21,6 +21,7 @@ logic [11:0] sxm_opcode_weight;
 //icxu vxm outs
 logic [3:0] vxm_ctrl;
 logic vxm_data_sel;
+logic [1:0] vxm_operand_sel;
 
 //icu busses
 logic [2:0] westbound_sel;
@@ -37,6 +38,15 @@ logic [1:0] mxm_e_col_sel;
 logic mxm_e_valid_in;
 logic mxm_input_is_signed;
 logic mxm_wght_is_signed;
+logic mxm_use_fp;
+logic fp_quant_mode;
+logic [1:0] mem_store_fmt;
+logic vxm_layernorm_en;
+
+localparam logic [1:0] VXM_OPERAND_DATA  = 2'd0;
+localparam logic [1:0] VXM_OPERAND_BIAS  = 2'd1;
+localparam logic [1:0] VXM_OPERAND_GAMMA = 2'd2;
+localparam logic [1:0] VXM_OPERAND_BETA  = 2'd3;
 
 // Encoded bus select views. Keep these as plain vectors for Icarus compatibility.
 logic [2:0] westbound_consumer_sel_t;
@@ -53,8 +63,8 @@ logic       eastbound_valid;
 superlane_t eastbound_payload_lane0;
 
 // mem0 datapath
-mxm_row_t   mem0_stream_in;
-mxm_row_t   mem0_stream_out;
+mem_row_t   mem0_stream_in;
+mem_row_t   mem0_stream_out;
 logic       mem0_write_from_west;
 logic       mem0_write_from_east;
 logic       mem0_write_en_eff;
@@ -90,6 +100,7 @@ icu u_icu(
     .sxm_opcode_weight(sxm_opcode_weight),
     .vxm_ctrl(vxm_ctrl),
     .vxm_data_sel(vxm_data_sel),
+    .vxm_operand_sel(vxm_operand_sel),
     .westbound_sel(westbound_sel),
     .eastbound_sel(eastbound_sel),
     .westbound_consumer_sel(westbound_consumer_sel),
@@ -101,7 +112,11 @@ icu u_icu(
     .mxm_e_col_sel(mxm_e_col_sel),
     .mxm_e_valid_in(mxm_e_valid_in),
     .mxm_input_is_signed(mxm_input_is_signed),
-    .mxm_wght_is_signed(mxm_wght_is_signed)
+    .mxm_wght_is_signed(mxm_wght_is_signed),
+    .mxm_use_fp(mxm_use_fp),
+    .fp_quant_mode(fp_quant_mode),
+    .mem_store_fmt(mem_store_fmt),
+    .vxm_layernorm_en(vxm_layernorm_en)
 );
 
 //mux logic for mem0 input
@@ -121,13 +136,13 @@ always_comb begin
     mem0_stream_in = '0;
 
     if (mem0_write_from_west)
-        mem0_stream_in[31:0] = westbound_payload;
+        mem0_stream_in = mem_row_t'(make_fp8_row_mem(westbound_payload, '0));
     else if (mem0_write_from_east)
-        mem0_stream_in = eastbound_payload;
+        mem0_stream_in = eastbound_to_mem_row(eastbound_payload);
 end
 
 mem #(
-    .DATA_W($bits(mxm_row_t))
+    .DATA_W($bits(mem_row_t))
 ) u_mem0(
     .clk(clk),
     .rst_n(rst_n),
@@ -139,7 +154,7 @@ mem #(
 );
 
 //since mem1 is on the far left westbound cannot write into it, so only eastbound can 
-mxm_row_t mem1_stream_out;
+mem_row_t mem1_stream_out;
 
 logic mem1_write_en_eff;
 
@@ -150,11 +165,11 @@ assign westbound_sel_t = westbound_sel;
 assign eastbound_sel_t = eastbound_sel;
 
 mem #(
-    .DATA_W($bits(mxm_row_t))
+    .DATA_W($bits(mem_row_t))
 ) u_mem1(
     .clk(clk),
     .rst_n(rst_n),
-    .stream_in(eastbound_payload),
+    .stream_in(eastbound_to_mem_row(eastbound_payload)),
     .stream_out(mem1_stream_out),
     .read_en(mem1_read_en),
     .write_en(mem1_write_en_eff),
@@ -191,8 +206,8 @@ logic        sxm_load_from_west;
 
 westbound_bus u_westbound_bus(
     .producer_sel(westbound_sel_t),
-    .mem0_payload(mem0_stream_out[31:0]),
-    .mem1_payload(mem1_stream_out[31:0]),
+    .mem0_payload(fp8_row_mem_packed(mem0_stream_out)),
+    .mem1_payload(fp8_row_mem_packed(mem1_stream_out)),
     .mem0_valid(mem0_valid),
     .mem1_valid(mem1_valid),
     // SXM emits transpose rows onto westbound for downstream scheduling.
@@ -226,10 +241,9 @@ always_comb begin
     sxm_payload_e_bus = '0;
     mem0_payload_e_bus = '0;
 
-    vxm_payload_e_bus[31:0] = vxm_stream_out_buf;
-    vxm_payload_e_bus[63:32] = vxm_stream_out_scale_buf;
+    vxm_payload_e_bus = mxm_row_t'(make_fp8_row_mem(vxm_stream_out_buf, vxm_stream_out_scale_buf));
     sxm_payload_e_bus[31:0] = sxm_stream_out_to_mxm_left;
-    mem0_payload_e_bus = mem0_stream_out;
+    mem0_payload_e_bus = mem_row_to_eastbound(mem0_stream_out);
 end
 
 mxm_eastbound_adapter #(
@@ -321,7 +335,7 @@ mxm u_mxm(
     .westbound_valid(westbound_valid),
     .mxm_west_en(mxm_west_en),
     .mxm_ingress_mode(mxm_ingress_mode),
-    .mxm_use_fp(1'b0),
+    .mxm_use_fp(mxm_use_fp),
     .mxm_input_is_signed(mxm_input_is_signed),
     .mxm_wght_is_signed(mxm_wght_is_signed),
     .mxm_input_in(mxm_input_in),
@@ -335,6 +349,9 @@ mxm u_mxm(
 
 mxm_row_t vxm_stream_in_data;
 mxm_row_t vxm_stream_in_bias;
+mxm_row_t vxm_bias_reg;
+mxm_row_t vxm_layernorm_gamma_reg;
+mxm_row_t vxm_layernorm_beta_reg;
 logic     vxm_in_valid;
 logic     vxm_in_ready;
 logic     vxm_fifo_wr_en;
@@ -343,13 +360,16 @@ logic     vxm_fifo_full;
 logic     vxm_fifo_empty;
 mxm_row_t vxm_fifo_data_out;
 logic     vxm_input_overflow;
+logic     vxm_load_operand;
+
+assign vxm_load_operand = vxm_east_en && eastbound_valid;
 
 // For now VXM consumes full-width rows from the eastbound bus only.
 // ICU still controls whether that traffic appears on eastbound via the bus selectors.
-assign vxm_fifo_wr_en = vxm_east_en && eastbound_valid;
+assign vxm_fifo_wr_en = vxm_load_operand && (vxm_operand_sel == VXM_OPERAND_DATA);
 assign vxm_fifo_rd_en = !vxm_fifo_empty && vxm_in_ready;
 assign vxm_stream_in_data = vxm_fifo_data_out;
-assign vxm_stream_in_bias = '0;
+assign vxm_stream_in_bias = vxm_bias_reg;
 assign vxm_in_valid = !vxm_fifo_empty;
 
 assign vxm_result_take_west = !vxm_result_empty && (westbound_sel_t == WB_VXM);
@@ -379,8 +399,30 @@ row_fifo #(
 always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
         vxm_input_overflow <= 1'b0;
-    end else if (vxm_fifo_wr_en && vxm_fifo_full) begin
-        vxm_input_overflow <= 1'b1;
+        vxm_bias_reg <= '0;
+        vxm_layernorm_gamma_reg <= {32'h3f800000, 32'h3f800000, 32'h3f800000, 32'h3f800000};
+        vxm_layernorm_beta_reg <= '0;
+    end else begin
+        if (vxm_fifo_wr_en && vxm_fifo_full) begin
+            vxm_input_overflow <= 1'b1;
+        end
+
+        if (vxm_load_operand) begin
+            unique case (vxm_operand_sel)
+                VXM_OPERAND_BIAS: begin
+                    vxm_bias_reg <= eastbound_payload;
+                end
+                VXM_OPERAND_GAMMA: begin
+                    vxm_layernorm_gamma_reg <= eastbound_payload;
+                end
+                VXM_OPERAND_BETA: begin
+                    vxm_layernorm_beta_reg <= eastbound_payload;
+                end
+                default: begin
+                    // Data operands are queued by u_vxm_input_fifo above.
+                end
+            endcase
+        end
     end
 end
 
@@ -424,9 +466,10 @@ vxm #(
     .in_valid(vxm_in_valid),
     .in_ready(vxm_in_ready),
     .vxm_ctrl(vxm_ctrl),
-    .layernorm_bypass(1'b1),
-    .layernorm_gamma(128'h00000001000000010000000100000001),
-    .layernorm_beta(128'h00000000000000000000000000000000),
+    .layernorm_bypass(~vxm_layernorm_en),
+    .layernorm_gamma(vxm_layernorm_gamma_reg),
+    .layernorm_beta(vxm_layernorm_beta_reg),
+    .fp_quant_mode(fp_quant_mode),
     .stream_out(vxm_stream_out_live),
     .stream_out_scale(vxm_stream_out_scale_live),
     .out_valid(vxm_out_valid_live),

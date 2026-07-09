@@ -1,11 +1,13 @@
-import os
 from pathlib import Path
+
 from cocotb_tools.runner import get_runner
 
-def test_lpu():
+
+def test_lpu_mem_sxm_mxm():
     src_dir = (Path(__file__).parent / "../src").resolve()
     tb_dir = Path(__file__).parent.resolve()
-    
+    build_dir = (tb_dir / "sim_build_mem_sxm_mxm_focus").resolve()
+
     sources = [
         src_dir / "lpu_pkg.sv",
         src_dir / "cvfpu_fp8_fp32_fma.sv",
@@ -25,7 +27,6 @@ def test_lpu():
         src_dir / "lut_softmax_div.sv",
         src_dir / "softmax.sv",
         src_dir / "quant.sv",
-        src_dir / "lut_layernorm.sv",
         src_dir / "vxm.sv",
         src_dir / "icu.sv",
         src_dir / "shared_bus_mux.sv",
@@ -35,25 +36,28 @@ def test_lpu():
         src_dir / "eastbound_bus/eastbound_consumer_decode.sv",
         src_dir / "eastbound_bus/mxm_eastbound_adapter.sv",
         src_dir / "lpu.sv",
-        tb_dir / "LPU_tb.sv"
+        tb_dir / "LPU_mem_sxm_mxm_tb.sv",
     ]
-    
+
     runner = get_runner("icarus")
-    
+
     runner.build(
         sources=sources,
+        hdl_toplevel="lpu_mem_sxm_mxm_cocotb_top",
         includes=[src_dir],
-        hdl_toplevel="lpu_cocotb_top",
+        build_dir=build_dir,
         always=True,
         waves=True,
     )
-    
+
     runner.test(
-        hdl_toplevel="lpu_cocotb_top",
-        test_module=os.getenv("TEST_MODULE", "lpu_tb"),
-        testcase=os.getenv("TESTCASE"),
+        hdl_toplevel="lpu_mem_sxm_mxm_cocotb_top",
+        test_module="lpu_mem_sxm_mxm_tb",
+        build_dir=build_dir,
+        test_dir=build_dir,
         waves=True,
     )
 
+
 if __name__ == "__main__":
-    test_lpu()
+    test_lpu_mem_sxm_mxm()

@@ -1,3 +1,5 @@
+import struct
+
 import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge, Timer
@@ -71,10 +73,47 @@ def softmax_quant_reference(p_value: int) -> int:
     return p_value & 0xFF
 
 
+def float_to_bits(value: float) -> int:
+    return struct.unpack(">I", struct.pack(">f", float(value)))[0]
+
+
+def fp8_e5m2_bits_reference(value: float) -> int:
+    bits = float_to_bits(value)
+    sign = (bits >> 31) & 0x1
+    exp = (bits >> 23) & 0xFF
+    frac = bits & 0x7FFFFF
+
+    if exp == 0 and frac == 0:
+        return sign << 7
+    if exp == 0xFF:
+        return (sign << 7) | 0x7D if frac else (sign << 7) | 0x7C
+    if exp == 0:
+        return sign << 7
+
+    fp8_exp = exp - 127 + 15
+    if fp8_exp <= 0:
+        return sign << 7
+
+    mantissa_full = (1 << 23) | frac
+    mantissa_q = (mantissa_full >> 21) & 0x7
+    guard = (mantissa_full >> 20) & 0x1
+    sticky = mantissa_full & ((1 << 20) - 1)
+    if guard and (sticky or (mantissa_q & 0x1)):
+        mantissa_q += 1
+    if mantissa_q == 8:
+        mantissa_q = 4
+        fp8_exp += 1
+    if fp8_exp >= 31:
+        return (sign << 7) | 0x7C
+    return (sign << 7) | ((fp8_exp & 0x1F) << 2) | (mantissa_q & 0x3)
+
+
 async def reset_dut(dut) -> None:
     dut.rst_n.value = 0
     dut.in_valid.value = 0
     dut.mode_softmax.value = 0
+    dut.fp_quant_mode.value = 0
+    dut.softmax_input_is_fp.value = 0
     dut.x_input.value = 0
 
     await RisingEdge(dut.clk)
@@ -87,9 +126,11 @@ async def reset_dut(dut) -> None:
     await Timer(1, unit="ns")
 
 
-async def drive_transaction(dut, *, mode_softmax: int, lanes: list[int]) -> int:
+async def drive_transaction(dut, *, mode_softmax: int, fp_quant_mode: int = 0, softmax_input_is_fp: int = 0, lanes: list[int]) -> int:
     dut.in_valid.value = 1
     dut.mode_softmax.value = mode_softmax
+    dut.fp_quant_mode.value = fp_quant_mode
+    dut.softmax_input_is_fp.value = softmax_input_is_fp
     dut.x_input.value = pack_input_lanes(lanes)
 
     await RisingEdge(dut.clk)
@@ -97,6 +138,8 @@ async def drive_transaction(dut, *, mode_softmax: int, lanes: list[int]) -> int:
 
     dut.in_valid.value = 0
     dut.mode_softmax.value = 0
+    dut.fp_quant_mode.value = 0
+    dut.softmax_input_is_fp.value = 0
     dut.x_input.value = 0
 
     await RisingEdge(dut.clk)
@@ -165,12 +208,16 @@ async def test_back_to_back_mode_switching(dut):
 
     dut.in_valid.value = 1
     dut.mode_softmax.value = 0
+    dut.fp_quant_mode.value = 0
+    dut.softmax_input_is_fp.value = 0
     dut.x_input.value = pack_input_lanes(regular_lanes)
     await RisingEdge(dut.clk)
     await Timer(1, unit="ns")
 
     dut.in_valid.value = 1
     dut.mode_softmax.value = 1
+    dut.fp_quant_mode.value = 0
+    dut.softmax_input_is_fp.value = 0
     dut.x_input.value = pack_input_lanes(softmax_lanes)
     await RisingEdge(dut.clk)
     await Timer(1, unit="ns")
@@ -187,6 +234,8 @@ async def test_back_to_back_mode_switching(dut):
 
     dut.in_valid.value = 0
     dut.mode_softmax.value = 0
+    dut.fp_quant_mode.value = 0
+    dut.softmax_input_is_fp.value = 0
     dut.x_input.value = 0
     await RisingEdge(dut.clk)
     await Timer(1, unit="ns")
@@ -218,3 +267,93 @@ async def test_softmax_quant_peaked_distribution(dut):
         f"peaked softmax mismatch: got 0x{observed_word:08x}, expected 0x{expected_word:08x}"
     )
     assert int(dut.q_scale_out.value) == 0, "softmax mode should emit zero scale metadata"
+
+
+@cocotb.test()
+async def test_softmax_quant_fp_probability_vector(dut):
+    cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
+    await reset_dut(dut)
+
+    fp_prob_lanes = [
+        float_to_bits(0.125),
+        float_to_bits(0.250),
+        float_to_bits(0.500),
+        float_to_bits(1.000),
+    ]
+    observed_word = await drive_transaction(
+        dut,
+        mode_softmax=1,
+        fp_quant_mode=0,
+        softmax_input_is_fp=1,
+        lanes=fp_prob_lanes,
+    )
+
+    expected_word = pack_output_bytes([32, 64, 128, 255])
+    assert observed_word == expected_word, (
+        f"fp softmax quant mismatch: got 0x{observed_word:08x}, expected 0x{expected_word:08x}"
+    )
+    assert int(dut.q_scale_out.value) == 0, "softmax mode should emit zero scale metadata"
+
+
+@cocotb.test()
+async def test_regular_fp8_quant_mode_vector(dut):
+    cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
+    await reset_dut(dut)
+
+    # absmax = 8.0 => shared row scale exponent = +3, scaled row = [1.0, -0.5, 0.5, -1.0]
+    input_lanes = [
+        float_to_bits(8.0),
+        float_to_bits(-4.0),
+        float_to_bits(4.0),
+        float_to_bits(-8.0),
+    ]
+    observed_word = await drive_transaction(
+        dut,
+        mode_softmax=0,
+        fp_quant_mode=1,
+        lanes=input_lanes,
+    )
+
+    expected_word = pack_output_bytes([
+        fp8_e5m2_bits_reference(1.0),
+        fp8_e5m2_bits_reference(-0.5),
+        fp8_e5m2_bits_reference(0.5),
+        fp8_e5m2_bits_reference(-1.0),
+    ])
+    assert observed_word == expected_word, (
+        f"regular fp8 mode mismatch: got 0x{observed_word:08x}, expected 0x{expected_word:08x}"
+    )
+    assert int(dut.q_scale_out.value) == 3, (
+        f"regular fp8 scale mismatch: got {int(dut.q_scale_out.value)}, expected 3"
+    )
+
+
+@cocotb.test()
+async def test_softmax_fp8_quant_mode_vector(dut):
+    cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
+    await reset_dut(dut)
+
+    fp_prob_lanes = [
+        float_to_bits(0.125),
+        float_to_bits(0.250),
+        float_to_bits(0.500),
+        float_to_bits(1.000),
+    ]
+    observed_word = await drive_transaction(
+        dut,
+        mode_softmax=1,
+        fp_quant_mode=1,
+        softmax_input_is_fp=1,
+        lanes=fp_prob_lanes,
+    )
+
+    expected_word = pack_output_bytes([
+        fp8_e5m2_bits_reference(0.125),
+        fp8_e5m2_bits_reference(0.250),
+        fp8_e5m2_bits_reference(0.500),
+        fp8_e5m2_bits_reference(1.000),
+    ])
+    assert observed_word == expected_word, (
+        f"softmax fp8 mode mismatch: got 0x{observed_word:08x}, expected 0x{expected_word:08x}"
+    )
+    assert int(dut.q_scale_out.value) == 0, "softmax fp8 mode should emit zero scale metadata"
