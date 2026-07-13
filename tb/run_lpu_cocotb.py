@@ -26,6 +26,8 @@ def test_lpu():
         src_dir / "softmax.sv",
         src_dir / "quant.sv",
         src_dir / "lut_layernorm.sv",
+        src_dir / "vxm_rope.sv",
+        src_dir / "residual_add.sv",
         src_dir / "vxm.sv",
         src_dir / "icu.sv",
         src_dir / "shared_bus_mux.sv",
