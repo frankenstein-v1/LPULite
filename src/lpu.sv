@@ -21,7 +21,7 @@ logic [11:0] sxm_opcode_weight;
 //icxu vxm outs
 logic [3:0] vxm_ctrl;
 logic vxm_data_sel;
-logic [1:0] vxm_operand_sel;
+logic [2:0] vxm_operand_sel;
 
 //icu busses
 logic [2:0] westbound_sel;
@@ -41,13 +41,16 @@ logic mxm_wght_is_signed;
 logic mxm_use_fp;
 logic fp_quant_mode;
 logic [1:0] mem_store_fmt;
-// logic vxm_layernorm_en;
 logic vxm_rmsnorm_en;
+logic vxm_rope_en;
+logic [2:0] vxm_residual_op;
 
-localparam logic [1:0] VXM_OPERAND_DATA  = 2'd0;
-localparam logic [1:0] VXM_OPERAND_BIAS  = 2'd1;
-localparam logic [1:0] VXM_OPERAND_GAMMA = 2'd2;
-localparam logic [1:0] VXM_OPERAND_BETA  = 2'd3;
+localparam logic [2:0] VXM_OPERAND_DATA     = 3'd0;
+localparam logic [2:0] VXM_OPERAND_BIAS     = 3'd1;
+localparam logic [2:0] VXM_OPERAND_GAMMA    = 3'd2;
+localparam logic [2:0] VXM_OPERAND_BETA     = 3'd3;
+localparam logic [2:0] VXM_OPERAND_ROPE_COS = 3'd4;
+localparam logic [2:0] VXM_OPERAND_ROPE_SIN = 3'd5;
 
 // Encoded bus select views. Keep these as plain vectors for Icarus compatibility.
 logic [2:0] westbound_consumer_sel_t;
@@ -117,8 +120,9 @@ icu u_icu(
     .mxm_use_fp(mxm_use_fp),
     .fp_quant_mode(fp_quant_mode),
     .mem_store_fmt(mem_store_fmt),
-    // .vxm_layernorm_en(vxm_layernorm_en)
-    .vxm_rmsnorm_en(vxm_rmsnorm_en)
+    .vxm_rmsnorm_en(vxm_rmsnorm_en),
+    .vxm_rope_en(vxm_rope_en),
+    .vxm_residual_op(vxm_residual_op)
 );
 
 //mux logic for mem0 input
@@ -352,10 +356,10 @@ mxm u_mxm(
 mxm_row_t vxm_stream_in_data;
 mxm_row_t vxm_stream_in_bias;
 mxm_row_t vxm_bias_reg;
-// mxm_row_t vxm_layernorm_gamma_reg;
-// mxm_row_t vxm_layernorm_beta_reg;
 mxm_row_t vxm_rmsnorm_gamma_reg;
 mxm_row_t vxm_rmsnorm_beta_reg;
+superlane_t vxm_rope_cos_fp8_reg;
+superlane_t vxm_rope_sin_fp8_reg;
 logic     vxm_in_valid;
 logic     vxm_in_ready;
 logic     vxm_fifo_wr_en;
@@ -365,12 +369,25 @@ logic     vxm_fifo_empty;
 mxm_row_t vxm_fifo_data_out;
 logic     vxm_input_overflow;
 logic     vxm_load_operand;
+logic     vxm_load_operand_east;
+logic     vxm_load_operand_west;
+mxm_row_t vxm_operand_payload;
 
-assign vxm_load_operand = vxm_east_en && eastbound_valid;
+assign vxm_load_operand_east = vxm_east_en && eastbound_valid;
+assign vxm_load_operand_west = vxm_west_en && westbound_valid;
+assign vxm_load_operand = vxm_load_operand_east || vxm_load_operand_west;
+
+always_comb begin
+    vxm_operand_payload = '0;
+    if (vxm_load_operand_east)
+        vxm_operand_payload = eastbound_payload;
+    else if (vxm_load_operand_west)
+        vxm_operand_payload[31:0] = westbound_payload;
+end
 
 // For now VXM consumes full-width rows from the eastbound bus only.
 // ICU still controls whether that traffic appears on eastbound via the bus selectors.
-assign vxm_fifo_wr_en = vxm_load_operand && (vxm_operand_sel == VXM_OPERAND_DATA);
+assign vxm_fifo_wr_en = vxm_load_operand_east && (vxm_operand_sel == VXM_OPERAND_DATA);
 assign vxm_fifo_rd_en = !vxm_fifo_empty && vxm_in_ready;
 assign vxm_stream_in_data = vxm_fifo_data_out;
 assign vxm_stream_in_bias = vxm_bias_reg;
@@ -403,10 +420,11 @@ row_fifo #(
 always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
         vxm_input_overflow <= 1'b0;
-        // vxm_layernorm_gamma_reg <= {32'h3f800000, 32'h3f800000, 32'h3f800000, 32'h3f800000};
-        // vxm_layernorm_beta_reg <= '0;
+        vxm_bias_reg <= '0;
         vxm_rmsnorm_gamma_reg <= {32'h3f800000, 32'h3f800000, 32'h3f800000, 32'h3f800000};
         vxm_rmsnorm_beta_reg <= '0;
+        vxm_rope_cos_fp8_reg <= 32'h3c3c_3c3c;
+        vxm_rope_sin_fp8_reg <= '0;
     end else begin
         if (vxm_fifo_wr_en && vxm_fifo_full) begin
             vxm_input_overflow <= 1'b1;
@@ -415,15 +433,19 @@ always_ff @(posedge clk or negedge rst_n) begin
         if (vxm_load_operand) begin
             unique case (vxm_operand_sel)
                 VXM_OPERAND_BIAS: begin
-                    vxm_bias_reg <= eastbound_payload;
+                    vxm_bias_reg <= vxm_operand_payload;
                 end
                 VXM_OPERAND_GAMMA: begin
-                    // vxm_layernorm_gamma_reg <= eastbound_payload;
-                    vxm_rmsnorm_gamma_reg <= eastbound_payload;
+                    vxm_rmsnorm_gamma_reg <= vxm_operand_payload;
                 end
                 VXM_OPERAND_BETA: begin
-                    // vxm_layernorm_beta_reg <= eastbound_payload;
-                    vxm_rmsnorm_beta_reg <= eastbound_payload;
+                    vxm_rmsnorm_beta_reg <= vxm_operand_payload;
+                end
+                VXM_OPERAND_ROPE_COS: begin
+                    vxm_rope_cos_fp8_reg <= vxm_operand_payload[31:0];
+                end
+                VXM_OPERAND_ROPE_SIN: begin
+                    vxm_rope_sin_fp8_reg <= vxm_operand_payload[31:0];
                 end
                 default: begin
                     // Data operands are queued by u_vxm_input_fifo above.
@@ -473,9 +495,10 @@ vxm #(
     .in_valid(vxm_in_valid),
     .in_ready(vxm_in_ready),
     .vxm_ctrl(vxm_ctrl),
-    // .layernorm_bypass(~vxm_layernorm_en),
-    // .layernorm_gamma(vxm_layernorm_gamma_reg),
-    // .layernorm_beta(vxm_layernorm_beta_reg),
+    .rope_en(vxm_rope_en),
+    .rope_cos_fp8(vxm_rope_cos_fp8_reg),
+    .rope_sin_fp8(vxm_rope_sin_fp8_reg),
+    .residual_op(vxm_residual_op),
     .rmsnorm_bypass(~vxm_rmsnorm_en),
     .rmsnorm_gamma(vxm_rmsnorm_gamma_reg),
     .rmsnorm_beta(vxm_rmsnorm_beta_reg),

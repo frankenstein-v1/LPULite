@@ -22,6 +22,8 @@ def test_decode():
         src_dir / "softmax.sv",
         src_dir / "quant.sv",
         src_dir / "lut_rmsnorm.sv",
+        src_dir / "vxm_rope.sv",
+        src_dir / "residual_add.sv",
         src_dir / "vxm.sv",
         src_dir / "icu.sv",
         src_dir / "westbound_bus/westbound_bus.sv",

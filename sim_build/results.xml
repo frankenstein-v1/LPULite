@@ -1,9 +1,11 @@
 <testsuites name="results">
   <testsuite name="all" package="all">
-    <property name="random_seed" value="1783619515" />
-    <testcase name="test_rmsnorm_fp32_combinatorial_isolated" classname="lut_rmsnorm_tb" file="C:\Users\z005a2rv\Documents\tinyLPU\tb\lut_rmsnorm_tb.py" lineno="68" time="0.0" sim_time_ns="1.0" ratio_time="inf" />
-    <testcase name="test_rmsnorm_fp32_gamma" classname="lut_rmsnorm_tb" file="C:\Users\z005a2rv\Documents\tinyLPU\tb\lut_rmsnorm_tb.py" lineno="78" time="0.0" sim_time_ns="1.0" ratio_time="inf" />
-    <testcase name="test_rmsnorm_fp32_random_sweep" classname="lut_rmsnorm_tb" file="C:\Users\z005a2rv\Documents\tinyLPU\tb\lut_rmsnorm_tb.py" lineno="88" time="0.0039806365966796875" sim_time_ns="10.0" ratio_time="2512.160996645903" />
-    <testcase name="test_rmsnorm_fp32_user_requested" classname="lut_rmsnorm_tb" file="C:\Users\z005a2rv\Documents\tinyLPU\tb\lut_rmsnorm_tb.py" lineno="98" time="0.001995086669921875" sim_time_ns="1.0" ratio_time="501.23135755258124" />
+    <property name="random_seed" value="1783967714" />
+    <testcase name="test_tiny_lm_prefill_decode_golden" classname="lpu_test" file="/Users/sakshambatra/tinylpu/tb/lpu_test.py" lineno="450" time="0.014163017272949219" sim_time_ns="1.0" ratio_time="70.60642380984446" />
+    <testcase name="test_lpu_vxm_hardware_relu_softmax_layernorm_paths" classname="lpu_test" file="/Users/sakshambatra/tinylpu/tb/lpu_test.py" lineno="477" time="0.017757892608642578" sim_time_ns="1081.0" ratio_time="60874.34043124513" />
+    <testcase name="test_tiny_lm_ranvijay_prompt_probe" classname="lpu_test" file="/Users/sakshambatra/tinylpu/tb/lpu_test.py" lineno="631" time="0.002187967300415039" sim_time_ns="1.0" ratio_time="457.0452217500272" />
+    <testcase name="test_lpu_ranvijay_prompt_timing" classname="lpu_test" file="/Users/sakshambatra/tinylpu/tb/lpu_test.py" lineno="646" time="0.6677289009094238" sim_time_ns="50701.0" ratio_time="75930.51600873795" />
+    <testcase name="test_lpu_tiny_lm_prefill_decode_tiles_and_lm_head" classname="lpu_test" file="/Users/sakshambatra/tinylpu/tb/lpu_test.py" lineno="740" time="0.684683084487915" sim_time_ns="50701.0" ratio_time="74050.31780202377" />
+    <testcase name="test_interactive_prompt" classname="lpu_test" file="/Users/sakshambatra/tinylpu/tb/lpu_test.py" lineno="865" time="4.57763671875e-05" sim_time_ns="1.0" ratio_time="21845.333333333332" />
   </testsuite>
 </testsuites>

@@ -86,6 +86,18 @@ def layernorm_rows(rows, gamma, beta, eps=1e-5):
     return out
 
 
+def rmsnorm_rows(rows, gamma, eps=1e-5):
+    out = []
+    for row in rows:
+        rms_sq = lpu.to_f32(sum(lpu.to_f32(value * value) for value in row) / len(row))
+        inv_rms = lpu.to_f32(1.0 / math.sqrt(rms_sq + eps))
+        out.append([
+            lpu.to_f32(lpu.to_f32(value * inv_rms) * gamma[idx])
+            for idx, value in enumerate(row)
+        ])
+    return out
+
+
 def softmax_rows(scores):
     out = []
     for row in scores:
@@ -221,6 +233,24 @@ def unpack_fp8_word(word):
     return [(word >> (8 * idx)) & 0xFF for idx in range(4)]
 
 
+def rope_rows_fp32(data, cos_bits, sin_bits):
+    out = [0.0 for _ in range(4)]
+    for pair in range(2):
+        even = 2 * pair
+        odd = even + 1
+        x_even = lpu.to_f32(data[even])
+        x_odd = lpu.to_f32(data[odd])
+        cos_value = lpu.fp8_e5m2_to_f32(cos_bits[even])
+        sin_value = lpu.fp8_e5m2_to_f32(sin_bits[even])
+        out[even] = lpu.to_f32(
+            lpu.to_f32(x_even * cos_value) - lpu.to_f32(x_odd * sin_value)
+        )
+        out[odd] = lpu.to_f32(
+            lpu.to_f32(x_even * sin_value) + lpu.to_f32(x_odd * cos_value)
+        )
+    return out
+
+
 def matrix_close(actual, expected, *, tol=1e-5):
     assert len(actual) == len(expected)
     assert len(actual[0]) == len(expected[0])
@@ -302,20 +332,39 @@ async def run_forced_vxm_row(
     gamma=None,
     beta=None,
     layernorm_en=0,
+    rope_en=0,
+    rope_cos_bits=None,
+    rope_sin_bits=None,
+    residual_op=lpu.VXM_RES_PASS,
+    reset=True,
 ):
-    await lpu.reset_dut(dut)
+    if reset:
+        await lpu.reset_dut(dut)
+    else:
+        dut.u_lpu.u_vxm.in_valid.value = Force(0)
+        dut.u_lpu.u_vxm.out_ready.value = Force(1)
+        for _ in range(8):
+            if not int(dut.u_lpu.u_vxm.out_valid.value):
+                break
+            await lpu.tick(dut, 1)
 
     if bias is not None:
         dut.u_lpu.vxm_bias_reg.value = pack_fp32_row(bias)
     if gamma is not None:
-        dut.u_lpu.vxm_layernorm_gamma_reg.value = pack_fp32_row(gamma)
+        dut.u_lpu.vxm_rmsnorm_gamma_reg.value = pack_fp32_row(gamma)
     if beta is not None:
-        dut.u_lpu.vxm_layernorm_beta_reg.value = pack_fp32_row(beta)
+        dut.u_lpu.vxm_rmsnorm_beta_reg.value = pack_fp32_row(beta)
+    if rope_cos_bits is not None:
+        dut.u_lpu.vxm_rope_cos_fp8_reg.value = lpu.pack_bytes(rope_cos_bits)
+    if rope_sin_bits is not None:
+        dut.u_lpu.vxm_rope_sin_fp8_reg.value = lpu.pack_bytes(rope_sin_bits)
 
     dut.u_lpu.u_vxm.stream_in_data.value = Force(pack_fp32_row(data))
     dut.u_lpu.u_vxm.vxm_ctrl.value = Force(vxm_ctrl)
     dut.u_lpu.u_vxm.fp_quant_mode.value = Force(fp_quant_mode)
-    dut.u_lpu.u_vxm.layernorm_bypass.value = Force(0 if layernorm_en else 1)
+    dut.u_lpu.u_vxm.rope_en.value = Force(rope_en)
+    dut.u_lpu.u_vxm.residual_op.value = Force(residual_op)
+    dut.u_lpu.u_vxm.rmsnorm_bypass.value = Force(0 if layernorm_en else 1)
     dut.u_lpu.u_vxm.in_valid.value = Force(1)
     dut.u_lpu.u_vxm.out_ready.value = Force(1)
 
@@ -330,7 +379,9 @@ async def run_forced_vxm_row(
             dut.u_lpu.u_vxm.stream_in_data.value = Release()
             dut.u_lpu.u_vxm.vxm_ctrl.value = Release()
             dut.u_lpu.u_vxm.fp_quant_mode.value = Release()
-            dut.u_lpu.u_vxm.layernorm_bypass.value = Release()
+            dut.u_lpu.u_vxm.rope_en.value = Release()
+            dut.u_lpu.u_vxm.residual_op.value = Release()
+            dut.u_lpu.u_vxm.rmsnorm_bypass.value = Release()
             dut.u_lpu.u_vxm.in_valid.value = Release()
             dut.u_lpu.u_vxm.out_ready.value = Release()
             return row_word, scale_word
@@ -338,10 +389,58 @@ async def run_forced_vxm_row(
     dut.u_lpu.u_vxm.stream_in_data.value = Release()
     dut.u_lpu.u_vxm.vxm_ctrl.value = Release()
     dut.u_lpu.u_vxm.fp_quant_mode.value = Release()
-    dut.u_lpu.u_vxm.layernorm_bypass.value = Release()
+    dut.u_lpu.u_vxm.rope_en.value = Release()
+    dut.u_lpu.u_vxm.residual_op.value = Release()
+    dut.u_lpu.u_vxm.rmsnorm_bypass.value = Release()
     dut.u_lpu.u_vxm.in_valid.value = Release()
     dut.u_lpu.u_vxm.out_ready.value = Release()
     raise AssertionError("VXM did not produce an output row")
+
+
+async def drive_forced_vxm_residual_op(
+    dut,
+    *,
+    data,
+    residual_op,
+    reset=False,
+):
+    if reset:
+        await lpu.reset_dut(dut)
+
+    dut.u_lpu.u_vxm.stream_in_data.value = Force(pack_fp32_row(data))
+    dut.u_lpu.u_vxm.vxm_ctrl.value = Force(0)
+    dut.u_lpu.u_vxm.fp_quant_mode.value = Force(1)
+    dut.u_lpu.u_vxm.rope_en.value = Force(0)
+    dut.u_lpu.u_vxm.residual_op.value = Force(residual_op)
+    dut.u_lpu.u_vxm.rmsnorm_bypass.value = Force(1)
+    dut.u_lpu.u_vxm.in_valid.value = Force(1)
+    dut.u_lpu.u_vxm.out_ready.value = Force(1)
+
+    await lpu.tick(dut, 1)
+    dut.u_lpu.u_vxm.in_valid.value = Force(0)
+
+    for _ in range(120):
+        await lpu.tick(dut, 1)
+        if int(dut.u_lpu.u_vxm.residual_done.value):
+            dut.u_lpu.u_vxm.stream_in_data.value = Release()
+            dut.u_lpu.u_vxm.vxm_ctrl.value = Release()
+            dut.u_lpu.u_vxm.fp_quant_mode.value = Release()
+            dut.u_lpu.u_vxm.rope_en.value = Release()
+            dut.u_lpu.u_vxm.residual_op.value = Release()
+            dut.u_lpu.u_vxm.rmsnorm_bypass.value = Release()
+            dut.u_lpu.u_vxm.in_valid.value = Release()
+            dut.u_lpu.u_vxm.out_ready.value = Release()
+            return
+
+    dut.u_lpu.u_vxm.stream_in_data.value = Release()
+    dut.u_lpu.u_vxm.vxm_ctrl.value = Release()
+    dut.u_lpu.u_vxm.fp_quant_mode.value = Release()
+    dut.u_lpu.u_vxm.rope_en.value = Release()
+    dut.u_lpu.u_vxm.residual_op.value = Release()
+    dut.u_lpu.u_vxm.rmsnorm_bypass.value = Release()
+    dut.u_lpu.u_vxm.in_valid.value = Release()
+    dut.u_lpu.u_vxm.out_ready.value = Release()
+    raise AssertionError("VXM residual op did not complete")
 
 
 def token_rows_to_string(tokens):
@@ -412,7 +511,7 @@ async def test_lpu_vxm_hardware_relu_softmax_layernorm_paths(dut):
     ln_data = [0.35, -0.49, 1.25, -0.75]
     ln_gamma = [1.0, 0.5, 1.25, 0.75]
     ln_beta = [0.10, -0.20, 0.0, 0.35]
-    ln_expected = layernorm_rows([ln_data], ln_gamma, ln_beta)[0]
+    ln_expected = rmsnorm_rows([ln_data], ln_gamma)[0]
     ln_expected_bits, ln_expected_scale = lpu.regular_fp8_row_quant_expected(ln_expected)
     ln_word, ln_scale = await run_forced_vxm_row(
         dut,
@@ -425,7 +524,108 @@ async def test_lpu_vxm_hardware_relu_softmax_layernorm_paths(dut):
     )
     assert unpack_fp8_word(ln_word) == ln_expected_bits
     assert (ln_scale & 0xFF) == (ln_expected_scale & 0xFF)
-    dut._log.info("hardware VXM programmable layernorm quantized row: %s scale=%d", unpack_fp8_word(ln_word), ln_expected_scale)
+    dut._log.info("hardware VXM programmable RMSNorm quantized row: %s scale=%d", unpack_fp8_word(ln_word), ln_expected_scale)
+
+    rope_data = [0.35, -0.49, 1.20, -0.85]
+    cos_bits = [
+        lpu.fp8_e5m2_bits(0.96),
+        lpu.fp8_e5m2_bits(0.96),
+        lpu.fp8_e5m2_bits(0.78),
+        lpu.fp8_e5m2_bits(0.78),
+    ]
+    sin_bits = [
+        lpu.fp8_e5m2_bits(0.29),
+        lpu.fp8_e5m2_bits(0.29),
+        lpu.fp8_e5m2_bits(-0.63),
+        lpu.fp8_e5m2_bits(-0.63),
+    ]
+
+    lpu.preload_mem0_word(dut, addr=12, values=cos_bits)
+    lpu.preload_mem1_word(dut, addr=18, values=sin_bits)
+    load_rope_operands = [
+        lpu.build_instruction(mem0_read_en=1, mem0_addr=12),
+        lpu.build_instruction(
+            eastbound_sel=lpu.EB_MEM0,
+            eastbound_consumer_sel=lpu.EC_VXM,
+            vxm_operand_sel=lpu.VXM_OPERAND_ROPE_COS,
+        ),
+        lpu.build_instruction(mem1_read_en=1, mem1_addr=18),
+        lpu.build_instruction(
+            westbound_sel=lpu.WB_MEM1,
+            westbound_consumer_sel=lpu.WC_VXM,
+            vxm_operand_sel=lpu.VXM_OPERAND_ROPE_SIN,
+        ),
+    ]
+    await lpu.run_lpu_program(dut, load_rope_operands, extra_cycles=6)
+    assert int(dut.u_lpu.vxm_rope_cos_fp8_reg.value) == lpu.pack_bytes(cos_bits)
+    assert int(dut.u_lpu.vxm_rope_sin_fp8_reg.value) == lpu.pack_bytes(sin_bits)
+
+    rope_expected = rope_rows_fp32(rope_data, cos_bits, sin_bits)
+    rope_expected_bits, rope_expected_scale = lpu.regular_fp8_row_quant_expected(rope_expected)
+    rope_word, rope_scale = await run_forced_vxm_row(
+        dut,
+        data=rope_data,
+        vxm_ctrl=0b0000,
+        fp_quant_mode=1,
+        rope_en=1,
+        rope_cos_bits=cos_bits,
+        rope_sin_bits=sin_bits,
+    )
+    assert unpack_fp8_word(rope_word) == rope_expected_bits, (
+        f"RoPE output mismatch: got {unpack_fp8_word(rope_word)}, "
+        f"expected {rope_expected_bits}, "
+        f"rope_out=0x{int(dut.u_lpu.u_vxm.rope_out.value):032x}, "
+        f"rope_result=0x{int(dut.u_lpu.u_vxm.rope_result_reg.value):032x}, "
+        f"rope_start={int(dut.u_lpu.u_vxm.rope_start.value)}, "
+        f"rope_done={int(dut.u_lpu.u_vxm.rope_done.value)}, "
+        f"rope_busy={int(dut.u_lpu.u_vxm.rope_busy.value)}, "
+        f"rope_state={int(dut.u_lpu.u_vxm.rope_inst.state_q.value)}, "
+        f"mux_valid={int(dut.u_lpu.u_vxm.mux_valid.value)}, "
+        f"rope_result_valid={int(dut.u_lpu.u_vxm.rope_result_valid.value)}, "
+        f"cos=0x{int(dut.u_lpu.vxm_rope_cos_fp8_reg.value):08x}, "
+        f"sin=0x{int(dut.u_lpu.vxm_rope_sin_fp8_reg.value):08x}"
+    )
+    assert (rope_scale & 0xFF) == (rope_expected_scale & 0xFF)
+    dut._log.info(
+        "hardware VXM RoPE quantized row: %s scale=%d",
+        unpack_fp8_word(rope_word),
+        rope_expected_scale,
+    )
+
+    residual_base = [0.37, -0.82, 1.13, -1.41]
+    residual_delta = [-0.29, 0.44, -0.61, 0.95]
+    residual_expected = [
+        lpu.to_f32(base + delta)
+        for base, delta in zip(residual_base, residual_delta)
+    ]
+    residual_expected_bits, residual_expected_scale = lpu.regular_fp8_row_quant_expected(residual_expected)
+
+    await drive_forced_vxm_residual_op(
+        dut,
+        data=residual_base,
+        residual_op=lpu.VXM_RES_LOAD,
+        reset=True,
+    )
+    await drive_forced_vxm_residual_op(
+        dut,
+        data=residual_delta,
+        residual_op=lpu.VXM_RES_ADD,
+    )
+    residual_word, residual_scale = await run_forced_vxm_row(
+        dut,
+        data=[0.0, 0.0, 0.0, 0.0],
+        vxm_ctrl=0b0000,
+        fp_quant_mode=1,
+        residual_op=lpu.VXM_RES_EMIT,
+        reset=False,
+    )
+    assert unpack_fp8_word(residual_word) == residual_expected_bits
+    assert (residual_scale & 0xFF) == (residual_expected_scale & 0xFF)
+    dut._log.info(
+        "hardware VXM residual add quantized row: %s scale=%d",
+        unpack_fp8_word(residual_word),
+        residual_expected_scale,
+    )
 
 
 @cocotb.test()

@@ -324,11 +324,21 @@ async def reset_dut(dut):
     dut.in_valid.value = 0
     dut.vxm_ctrl.value = 0
     dut.fp_quant_mode.value = 0
+    if hasattr(dut, "rope_en"):
+        dut.rope_en.value = 0
+        dut.rope_cos_fp8.value = 0x3C3C_3C3C
+        dut.rope_sin_fp8.value = 0
+    if hasattr(dut, "residual_op"):
+        dut.residual_op.value = 0
     dut.out_ready.value = 1
     if hasattr(dut, "layernorm_bypass"):
         dut.layernorm_bypass.value = 1
         dut.layernorm_gamma.value = pack_float_lanes([1.0, 1.0, 1.0, 1.0])
         dut.layernorm_beta.value = pack_float_lanes([0.0, 0.0, 0.0, 0.0])
+    if hasattr(dut, "rmsnorm_bypass"):
+        dut.rmsnorm_bypass.value = 1
+        dut.rmsnorm_gamma.value = pack_float_lanes([1.0, 1.0, 1.0, 1.0])
+        dut.rmsnorm_beta.value = pack_float_lanes([0.0, 0.0, 0.0, 0.0])
     await RisingEdge(dut.clk)
     await RisingEdge(dut.clk)
     dut.rst_n.value = 1

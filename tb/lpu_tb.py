@@ -22,6 +22,14 @@ VXM_OPERAND_DATA = 0
 VXM_OPERAND_BIAS = 1
 VXM_OPERAND_GAMMA = 2
 VXM_OPERAND_BETA = 3
+VXM_OPERAND_ROPE_COS = 4
+VXM_OPERAND_ROPE_SIN = 5
+
+VXM_RES_PASS = 0
+VXM_RES_CLEAR = 1
+VXM_RES_LOAD = 2
+VXM_RES_ADD = 3
+VXM_RES_EMIT = 4
 
 WC_NONE = 0
 WC_MXM = 1
@@ -293,6 +301,8 @@ def build_instruction(
     fp_quant_mode=0,
     mem_store_fmt=0,
     vxm_layernorm_en=0,
+    vxm_rope_en=0,
+    vxm_residual_op=VXM_RES_PASS,
     vxm_operand_sel=VXM_OPERAND_DATA,
 ):
     
@@ -335,7 +345,9 @@ def build_instruction(
     word = _set_field(word, fp_quant_mode, 80, 1)
     word = _set_field(word, mem_store_fmt, 81, 2)
     word = _set_field(word, vxm_layernorm_en, 83, 1)
-    word = _set_field(word, vxm_operand_sel, 84, 2)
+    word = _set_field(word, vxm_operand_sel, 84, 3)
+    word = _set_field(word, vxm_rope_en, 87, 1)
+    word = _set_field(word, vxm_residual_op, 88, 3)
 
     return word
 

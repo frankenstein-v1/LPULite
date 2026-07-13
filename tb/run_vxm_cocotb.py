@@ -9,12 +9,15 @@ def test_vxm():
     build_dir = (tb_dir / f"sim_build_vxm_{sim}").resolve()
 
     sources = [
-        src_dir / "vxm.sv",
         src_dir / "lut_rmsnorm.sv",
         src_dir / "cvfpu_fp32_addsub.sv",
         src_dir / "cvfpu_fp32_div.sv",
         src_dir / "cvfpu_fp32_cmp.sv",
         src_dir / "cvfpu_fp32_fma.sv",
+        src_dir / "cvfpu_fp8_to_fp32_cast.sv",
+        src_dir / "vxm_rope.sv",
+        src_dir / "residual_add.sv",
+        src_dir / "vxm.sv",
         src_dir / "softmax.sv",
         src_dir / "quant.sv",
         src_dir / "lut_softmax_exp.sv",
