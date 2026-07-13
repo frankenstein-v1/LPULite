@@ -1,5 +1,7 @@
 `timescale 1ns/1ps
 
+`include "cvfpu_compat.svh"
+
 // Wrapper around CVFPU fpnew_top for scalar FP32 fused multiply-add:
 //   result = multiplicand * multiplier + addend
 //
@@ -85,10 +87,12 @@ module cvfpu_fp32_fma (
         end else begin
             start_q  <= start_i;
             if (start_i) begin
-                result_o <= $shortrealtobits(
-                    $bitstoshortreal(multiplicand_i) *
-                    $bitstoshortreal(multiplier_i) +
-                    $bitstoshortreal(addend_i)
+                result_o <= f64_to_f32_bits(
+                    $realtobits(
+                        $bitstoreal(f32_to_f64_bits(multiplicand_i)) *
+                        $bitstoreal(f32_to_f64_bits(multiplier_i)) +
+                        $bitstoreal(f32_to_f64_bits(addend_i))
+                    )
                 );
             end
         end

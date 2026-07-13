@@ -1,5 +1,7 @@
 `timescale 1ns/1ps
 
+`include "cvfpu_compat.svh"
+
 // Wrapper around CVFPU fpnew_top for scalar FP8 -> FP32 conversion.
 //
 // Notes:
@@ -89,8 +91,8 @@ module cvfpu_fp8_to_fp32_cast (
         logic [4:0] exp_bits;
         logic [1:0] frac_bits;
         integer     exp_unbiased;
-        shortreal   value;
-        shortreal   scale;
+        real        value;
+        real        scale;
         begin
             sign_bit = fp8_bits[7];
             exp_bits = fp8_bits[6:2];
@@ -116,7 +118,7 @@ module cvfpu_fp8_to_fp32_cast (
                 if (sign_bit)
                     value = -value;
 
-                fp8_e5m2_to_fp32_bits = $shortrealtobits(value);
+                fp8_e5m2_to_fp32_bits = f64_to_f32_bits($realtobits(value));
             end
         end
     endfunction

@@ -1,0 +1,26 @@
+<testsuites name="results">
+  <testsuite name="all" package="all">
+    <property name="random_seed" value="1783610184" />
+    <testcase name="test_bias_relu_pipeline_overlap" classname="vxm_tb" file="C:\Users\z005a2rv\Documents\tinyLPU\tb\vxm_tb.py" lineno="509" time="0.00592350959777832" sim_time_ns="50.0" ratio_time="8440.941839404306" />
+    <testcase name="test_bias_relu_pipeline_throughput" classname="vxm_tb" file="C:\Users\z005a2rv\Documents\tinyLPU\tb\vxm_tb.py" lineno="561" time="0.005820512771606445" sim_time_ns="120.0" ratio_time="20616.740261336174">
+      <failure error_type="ValueError" error_msg="Can't convert LogicArray to int: it contains non-0/1 values" />
+    </testcase>
+    <testcase name="test_full_row_scale_softmax_quant" classname="vxm_tb" file="C:\Users\z005a2rv\Documents\tinyLPU\tb\vxm_tb.py" lineno="615" time="0.005788564682006836" sim_time_ns="140.0" ratio_time="24185.615552535113">
+      <failure error_type="ValueError" error_msg="Can't convert LogicArray to int: it contains non-0/1 values" />
+    </testcase>
+    <testcase name="test_fp_row_softmax_quant" classname="vxm_tb" file="C:\Users\z005a2rv\Documents\tinyLPU\tb\vxm_tb.py" lineno="638" time="0.007073163986206055" sim_time_ns="250.00000000000006" ratio_time="35344.861293693335">
+      <failure error_type="ValueError" error_msg="Can't convert LogicArray to int: it contains non-0/1 values" />
+    </testcase>
+    <testcase name="test_fp_bias_relu_scale_internal_registers" classname="vxm_tb" file="C:\Users\z005a2rv\Documents\tinyLPU\tb\vxm_tb.py" lineno="667" time="0.0035042762756347656" sim_time_ns="90.0" ratio_time="25682.906517893593" />
+    <testcase name="test_fp_full_row_bias_relu_scale_quant" classname="vxm_tb" file="C:\Users\z005a2rv\Documents\tinyLPU\tb\vxm_tb.py" lineno="728" time="0.003998279571533203" sim_time_ns="130.0" ratio_time="32513.98449612403">
+      <failure error_type="ValueError" error_msg="Can't convert LogicArray to int: it contains non-0/1 values" />
+    </testcase>
+    <testcase name="test_four_row_scale_softmax_quant_stress" classname="vxm_tb" file="C:\Users\z005a2rv\Documents\tinyLPU\tb\vxm_tb.py" lineno="759" time="0.006511211395263672" sim_time_ns="140.0" ratio_time="21501.37532039546">
+      <failure error_type="ValueError" error_msg="Can't convert LogicArray to int: it contains non-0/1 values" />
+    </testcase>
+    <testcase name="test_four_row_scale_softmax_quant_observe" classname="vxm_tb" file="C:\Users\z005a2rv\Documents\tinyLPU\tb\vxm_tb.py" lineno="778" time="0.026646137237548828" sim_time_ns="2530.0" ratio_time="94948.09613285374" />
+    <testcase name="test_rmsnorm_normal" classname="vxm_tb" file="C:\Users\z005a2rv\Documents\tinyLPU\tb\vxm_tb.py" lineno="893" time="0.0037908554077148438" sim_time_ns="100.0" ratio_time="26379.270440251574" />
+    <testcase name="test_rmsnorm_zero_variance" classname="vxm_tb" file="C:\Users\z005a2rv\Documents\tinyLPU\tb\vxm_tb.py" lineno="921" time="0.0032806396484375" sim_time_ns="110.0" ratio_time="33530.04651162791" />
+    <testcase name="test_rmsnorm_random" classname="vxm_tb" file="C:\Users\z005a2rv\Documents\tinyLPU\tb\vxm_tb.py" lineno="949" time="0.0033648014068603516" sim_time_ns="110.0" ratio_time="32691.379579111457" />
+  </testsuite>
+</testsuites>

@@ -41,7 +41,7 @@ logic mxm_wght_is_signed;
 logic mxm_use_fp;
 logic fp_quant_mode;
 logic [1:0] mem_store_fmt;
-logic vxm_layernorm_en;
+logic vxm_rmsnorm_en;
 logic vxm_rope_en;
 logic [2:0] vxm_residual_op;
 
@@ -120,7 +120,7 @@ icu u_icu(
     .mxm_use_fp(mxm_use_fp),
     .fp_quant_mode(fp_quant_mode),
     .mem_store_fmt(mem_store_fmt),
-    .vxm_layernorm_en(vxm_layernorm_en),
+    .vxm_rmsnorm_en(vxm_rmsnorm_en),
     .vxm_rope_en(vxm_rope_en),
     .vxm_residual_op(vxm_residual_op)
 );
@@ -356,8 +356,8 @@ mxm u_mxm(
 mxm_row_t vxm_stream_in_data;
 mxm_row_t vxm_stream_in_bias;
 mxm_row_t vxm_bias_reg;
-mxm_row_t vxm_layernorm_gamma_reg;
-mxm_row_t vxm_layernorm_beta_reg;
+mxm_row_t vxm_rmsnorm_gamma_reg;
+mxm_row_t vxm_rmsnorm_beta_reg;
 superlane_t vxm_rope_cos_fp8_reg;
 superlane_t vxm_rope_sin_fp8_reg;
 logic     vxm_in_valid;
@@ -421,8 +421,8 @@ always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
         vxm_input_overflow <= 1'b0;
         vxm_bias_reg <= '0;
-        vxm_layernorm_gamma_reg <= {32'h3f800000, 32'h3f800000, 32'h3f800000, 32'h3f800000};
-        vxm_layernorm_beta_reg <= '0;
+        vxm_rmsnorm_gamma_reg <= {32'h3f800000, 32'h3f800000, 32'h3f800000, 32'h3f800000};
+        vxm_rmsnorm_beta_reg <= '0;
         vxm_rope_cos_fp8_reg <= 32'h3c3c_3c3c;
         vxm_rope_sin_fp8_reg <= '0;
     end else begin
@@ -436,10 +436,10 @@ always_ff @(posedge clk or negedge rst_n) begin
                     vxm_bias_reg <= vxm_operand_payload;
                 end
                 VXM_OPERAND_GAMMA: begin
-                    vxm_layernorm_gamma_reg <= vxm_operand_payload;
+                    vxm_rmsnorm_gamma_reg <= vxm_operand_payload;
                 end
                 VXM_OPERAND_BETA: begin
-                    vxm_layernorm_beta_reg <= vxm_operand_payload;
+                    vxm_rmsnorm_beta_reg <= vxm_operand_payload;
                 end
                 VXM_OPERAND_ROPE_COS: begin
                     vxm_rope_cos_fp8_reg <= vxm_operand_payload[31:0];
@@ -499,9 +499,9 @@ vxm #(
     .rope_cos_fp8(vxm_rope_cos_fp8_reg),
     .rope_sin_fp8(vxm_rope_sin_fp8_reg),
     .residual_op(vxm_residual_op),
-    .layernorm_bypass(~vxm_layernorm_en),
-    .layernorm_gamma(vxm_layernorm_gamma_reg),
-    .layernorm_beta(vxm_layernorm_beta_reg),
+    .rmsnorm_bypass(~vxm_rmsnorm_en),
+    .rmsnorm_gamma(vxm_rmsnorm_gamma_reg),
+    .rmsnorm_beta(vxm_rmsnorm_beta_reg),
     .fp_quant_mode(fp_quant_mode),
     .stream_out(vxm_stream_out_live),
     .stream_out_scale(vxm_stream_out_scale_live),

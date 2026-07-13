@@ -32,10 +32,10 @@ module vxm #(
     // Residual accumulator control
     input  logic [2:0]              residual_op,
 
-    // LayerNorm control and parameters
-    input  logic                    layernorm_bypass,
-    input  logic [LANES*LANE_W-1:0] layernorm_gamma,
-    input  logic [LANES*LANE_W-1:0] layernorm_beta,
+    // RMSNorm control and parameters
+    input  logic                    rmsnorm_bypass,
+    input  logic [LANES*LANE_W-1:0] rmsnorm_gamma,
+    input  logic [LANES*LANE_W-1:0] rmsnorm_beta,
 
     // Outputs
     output logic [31:0] stream_out,
@@ -534,9 +534,6 @@ module vxm #(
         end
     endgenerate
 
-    logic [LANES*LANE_W-1:0] layernorm_out;
-    logic [LANES*LANE_W-1:0] layernorm_mux_out;
-
     vxm_rope #(
         .LANES(LANES),
         .LANE_W(LANE_W)
@@ -554,19 +551,22 @@ module vxm #(
 
     assign pre_layernorm_in = rope_en ? rope_result_reg : mux_out;
 
-    lut_layernorm #(
+    logic [LANES*LANE_W-1:0] rmsnorm_out;
+    logic [LANES*LANE_W-1:0] rmsnorm_mux_out;
+
+    lut_rmsnorm #(
         .LANES(LANES),
         .LANE_W(LANE_W)
-    ) layernorm_inst (
+    ) rmsnorm_inst (
         .x_in(pre_layernorm_in),
-        .gamma(layernorm_gamma),
-        .beta(layernorm_beta),
-        .y_out(layernorm_out)
+        .gamma(rmsnorm_gamma),
+        .beta(rmsnorm_beta),
+        .y_out(rmsnorm_out)
     );
 
-    assign layernorm_mux_out = layernorm_bypass ? pre_layernorm_in : layernorm_out;
+    assign rmsnorm_mux_out = rmsnorm_bypass ? pre_layernorm_in : rmsnorm_out;
 
-    assign residual_row_in = layernorm_mux_out;
+    assign residual_row_in = rmsnorm_mux_out;
 
     residual_add #(
         .LANES(LANES),

@@ -1,5 +1,7 @@
 `timescale 1ns/1ps
 
+`include "cvfpu_compat.svh"
+
 // Wrapper around CVFPU fpnew_top for scalar FP32 multiply:
 //   result = a * b
 module cvfpu_fp32_mul (
@@ -81,8 +83,10 @@ module cvfpu_fp32_mul (
         end else begin
             start_q <= start_i;
             if (start_i) begin
-                result_o <= $shortrealtobits(
-                    $bitstoshortreal(a_i) * $bitstoshortreal(b_i)
+                result_o <= f64_to_f32_bits(
+                    $realtobits(
+                        $bitstoreal(f32_to_f64_bits(a_i)) * $bitstoreal(f32_to_f64_bits(b_i))
+                    )
                 );
             end
         end

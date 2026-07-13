@@ -1,5 +1,7 @@
 `timescale 1ns/1ps
 
+`include "cvfpu_compat.svh"
+
 // Wrapper around CVFPU fpnew_top for scalar FP32 divide:
 //   result = dividend / divisor
 module cvfpu_fp32_div (
@@ -81,8 +83,10 @@ module cvfpu_fp32_div (
         end else begin
             start_q <= start_i;
             if (start_i) begin
-                result_o <= $shortrealtobits(
-                    $bitstoshortreal(dividend_i) / $bitstoshortreal(divisor_i)
+                result_o <= f64_to_f32_bits(
+                    $realtobits(
+                        $bitstoreal(f32_to_f64_bits(dividend_i)) / $bitstoreal(f32_to_f64_bits(divisor_i))
+                    )
                 );
             end
         end

@@ -1,6 +1,9 @@
 import os
+import logging
 from pathlib import Path
 from cocotb_tools.runner import get_runner
+
+logging.basicConfig(level=logging.INFO)
 
 def test_lpu():
     src_dir = (Path(__file__).parent / "../src").resolve()
@@ -25,7 +28,7 @@ def test_lpu():
         src_dir / "lut_softmax_div.sv",
         src_dir / "softmax.sv",
         src_dir / "quant.sv",
-        src_dir / "lut_layernorm.sv",
+        src_dir / "lut_rmsnorm.sv",
         src_dir / "vxm_rope.sv",
         src_dir / "residual_add.sv",
         src_dir / "vxm.sv",
@@ -48,12 +51,26 @@ def test_lpu():
         hdl_toplevel="lpu_cocotb_top",
         always=True,
         waves=True,
+        build_args=["-g2012"],
+        verbose=True,
     )
     
+    testcase = os.getenv("TESTCASE")
+    default_module = "lpu_tb"
+    if testcase:
+        lpu_test_path = tb_dir / "lpu_test.py"
+        if lpu_test_path.exists():
+            try:
+                with open(lpu_test_path, "r", encoding="utf-8") as f:
+                    if f"async def {testcase}" in f.read():
+                        default_module = "lpu_test"
+            except Exception:
+                pass
+
     runner.test(
         hdl_toplevel="lpu_cocotb_top",
-        test_module=os.getenv("TEST_MODULE", "lpu_tb"),
-        testcase=os.getenv("TESTCASE"),
+        test_module=os.getenv("TEST_MODULE", default_module),
+        testcase=testcase,
         waves=True,
     )
 

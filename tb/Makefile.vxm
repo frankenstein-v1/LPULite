@@ -8,10 +8,10 @@ COCOTB_CONFIG ?= $(if $(wildcard $(REPO_ROOT)/.venv_cocotb13/bin/cocotb-config),
 
 VERILOG_SOURCES = $(REPO_ROOT)/src/cvfpu_fp8_to_fp32_cast.sv \
                   $(REPO_ROOT)/src/cvfpu_fp32_fma.sv \
+                  $(REPO_ROOT)/src/lut_rmsnorm.sv \
                   $(REPO_ROOT)/src/vxm_rope.sv \
                   $(REPO_ROOT)/src/residual_add.sv \
                   $(REPO_ROOT)/src/vxm.sv \
-                  $(REPO_ROOT)/src/lut_layernorm.sv \
                   $(REPO_ROOT)/src/row_fifo.sv \
                   $(REPO_ROOT)/src/softmax.sv \
                   $(REPO_ROOT)/src/quant.sv \

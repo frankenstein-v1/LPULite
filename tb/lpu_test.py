@@ -86,6 +86,18 @@ def layernorm_rows(rows, gamma, beta, eps=1e-5):
     return out
 
 
+def rmsnorm_rows(rows, gamma, eps=1e-5):
+    out = []
+    for row in rows:
+        rms_sq = lpu.to_f32(sum(lpu.to_f32(value * value) for value in row) / len(row))
+        inv_rms = lpu.to_f32(1.0 / math.sqrt(rms_sq + eps))
+        out.append([
+            lpu.to_f32(lpu.to_f32(value * inv_rms) * gamma[idx])
+            for idx, value in enumerate(row)
+        ])
+    return out
+
+
 def softmax_rows(scores):
     out = []
     for row in scores:
@@ -339,9 +351,9 @@ async def run_forced_vxm_row(
     if bias is not None:
         dut.u_lpu.vxm_bias_reg.value = pack_fp32_row(bias)
     if gamma is not None:
-        dut.u_lpu.vxm_layernorm_gamma_reg.value = pack_fp32_row(gamma)
+        dut.u_lpu.vxm_rmsnorm_gamma_reg.value = pack_fp32_row(gamma)
     if beta is not None:
-        dut.u_lpu.vxm_layernorm_beta_reg.value = pack_fp32_row(beta)
+        dut.u_lpu.vxm_rmsnorm_beta_reg.value = pack_fp32_row(beta)
     if rope_cos_bits is not None:
         dut.u_lpu.vxm_rope_cos_fp8_reg.value = lpu.pack_bytes(rope_cos_bits)
     if rope_sin_bits is not None:
@@ -352,7 +364,7 @@ async def run_forced_vxm_row(
     dut.u_lpu.u_vxm.fp_quant_mode.value = Force(fp_quant_mode)
     dut.u_lpu.u_vxm.rope_en.value = Force(rope_en)
     dut.u_lpu.u_vxm.residual_op.value = Force(residual_op)
-    dut.u_lpu.u_vxm.layernorm_bypass.value = Force(0 if layernorm_en else 1)
+    dut.u_lpu.u_vxm.rmsnorm_bypass.value = Force(0 if layernorm_en else 1)
     dut.u_lpu.u_vxm.in_valid.value = Force(1)
     dut.u_lpu.u_vxm.out_ready.value = Force(1)
 
@@ -369,7 +381,7 @@ async def run_forced_vxm_row(
             dut.u_lpu.u_vxm.fp_quant_mode.value = Release()
             dut.u_lpu.u_vxm.rope_en.value = Release()
             dut.u_lpu.u_vxm.residual_op.value = Release()
-            dut.u_lpu.u_vxm.layernorm_bypass.value = Release()
+            dut.u_lpu.u_vxm.rmsnorm_bypass.value = Release()
             dut.u_lpu.u_vxm.in_valid.value = Release()
             dut.u_lpu.u_vxm.out_ready.value = Release()
             return row_word, scale_word
@@ -379,7 +391,7 @@ async def run_forced_vxm_row(
     dut.u_lpu.u_vxm.fp_quant_mode.value = Release()
     dut.u_lpu.u_vxm.rope_en.value = Release()
     dut.u_lpu.u_vxm.residual_op.value = Release()
-    dut.u_lpu.u_vxm.layernorm_bypass.value = Release()
+    dut.u_lpu.u_vxm.rmsnorm_bypass.value = Release()
     dut.u_lpu.u_vxm.in_valid.value = Release()
     dut.u_lpu.u_vxm.out_ready.value = Release()
     raise AssertionError("VXM did not produce an output row")
@@ -400,7 +412,7 @@ async def drive_forced_vxm_residual_op(
     dut.u_lpu.u_vxm.fp_quant_mode.value = Force(1)
     dut.u_lpu.u_vxm.rope_en.value = Force(0)
     dut.u_lpu.u_vxm.residual_op.value = Force(residual_op)
-    dut.u_lpu.u_vxm.layernorm_bypass.value = Force(1)
+    dut.u_lpu.u_vxm.rmsnorm_bypass.value = Force(1)
     dut.u_lpu.u_vxm.in_valid.value = Force(1)
     dut.u_lpu.u_vxm.out_ready.value = Force(1)
 
@@ -415,7 +427,7 @@ async def drive_forced_vxm_residual_op(
             dut.u_lpu.u_vxm.fp_quant_mode.value = Release()
             dut.u_lpu.u_vxm.rope_en.value = Release()
             dut.u_lpu.u_vxm.residual_op.value = Release()
-            dut.u_lpu.u_vxm.layernorm_bypass.value = Release()
+            dut.u_lpu.u_vxm.rmsnorm_bypass.value = Release()
             dut.u_lpu.u_vxm.in_valid.value = Release()
             dut.u_lpu.u_vxm.out_ready.value = Release()
             return
@@ -425,7 +437,7 @@ async def drive_forced_vxm_residual_op(
     dut.u_lpu.u_vxm.fp_quant_mode.value = Release()
     dut.u_lpu.u_vxm.rope_en.value = Release()
     dut.u_lpu.u_vxm.residual_op.value = Release()
-    dut.u_lpu.u_vxm.layernorm_bypass.value = Release()
+    dut.u_lpu.u_vxm.rmsnorm_bypass.value = Release()
     dut.u_lpu.u_vxm.in_valid.value = Release()
     dut.u_lpu.u_vxm.out_ready.value = Release()
     raise AssertionError("VXM residual op did not complete")
@@ -499,7 +511,7 @@ async def test_lpu_vxm_hardware_relu_softmax_layernorm_paths(dut):
     ln_data = [0.35, -0.49, 1.25, -0.75]
     ln_gamma = [1.0, 0.5, 1.25, 0.75]
     ln_beta = [0.10, -0.20, 0.0, 0.35]
-    ln_expected = layernorm_rows([ln_data], ln_gamma, ln_beta)[0]
+    ln_expected = rmsnorm_rows([ln_data], ln_gamma)[0]
     ln_expected_bits, ln_expected_scale = lpu.regular_fp8_row_quant_expected(ln_expected)
     ln_word, ln_scale = await run_forced_vxm_row(
         dut,
@@ -512,7 +524,7 @@ async def test_lpu_vxm_hardware_relu_softmax_layernorm_paths(dut):
     )
     assert unpack_fp8_word(ln_word) == ln_expected_bits
     assert (ln_scale & 0xFF) == (ln_expected_scale & 0xFF)
-    dut._log.info("hardware VXM programmable layernorm quantized row: %s scale=%d", unpack_fp8_word(ln_word), ln_expected_scale)
+    dut._log.info("hardware VXM programmable RMSNorm quantized row: %s scale=%d", unpack_fp8_word(ln_word), ln_expected_scale)
 
     rope_data = [0.35, -0.49, 1.20, -0.85]
     cos_bits = [
@@ -836,3 +848,151 @@ async def test_lpu_tiny_lm_prefill_decode_tiles_and_lm_head(dut):
     dut._log.info("golden decode next-token top5: %s", top_tokens(decode["logits"][-1], id_to_token))
     dut._log.info("LPU-backed quantized LM-head top5: %s", top_tokens(hw_logits, id_to_token))
     dut._log.info('LPU-backed next token for "%s" is "%s"', token_rows_to_string(PROMPT_DECODE), hw_next_token)
+
+
+@cocotb.task.bridge
+def get_user_input(prompt: str) -> str:
+    import sys
+    try:
+        sys.stdout.flush()
+        return input(prompt)
+    except (KeyboardInterrupt, EOFError):
+        return "exit"
+    except Exception:
+        return "exit"
+
+
+@cocotb.test()
+async def test_interactive_prompt(dut):
+    import os
+    import sys
+    
+    if os.getenv("INTERACTIVE") != "1":
+        dut._log.info("Skipping interactive prompt test. Set INTERACTIVE=1 to run.")
+        await Timer(1, unit="ns")
+        return
+
+    cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
+
+    config, vocab, id_to_token, weights = load_tiny_lm_export()
+    assert config == MODEL_CONFIG
+
+    print("\n" + "="*60)
+    print("Welcome to the Continuous Interactive LPU Inference Console!")
+    print("Type your prompt (up to 3 words) and press Enter.")
+    print("Type 'exit' or 'quit' to stop.")
+    print("="*60 + "\n")
+
+    while True:
+        prompt_str = await get_user_input("LPU-Prompt> ")
+        prompt_str = prompt_str.strip()
+        if not prompt_str:
+            continue
+        if prompt_str.lower() in ["exit", "quit"]:
+            break
+
+        words = prompt_str.split()
+        if not words:
+            continue
+
+        # Truncate prompt if it exceeds the maximum supported sequence length (4 tokens total, so 3 prompt tokens max)
+        if len(words) > 3:
+            words = words[-3:]
+            print(f"[*] Note: Prompt truncated to last 3 tokens: {words}")
+
+        # Run forward pass on the simulated LPU chip
+        try:
+            prompt_ids = encode_prompt(words, vocab)
+            golden = tiny_lm_forward(prompt_ids, weights)
+
+            # Prefill/Decode Attn & FFN projections on LPU
+            for projection, weight_name in [
+                ("Q projection", "blocks.0.attn.q_proj.weight"),
+                ("K projection", "blocks.0.attn.k_proj.weight"),
+                ("V projection", "blocks.0.attn.v_proj.weight"),
+            ]:
+                await run_lpu_mxm_tile(
+                    dut,
+                    left_rows=golden["ln1"],
+                    right_rows=weights[weight_name],
+                    label=projection,
+                )
+
+            await run_lpu_mxm_tile(
+                dut,
+                left_rows=golden["q"],
+                right_rows=golden["k"],
+                label="causal attention Q @ K^T raw scores",
+            )
+
+            v_by_hidden = transpose(golden["v"])
+            await run_lpu_mxm_tile(
+                dut,
+                left_rows=golden["probs"],
+                right_rows=v_by_hidden,
+                label="attention probabilities @ V",
+            )
+
+            await run_lpu_mxm_tile(
+                dut,
+                left_rows=golden["attn"],
+                right_rows=weights["blocks.0.attn.out_proj.weight"],
+                label="attention output projection",
+            )
+
+            for start in range(0, MODEL_CONFIG["ffn_dim"], 4):
+                await run_lpu_mxm_tile(
+                    dut,
+                    left_rows=golden["ln2"],
+                    right_rows=weights["blocks.0.ffn.0.weight"][start:start + 4],
+                    label=f"FFN W1 tile {start}:{start + 4}",
+                )
+
+            for start in range(0, MODEL_CONFIG["ffn_dim"], 4):
+                hidden_chunk = [row[start:start + 4] for row in golden["ffn_hidden"]]
+                w2_chunk = [row[start:start + 4] for row in weights["blocks.0.ffn.2.weight"]]
+                await run_lpu_mxm_tile(
+                    dut,
+                    left_rows=hidden_chunk,
+                    right_rows=w2_chunk,
+                    label=f"FFN W2 partial tile {start}:{start + 4}",
+                )
+
+            # LM Head on LPU
+            last_hidden = golden["final"][-1]
+            hw_logits = [0.0 for _ in range(MODEL_CONFIG["vocab_size"])]
+            for vocab_start in range(0, MODEL_CONFIG["vocab_size"], 4):
+                observed = await run_lpu_mxm_tile(
+                    dut,
+                    left_rows=[last_hidden],
+                    right_rows=weights["lm_head.weight"][vocab_start:vocab_start + 4],
+                    label=f"LM head tile {vocab_start}:{vocab_start + 4}",
+                )
+                for lane in range(4):
+                    token_id = vocab_start + lane
+                    hw_logits[token_id] = lpu.to_f32(observed[0][lane] + weights["lm_head.bias"][token_id])
+
+            # Process outputs
+            pred_id = argmax(hw_logits)
+            pred_token = id_to_token[pred_id]
+            probs = softmax_rows([hw_logits])[0]
+
+            top5_indices = sorted(range(len(hw_logits)), key=lambda idx: hw_logits[idx], reverse=True)[:5]
+
+            # Print required format:
+            # "the only thing I want in the response is the prompt + prediction and the top 5 highest predictions with scores"
+            print("\n" + "="*50)
+            print(f"Prompt: {' '.join(words)}")
+            print(f"Prediction: {pred_token}")
+            print("\nTop 5 predictions:")
+            for rank, idx in enumerate(top5_indices):
+                token_str = id_to_token[idx]
+                score = hw_logits[idx]
+                prob = probs[idx]
+                print(f"  {rank+1}. {token_str:<15} (score: {score:8.3f}, prob: {prob*100:5.1f}%)")
+            print("="*50 + "\n")
+
+        except Exception as e:
+            print(f"\n[!] Error during LPU inference: {e}\n", file=sys.stderr)
+
+    print("\nExiting interactive mode.\n")

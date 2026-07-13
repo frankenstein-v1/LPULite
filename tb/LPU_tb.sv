@@ -200,7 +200,16 @@ module lpu_cocotb_top (
     assign mxm_out_32_dbg            = u_lpu.u_mxm.mxm_out[3][2];
     assign mxm_out_33_dbg            = u_lpu.u_mxm.mxm_out[3][3];
 
-    lut_layernorm #(
+    // lut_layernorm #(
+    //     .LANES(8),
+    //     .LANE_W(32)
+    // ) u_ln8_dbg (
+    //     .x_in(ln8_x_dbg),
+    //     .gamma(ln8_gamma_dbg),
+    //     .beta(ln8_beta_dbg),
+    //     .y_out(ln8_y_dbg)
+    // );
+    lut_rmsnorm #(
         .LANES(8),
         .LANE_W(32)
     ) u_ln8_dbg (
