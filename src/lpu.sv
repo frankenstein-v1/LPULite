@@ -9,10 +9,10 @@ module lpu (
 //icu mem outputs
 logic mem0_read_en;
 logic mem0_write_en;
-logic [8:0] mem0_addr;
+logic [MEM_ADDR_W-1:0] mem0_addr;
 logic mem1_read_en;
 logic mem1_write_en;
-logic [8:0] mem1_addr;
+logic [MEM_ADDR_W-1:0] mem1_addr;
 
 //icu sxm outputs
 logic [11:0] sxm_opcode_input;

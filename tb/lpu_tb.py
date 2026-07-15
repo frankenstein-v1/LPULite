@@ -272,6 +272,19 @@ def _set_field(word, value, lsb, width):
     mask = (1 << width) - 1
     return word | ((value & mask) << lsb)
 
+
+MEM_ADDR_W = 11
+MEM_ADDR_LOW_W = 9
+MEM0_ADDR_HI_LSB = 90
+MEM1_ADDR_HI_LSB = 92
+
+
+def _set_mem_addr(word, value, low_lsb, high_lsb):
+    if value < 0 or value >= (1 << MEM_ADDR_W):
+        raise ValueError(f"memory address {value} does not fit in {MEM_ADDR_W} bits")
+    word = _set_field(word, value, low_lsb, MEM_ADDR_LOW_W)
+    return _set_field(word, value >> MEM_ADDR_LOW_W, high_lsb, MEM_ADDR_W - MEM_ADDR_LOW_W)
+
 #builds the instruction for the ICU
 def build_instruction(
     *,
@@ -317,12 +330,12 @@ def build_instruction(
     # mem0 control [22:12]
     word = _set_field(word, mem0_read_en, 12, 1)
     word = _set_field(word, mem0_write_en, 13, 1)
-    word = _set_field(word, mem0_addr, 14, 9)
+    word = _set_mem_addr(word, mem0_addr, 14, MEM0_ADDR_HI_LSB)
 
     # mem1 control [33:23]
     word = _set_field(word, mem1_read_en, 23, 1)
     word = _set_field(word, mem1_write_en, 24, 1)
-    word = _set_field(word, mem1_addr, 25, 9)
+    word = _set_mem_addr(word, mem1_addr, 25, MEM1_ADDR_HI_LSB)
 
     # sxm control [57:34]
     word = _set_field(word, sxm_opcode_input, 34, 12)

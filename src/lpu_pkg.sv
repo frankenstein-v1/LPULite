@@ -110,8 +110,10 @@ typedef enum logic [2:0] {
     EC_MEM1 = 3'd4
 } eastbound_consumer_e;
 
-// 1,280 bytes total per hemisphere.
-// 1,280 bytes / 4 bytes per superlane = 320 memory slots
-localparam MEM_DEPTH = 320;
+// Expanded scratch/KV-cache storage for model work.
+// Each hemisphere now has 2048 rows. At the current 64-bit mem_row_t width,
+// that is 16 KiB per memory, or 32 KiB across mem0 + mem1.
+localparam int MEM_DEPTH  = 2048;
+localparam int MEM_ADDR_W = $clog2(MEM_DEPTH);
 
 `endif

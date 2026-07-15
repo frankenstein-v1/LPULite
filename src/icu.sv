@@ -8,12 +8,12 @@ module icu #(
     // mem0 Control (11 bits)
     output logic      mem0_read_en,
     output logic      mem0_write_en,
-    output logic [8:0] mem0_addr,
+    output logic [MEM_ADDR_W-1:0] mem0_addr,
 
     // mem1 Control (11 bits)
     output logic      mem1_read_en,
     output logic      mem1_write_en,
-    output logic [8:0] mem1_addr,
+    output logic [MEM_ADDR_W-1:0] mem1_addr,
 
     // SXM Control (24 bits)
     output logic [11:0] sxm_opcode_input,
@@ -79,12 +79,14 @@ module icu #(
     // mem0 control
     assign mem0_read_en  = current_instruction[12];
     assign mem0_write_en = current_instruction[13];
-    assign mem0_addr     = current_instruction[22:14];
+    // Keep the original low 9 address bits in place for backward-compatible
+    // programs; use spare high instruction bits for expanded 2048-row memories.
+    assign mem0_addr     = {current_instruction[91:90], current_instruction[22:14]};
 
     // mem1 control
     assign mem1_read_en  = current_instruction[23];
     assign mem1_write_en = current_instruction[24];
-    assign mem1_addr     = current_instruction[33:25];
+    assign mem1_addr     = {current_instruction[93:92], current_instruction[33:25]};
 
     // SXM control
     assign sxm_opcode_input  = current_instruction[45:34];

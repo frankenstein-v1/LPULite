@@ -58,6 +58,19 @@ def _set_field(word, value, lsb, width):
     return word | ((value & mask) << lsb)
 
 
+MEM_ADDR_W = 11
+MEM_ADDR_LOW_W = 9
+MEM0_ADDR_HI_LSB = 90
+MEM1_ADDR_HI_LSB = 92
+
+
+def _set_mem_addr(word, value, low_lsb, high_lsb):
+    if value < 0 or value >= (1 << MEM_ADDR_W):
+        raise ValueError(f"memory address {value} does not fit in {MEM_ADDR_W} bits")
+    word = _set_field(word, value, low_lsb, MEM_ADDR_LOW_W)
+    return _set_field(word, value >> MEM_ADDR_LOW_W, high_lsb, MEM_ADDR_W - MEM_ADDR_LOW_W)
+
+
 def build_instruction(
     *,
     westbound_sel=WB_NONE,
@@ -78,9 +91,9 @@ def build_instruction(
     word = _set_field(word, westbound_sel, 0, 3)
     word = _set_field(word, westbound_consumer_sel, 6, 3)
     word = _set_field(word, mem0_read_en, 12, 1)
-    word = _set_field(word, mem0_addr, 14, 9)
+    word = _set_mem_addr(word, mem0_addr, 14, MEM0_ADDR_HI_LSB)
     word = _set_field(word, mem1_read_en, 23, 1)
-    word = _set_field(word, mem1_addr, 25, 9)
+    word = _set_mem_addr(word, mem1_addr, 25, MEM1_ADDR_HI_LSB)
     word = _set_field(word, sxm_opcode_input, 34, 12)
     word = _set_field(word, mxm_ingress_mode, 62, 2)
     word = _set_field(word, mxm_start, 64, 1)

@@ -1,7 +1,9 @@
 `include "lpu_pkg.sv"
 
 module mem #(
-    parameter int DATA_W = $bits(superlane_t)
+    parameter int DATA_W = $bits(superlane_t),
+    parameter int DEPTH  = MEM_DEPTH,
+    parameter int ADDR_W = $clog2(DEPTH)
 ) (
     input  logic clk,
     input  logic rst_n,       // Active-low reset signal
@@ -13,11 +15,11 @@ module mem #(
     // Control Signals
     input  logic read_en,
     input  logic write_en,
-    input  logic [8:0] addr   // 9 bits to address 320 slots (0 to 511)
+    input  logic [ADDR_W-1:0] addr
 );
 
     // The actual SRAM vault. Width is parameterized so LPU can use row-wide storage.
-    logic [DATA_W-1:0] sram_array [0:MEM_DEPTH-1];
+    logic [DATA_W-1:0] sram_array [0:DEPTH-1];
 
     // Sequential logic: Everything happens strictly on the clock edge
     always_ff @(posedge clk or negedge rst_n) begin

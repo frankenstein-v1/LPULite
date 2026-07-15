@@ -10,12 +10,12 @@ module lpu_mem_sxm_mxm_cocotb_top (
     output logic [11:0] sxm_opcode_input_dbg,
 
     output logic        mem0_read_en_dbg,
-    output logic [8:0]  mem0_addr_dbg,
+    output logic [MEM_ADDR_W-1:0]  mem0_addr_dbg,
     output logic        mem0_valid_dbg,
     output logic [31:0] mem0_stream_out_dbg,
 
     output logic        mem1_read_en_dbg,
-    output logic [8:0]  mem1_addr_dbg,
+    output logic [MEM_ADDR_W-1:0]  mem1_addr_dbg,
     output logic        mem1_valid_dbg,
     output logic [31:0] mem1_stream_out_dbg,
 

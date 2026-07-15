@@ -475,6 +475,43 @@ async def test_tiny_lm_prefill_decode_golden(dut):
 
 
 @cocotb.test()
+async def test_lpu_mem_2048_high_address_decode_and_read(dut):
+    cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
+
+    mem0_addr = 1500
+    mem1_addr = 1733
+    mem0_bytes = [0xA1, 0xB2, 0xC3, 0xD4]
+    mem1_bytes = [0x11, 0x22, 0x33, 0x44]
+
+    lpu.preload_mem0_word(dut, mem0_addr, mem0_bytes)
+    lpu.preload_mem1_word(dut, mem1_addr, mem1_bytes)
+
+    program = [
+        lpu.build_instruction(mem0_read_en=1, mem0_addr=mem0_addr),
+        lpu.build_instruction(
+            westbound_sel=lpu.WB_MEM0,
+            mem1_read_en=1,
+            mem1_addr=mem1_addr,
+        ),
+        lpu.build_instruction(westbound_sel=lpu.WB_MEM1),
+    ]
+
+    lpu.preload_program(dut, program)
+    await lpu.reset_dut(dut)
+
+    assert int(dut.u_lpu.mem0_addr.value) == mem0_addr
+
+    await lpu.tick(dut)
+    assert int(dut.u_lpu.mem1_addr.value) == mem1_addr
+    assert int(dut.u_lpu.westbound_valid.value) == 1
+    assert int(dut.u_lpu.westbound_payload.value) == lpu.pack_bytes(mem0_bytes)
+
+    await lpu.tick(dut)
+    assert int(dut.u_lpu.westbound_valid.value) == 1
+    assert int(dut.u_lpu.westbound_payload.value) == lpu.pack_bytes(mem1_bytes)
+
+
+@cocotb.test()
 async def test_lpu_vxm_hardware_relu_softmax_layernorm_paths(dut):
     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
 
