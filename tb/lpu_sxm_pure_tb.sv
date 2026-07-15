@@ -76,10 +76,10 @@ module lpu_sxm_pure_tb;
         input reg [2:0]  eastbound_consumer_sel,
         input reg        mem0_read_en,
         input reg        mem0_write_en,
-        input reg [8:0]  mem0_addr,
+        input reg [MEM_ADDR_W-1:0]  mem0_addr,
         input reg        mem1_read_en,
         input reg        mem1_write_en,
-        input reg [8:0]  mem1_addr,
+        input reg [MEM_ADDR_W-1:0]  mem1_addr,
         input reg [11:0] sxm_opcode_input,
         input reg [11:0] sxm_opcode_weight,
         input reg [1:0]  vxm_math_op,
@@ -92,19 +92,21 @@ module lpu_sxm_pure_tb;
         input reg [1:0]  mxm_e_col_sel,
         input reg        mxm_e_valid_in
     );
-        reg [71:0] word;
+        reg [95:0] word;
         begin
-            word = 72'd0;
+            word = 96'd0;
             word[2:0]   = westbound_sel;
             word[5:3]   = eastbound_sel;
             word[8:6]   = westbound_consumer_sel;
             word[11:9]  = eastbound_consumer_sel;
             word[12]    = mem0_read_en;
             word[13]    = mem0_write_en;
-            word[22:14] = mem0_addr;
+            word[22:14] = mem0_addr[8:0];
+            word[91:90] = mem0_addr[MEM_ADDR_W-1:9];
             word[23]    = mem1_read_en;
             word[24]    = mem1_write_en;
-            word[33:25] = mem1_addr;
+            word[33:25] = mem1_addr[8:0];
+            word[93:92] = mem1_addr[MEM_ADDR_W-1:9];
             word[45:34] = sxm_opcode_input;
             word[57:46] = sxm_opcode_weight;
             word[59:58] = vxm_math_op;
