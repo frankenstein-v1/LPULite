@@ -8,19 +8,17 @@ typedef logic [31:0] superlane_t;
 // FP8 lane type (8-bit raw encoding). Use when treating bytes as FP8.
 typedef logic [7:0] fp8_t;
 typedef logic [7:0] fp8_lane_t;
-typedef logic [31:0] packed_fp8_row_t;
+typedef logic [63:0] packed_fp8_row_t;
 typedef logic [7:0] fp8_row_scale_t;
 localparam int MXM_SIZE = 4;
 localparam int MXM_ACC_W = 32;
 typedef logic [127:0] mxm_row_t;
-typedef logic [63:0] mem_row_t;
+typedef logic [71:0] mem_row_t;
 
 // Memory format for one quantized FP8 row:
-//   [31:0]   packed 4-lane FP8 row
-//   [39:32]  shared row-scale metadata
-//   [63:40]  reserved for future metadata/expansion
+//   [63:0]   packed 8-lane FP8 row
+//   [71:64]  shared row-scale metadata
 typedef struct packed {
-    logic [23:0]     reserved;
     fp8_row_scale_t  row_scale;
     packed_fp8_row_t packed_row;
 } fp8_row_mem_t;
@@ -38,13 +36,23 @@ function automatic fp8_row_mem_t make_fp8_row_mem(
     end
 endfunction
 
-function automatic packed_fp8_row_t fp8_row_mem_packed(
+function automatic packed_fp8_row_t fp8_row_mem_packed8(
     input mem_row_t raw_row
 );
     fp8_row_mem_t decoded_row;
     begin
         decoded_row = fp8_row_mem_t'(raw_row);
-        fp8_row_mem_packed = decoded_row.packed_row;
+        fp8_row_mem_packed8 = decoded_row.packed_row;
+    end
+endfunction
+
+function automatic superlane_t fp8_row_mem_packed(
+    input mem_row_t raw_row
+);
+    packed_fp8_row_t packed_row;
+    begin
+        packed_row = fp8_row_mem_packed8(raw_row);
+        fp8_row_mem_packed = packed_row[31:0];
     end
 endfunction
 
@@ -111,9 +119,9 @@ typedef enum logic [2:0] {
 } eastbound_consumer_e;
 
 // Expanded scratch/KV-cache storage for model work.
-// Each hemisphere now has 2048 rows. At the current 64-bit mem_row_t width,
-// that is 16 KiB per memory, or 32 KiB across mem0 + mem1.
-localparam int MEM_DEPTH  = 2048;
+// Each memory has 32768 rows. At the current 72-bit mem_row_t width,
+// that is 288 KiB per memory, or 576 KiB across mem0 + mem1.
+localparam int MEM_DEPTH  = 32768;
 localparam int MEM_ADDR_W = $clog2(MEM_DEPTH);
 
 `endif
