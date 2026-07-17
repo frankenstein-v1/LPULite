@@ -6,7 +6,7 @@ from cocotb.clock import Clock
 from cocotb.triggers import NextTimeStep, ReadOnly, RisingEdge, Timer
 
 
-LANES = 4
+LANES = 8
 LANE_W = 32
 BIAS_RELU_CTRL = 0b0011
 SCALE_SOFTMAX_CTRL = 0b1100
@@ -197,9 +197,18 @@ def softmax_fp_quant_expected(data_floats):
         for bits in delta_bits
     ]
     exp_values = [bits_to_float(bits) for bits in exp_bits]
-    sum01 = to_f32(exp_values[0] + exp_values[1])
-    sum23 = to_f32(exp_values[2] + exp_values[3])
-    sum_exp = to_f32(sum01 + sum23)
+    if LANES == 8:
+        val01 = to_f32(exp_values[0] + exp_values[1])
+        val23 = to_f32(exp_values[2] + exp_values[3])
+        val45 = to_f32(exp_values[4] + exp_values[5])
+        val67 = to_f32(exp_values[6] + exp_values[7])
+        val_q0 = to_f32(val01 + val23)
+        val_q1 = to_f32(val45 + val67)
+        sum_exp = to_f32(val_q0 + val_q1)
+    else:
+        sum01 = to_f32(exp_values[0] + exp_values[1])
+        sum23 = to_f32(exp_values[2] + exp_values[3])
+        sum_exp = to_f32(sum01 + sum23)
     probs = [float_to_bits(to_f32(value / sum_exp)) for value in exp_values]
     return [fp32_to_uq0_8_ref(prob_bits) for prob_bits in probs]
 
@@ -288,9 +297,18 @@ def softmax_fp8_quant_expected(data_floats):
         for bits in delta_bits
     ]
     exp_values = [bits_to_float(bits) for bits in exp_bits]
-    sum01 = to_f32(exp_values[0] + exp_values[1])
-    sum23 = to_f32(exp_values[2] + exp_values[3])
-    sum_exp = to_f32(sum01 + sum23)
+    if LANES == 8:
+        val01 = to_f32(exp_values[0] + exp_values[1])
+        val23 = to_f32(exp_values[2] + exp_values[3])
+        val45 = to_f32(exp_values[4] + exp_values[5])
+        val67 = to_f32(exp_values[6] + exp_values[7])
+        val_q0 = to_f32(val01 + val23)
+        val_q1 = to_f32(val45 + val67)
+        sum_exp = to_f32(val_q0 + val_q1)
+    else:
+        sum01 = to_f32(exp_values[0] + exp_values[1])
+        sum23 = to_f32(exp_values[2] + exp_values[3])
+        sum_exp = to_f32(sum01 + sum23)
     prob_floats = [to_f32(value / sum_exp) for value in exp_values]
     return [fp8_e5m2_bits_reference(value) for value in prob_floats]
 
@@ -315,8 +333,8 @@ async def reset_dut(dut):
     dut.out_ready.value = 1
     if hasattr(dut, "layernorm_bypass"):
         dut.layernorm_bypass.value = 1
-        dut.layernorm_gamma.value = pack_float_lanes([1.0, 1.0, 1.0, 1.0])
-        dut.layernorm_beta.value = pack_float_lanes([0.0, 0.0, 0.0, 0.0])
+        dut.layernorm_gamma.value = pack_float_lanes([1.0] * LANES)
+        dut.layernorm_beta.value = pack_float_lanes([0.0] * LANES)
     await RisingEdge(dut.clk)
     await RisingEdge(dut.clk)
     dut.rst_n.value = 1
@@ -499,17 +517,17 @@ async def test_bias_relu_pipeline_overlap(dut):
     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
     await reset_dut(dut)
 
-    vec_a_data = [-16, -4, 7, 100]
-    vec_a_bias = [3, 10, -2, -50]
+    vec_a_data = [-16, -4, 7, 100, -5, 12, -3, 80]
+    vec_a_bias = [3, 10, -2, -50, 1, -2, 5, -10]
    
-    vec_b_data = [9, -9, 5, -5]
-    vec_b_bias = [1, 20, -10, 8]
+    vec_b_data = [9, -9, 5, -5, 2, -3, 1, 0]
+    vec_b_bias = [1, 20, -10, 8, -5, 4, 3, -2]
 
-    vec_c_data = [-40, 50, 67, -41]
-    vec_c_bias = [3,10,-2,-20]
+    vec_c_data = [-40, 50, 67, -41, 10, -20, 30, -40]
+    vec_c_bias = [3, 10, -2, -20, -2, 5, -4, 8]
 
-    vec_d_data = [67, 41, 67, 41]
-    vec_d_bias = [1, 20, -10, 8]
+    vec_d_data = [67, 41, 67, 41, 12, 14, 16, 18]
+    vec_d_bias = [1, 20, -10, 8, 4, -4, 2, -2]
 
 
 
@@ -552,16 +570,16 @@ async def test_bias_relu_pipeline_throughput(dut):
     await reset_dut(dut)
 
     vectors = [
-        ([-16, -4, 7, 100], [3, 10, -2, -50]),
-        ([9, -9, 5, -5], [1, 20, -10, 8]),
-        ([0, 1, -1, 2], [0, -2, 3, -4]),
-        ([15, -32, 64, -1], [-5, 31, -80, 2]),
+        ([-16, -4, 7, 100, -5, 12, -3, 80], [3, 10, -2, -50, 1, -2, 5, -10]),
+        ([9, -9, 5, -5, 2, -3, 1, 0], [1, 20, -10, 8, -5, 4, 3, -2]),
+        ([0, 1, -1, 2, -2, 3, -3, 4], [0, -2, 3, -4, 4, -3, 2, -1]),
+        ([15, -32, 64, -1, 10, -20, 30, -40], [-5, 31, -80, 2, -2, 5, -4, 8]),
     ]
     expected_rows = [
         quantize_regular_expected(bias_relu_expected(data, bias))
         for data, bias in vectors
     ]
-    max_cycles = len(vectors) + 8
+    max_cycles = len(vectors) * 3 + 8
     first_output_cycle = None
     next_expected_index = 0
 
@@ -577,6 +595,11 @@ async def test_bias_relu_pipeline_throughput(dut):
         if int(dut.out_valid.value) == 1:
             if first_output_cycle is None:
                 first_output_cycle = cycle
+            expected_cycle = first_output_cycle + next_expected_index * 3
+            assert cycle == expected_cycle, (
+                f"Vector {next_expected_index} arrived at cycle {cycle}, "
+                f"expected at cycle {expected_cycle}"
+            )
             expected_lanes = expected_rows[next_expected_index]
             observed_lanes = unpack_q8_lanes(dut.stream_out.value, signed=True)
             assert observed_lanes == expected_lanes, (
@@ -587,11 +610,6 @@ async def test_bias_relu_pipeline_throughput(dut):
 
             if next_expected_index == len(vectors):
                 break
-        elif first_output_cycle is not None and next_expected_index < len(vectors):
-            assert False, (
-                f"Pipeline inserted a bubble on cycle {cycle} after first output at cycle "
-                f"{first_output_cycle}"
-            )
 
     assert first_output_cycle is not None, "Pipeline never produced an output"
     assert next_expected_index == len(vectors), "Pipeline did not emit all queued vectors"
@@ -605,8 +623,8 @@ async def test_full_row_scale_softmax_quant(dut):
     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
     await reset_dut(dut)
 
-    data_lanes = [16, 8, 4, 0]
-    bias_lanes = [0, 0, 0, 0]
+    data_lanes = [16, 8, 4, 0, 12, 6, 2, 0]
+    bias_lanes = [0] * LANES
     expected_lanes = scale_softmax_quant_expected(data_lanes)
 
     observed_lanes = await run_vxm_row(
@@ -633,9 +651,13 @@ async def test_fp_row_softmax_quant(dut):
         float_to_bits(0.5),
         float_to_bits(-0.5),
         float_to_bits(2.0),
+        float_to_bits(-1.0),
+        float_to_bits(1.5),
+        float_to_bits(0.0),
+        float_to_bits(-2.0),
     ]
-    bias_lanes = [0, 0, 0, 0]
-    expected_lanes = softmax_fp8_quant_expected([1.0, 0.5, -0.5, 2.0])
+    bias_lanes = [0] * LANES
+    expected_lanes = softmax_fp8_quant_expected([1.0, 0.5, -0.5, 2.0, -1.0, 1.5, 0.0, -2.0])
 
     observed_lanes = await run_vxm_row(
         dut,
@@ -657,8 +679,8 @@ async def test_fp_bias_relu_scale_internal_registers(dut):
     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
     await reset_dut(dut)
 
-    data_floats = [1.0, -2.0, 4.0, -1.0]
-    bias_floats = [0.5, 0.25, -1.0, 2.0]
+    data_floats = [1.0, -2.0, 4.0, -1.0, 0.5, -0.5, 2.0, -1.5]
+    bias_floats = [0.5, 0.25, -1.0, 2.0, -0.25, 0.75, 1.0, -1.0]
     data_lanes = [float_to_bits(value) for value in data_floats]
     bias_lanes = [float_to_bits(value) for value in bias_floats]
 
@@ -718,8 +740,8 @@ async def test_fp_full_row_bias_relu_scale_quant(dut):
     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
     await reset_dut(dut)
 
-    data_floats = [1.0, -2.0, 4.0, -1.0]
-    bias_floats = [0.5, 0.25, -1.0, 2.0]
+    data_floats = [1.0, -2.0, 4.0, -1.0, 0.5, -0.5, 2.0, -1.5]
+    bias_floats = [0.5, 0.25, -1.0, 2.0, -0.25, 0.75, 1.0, -1.0]
     data_lanes = [float_to_bits(value) for value in data_floats]
     bias_lanes = [float_to_bits(value) for value in bias_floats]
 
@@ -750,10 +772,10 @@ async def test_four_row_scale_softmax_quant_stress(dut):
     await reset_dut(dut)
 
     rows = [
-        ([16, 8, 4, 0], [0, 0, 0, 0]),
-        ([20, 10, 5, 0], [0, 0, 0, 0]),
-        ([12, 6, 3, 0], [0, 0, 0, 0]),
-        ([28, 14, 7, 0], [0, 0, 0, 0]),
+        ([16, 8, 4, 0, 12, 6, 2, 0], [0] * LANES),
+        ([20, 10, 5, 0, 14, 7, 3, 0], [0] * LANES),
+        ([12, 6, 3, 0, 10, 5, 1, 0], [0] * LANES),
+        ([28, 14, 7, 0, 24, 12, 5, 0], [0] * LANES),
     ]
 
     await drive_rows_with_backpressure(
@@ -769,10 +791,10 @@ async def test_four_row_scale_softmax_quant_observe(dut):
     await reset_dut(dut)
 
     rows = [
-        ([16, 8, 4, 0], [0, 0, 0, 0]),
-        ([20, 10, 5, 0], [0, 0, 0, 0]),
-        ([12, 6, 3, 0], [0, 0, 0, 0]),
-        ([28, 14, 7, 0], [0, 0, 0, 0]),
+        ([16, 8, 4, 0, 12, 6, 2, 0], [0] * LANES),
+        ([20, 10, 5, 0, 14, 7, 3, 0], [0] * LANES),
+        ([12, 6, 3, 0, 10, 5, 1, 0], [0] * LANES),
+        ([28, 14, 7, 0, 24, 12, 5, 0], [0] * LANES),
     ]
 
     driver_task = cocotb.start_soon(
@@ -792,9 +814,9 @@ async def test_layernorm_normal(dut):
     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
     await reset_dut(dut)
 
-    data_lanes = [0.35, -0.72, 1.18, 0.49]
-    gamma_lanes = [1.0, 1.0, 1.0, 1.0]
-    beta_lanes = [0.0, 0.0, 0.0, 0.0]
+    data_lanes = [0.35, -0.72, 1.18, 0.49, -0.15, 0.85, -0.45, 1.25]
+    gamma_lanes = [1.0] * LANES
+    beta_lanes = [0.0] * LANES
     expected_lanes, _ = regular_fp8_row_quant_expected(
         layernorm_fp32_expected(data_lanes, gamma_lanes, beta_lanes)
     )
@@ -821,9 +843,9 @@ async def test_layernorm_zero_variance(dut):
     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
     await reset_dut(dut)
 
-    data_lanes = [0.73, 0.73, 0.73, 0.73]
-    gamma_lanes = [1.5, 0.75, 1.25, 0.5]
-    beta_lanes = [0.13, -0.21, 0.37, -0.49]
+    data_lanes = [0.73] * LANES
+    gamma_lanes = [1.5, 0.75, 1.25, 0.5, 1.0, 0.8, 1.2, 0.9]
+    beta_lanes = [0.13, -0.21, 0.37, -0.49, 0.05, 0.1, -0.1, 0.2]
     expected_lanes, _ = regular_fp8_row_quant_expected(
         layernorm_fp32_expected(data_lanes, gamma_lanes, beta_lanes)
     )

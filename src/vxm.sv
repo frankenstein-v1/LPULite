@@ -1,7 +1,7 @@
 `timescale 1ns/1ns
 
 module vxm #(
-    parameter int LANES   = 4,
+    parameter int LANES   = 8,
     parameter int LANE_W  = 32, // Upgraded to 32 bits
     parameter int ALU_W   = 32 // Upgraded ALU width to 32 bits per user request
 ) (
