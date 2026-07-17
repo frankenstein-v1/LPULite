@@ -1,7 +1,7 @@
 `timescale 1ns/1ns
 
 module vxm_four_row_observe_tb;
-    localparam int LANES = 4;
+    localparam int LANES = 8;
     localparam int LANE_W = 32;
     localparam int ROW_W = LANES * LANE_W;
 
@@ -13,7 +13,7 @@ module vxm_four_row_observe_tb;
     logic             in_ready;
     logic [3:0]       vxm_ctrl;
     logic             fp_quant_mode;
-    logic [31:0]      stream_out;
+    logic [LANES*8-1:0] stream_out;
     logic [31:0]      stream_out_scale;
     logic             out_valid;
     logic             out_ready;
@@ -35,8 +35,8 @@ module vxm_four_row_observe_tb;
         .rope_sin_fp8(32'h0000_0000),
         .residual_op(3'd0),
         .layernorm_bypass(1'b1),
-        .layernorm_gamma(128'h00000001000000010000000100000001),
-        .layernorm_beta(128'h00000000000000000000000000000000),
+        .layernorm_gamma({LANES{32'h00000001}}),
+        .layernorm_beta({LANES{32'h00000000}}),
         .fp_quant_mode(fp_quant_mode),
         .stream_out(stream_out),
         .stream_out_scale(stream_out_scale),
@@ -79,10 +79,10 @@ module vxm_four_row_observe_tb;
 
         fork
             begin
-                send_row({32'd0, 32'd4,  32'd8,  32'd16});
-                send_row({32'd0, 32'd5,  32'd10, 32'd20});
-                send_row({32'd0, 32'd3,  32'd6,  32'd12});
-                send_row({32'd0, 32'd7,  32'd14, 32'd28});
+                send_row({32'd0, 32'd2,  32'd4,  32'd6,  32'd8,  32'd10, 32'd12, 32'd16});
+                send_row({32'd0, 32'd3,  32'd5,  32'd7,  32'd10, 32'd12, 32'd15, 32'd20});
+                send_row({32'd0, 32'd1,  32'd3,  32'd4,  32'd6,  32'd8,  32'd10, 32'd12});
+                send_row({32'd0, 32'd4,  32'd7,  32'd10, 32'd14, 32'd18, 32'd22, 32'd28});
             end
             begin
                 repeat (250) @(posedge clk);

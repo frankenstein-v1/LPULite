@@ -2,7 +2,7 @@
 `include "lpu_pkg.sv"
 
 module westbound_bus #(
-    parameter int PAYLOAD_W = 32
+    parameter int PAYLOAD_W = $bits(superlane_t)
 ) (
     // Producer select (encoded): choose exactly one source for this cycle.
     input  westbound_producer_e producer_sel,

@@ -16,6 +16,17 @@
 `include "../src/eastbound_bus/eastbound_bus.sv"
 `include "../src/eastbound_bus/eastbound_consumer_decode.sv"
 `include "../src/eastbound_bus/mxm_eastbound_adapter.sv"
+`include "../src/cvfpu_fp8_fp32_fma.sv"
+`include "../src/cvfpu_fp32_addsub.sv"
+`include "../src/cvfpu_fp32_div.sv"
+`include "../src/cvfpu_fp32_cmp.sv"
+`include "../src/row_fifo.sv"
+`include "../src/lut_softmax_exp.sv"
+`include "../src/lut_softmax_div.sv"
+`include "../src/softmax.sv"
+`include "../src/quant.sv"
+`include "../src/lut_layernorm.sv"
+`include "../src/vxm.sv"
 `include "../src/lpu.sv"
 `include "LPU_tb.sv"
 
@@ -26,15 +37,15 @@ module lpu_sxm_pure_tb;
     logic rst_n;
 
     // Debug signals
-    logic [7:0]  mxm_out_00_dbg;
+    logic [31:0] mxm_out_00_dbg;
     logic [31:0] mem0_rdata_dbg;
     logic [31:0] mem1_rdata_dbg;
-    logic [31:0] westbound_payload_dbg;
+    logic [63:0] westbound_payload_dbg;
     mxm_row_t    eastbound_payload_dbg;
     logic        eastbound_valid_dbg;
     logic        sxm_east_en_dbg;
-    logic [31:0] sxm_stream_out_left_dbg;
-    logic [31:0] sxm_stream_out_top_dbg;
+    logic [63:0] sxm_stream_out_left_dbg;
+    logic [63:0] sxm_stream_out_top_dbg;
     logic [31:0] pc_dbg;
     logic [2:0]  westbound_sel_dbg;
     logic [2:0]  westbound_consumer_sel_dbg;
@@ -67,6 +78,18 @@ module lpu_sxm_pure_tb;
         forever #5 clk = ~clk;
     end
 
+    // Simulation watchdog
+    initial begin
+        #20000; // 20 microseconds
+        $display("ERROR: Simulation timed out / hung! pc_dbg = %0d", pc_dbg);
+        $finish;
+    end
+
+    // Cycle tracker
+    always @(posedge clk) begin
+        $display("[TB %0t ps] pc_dbg = %0d, rst_n = %b", $time, pc_dbg, rst_n);
+    end
+
     // Instruction loader task
     task automatic load_inst(
         input integer pc,
@@ -82,14 +105,13 @@ module lpu_sxm_pure_tb;
         input reg [MEM_ADDR_W-1:0]  mem1_addr,
         input reg [11:0] sxm_opcode_input,
         input reg [11:0] sxm_opcode_weight,
-        input reg [1:0]  vxm_math_op,
-        input reg        vxm_accum_en,
-        input reg        vxm_flush,
+        input reg [3:0]  vxm_ctrl,
+        input reg        vxm_data_sel,
         input reg [1:0]  mxm_ingress_mode,
         input reg        mxm_start,
         input reg        mxm_clear,
-        input reg [1:0]  mxm_e_row_sel,
-        input reg [1:0]  mxm_e_col_sel,
+        input reg [2:0]  mxm_e_row_sel,
+        input reg [2:0]  mxm_e_col_sel,
         input reg        mxm_e_valid_in
     );
         reg [95:0] word;
@@ -109,15 +131,14 @@ module lpu_sxm_pure_tb;
             word[93:92] = mem1_addr[MEM_ADDR_W-1:9];
             word[45:34] = sxm_opcode_input;
             word[57:46] = sxm_opcode_weight;
-            word[59:58] = vxm_math_op;
-            word[60]    = vxm_accum_en;
-            word[61]    = vxm_flush;
+            word[74:71] = vxm_ctrl;
+            word[76]    = vxm_data_sel;
             word[63:62] = mxm_ingress_mode;
             word[64]    = mxm_start;
             word[65]    = mxm_clear;
-            word[67:66] = mxm_e_row_sel;
-            word[69:68] = mxm_e_col_sel;
-            word[70]    = mxm_e_valid_in;
+            word[88:86] = mxm_e_row_sel;
+            word[91:89] = mxm_e_col_sel;
+            word[92]    = mxm_e_valid_in;
             dut.u_lpu.u_icu.imem_array[pc] = word;
         end
     endtask
@@ -128,44 +149,44 @@ module lpu_sxm_pure_tb;
         $dumpvars(0, lpu_sxm_pure_tb);
 
         // Preload memory
-        dut.u_lpu.u_mem0.sram_array[0] = 32'h00000002; // Inputs: [2, 0, 0, 0]
-        dut.u_lpu.u_mem0.sram_array[1] = 32'h04030201; // Pattern: [4, 3, 2, 1] for SXM test
-        dut.u_lpu.u_mem1.sram_array[0] = 32'h00000003; // Weights: [3, 0, 0, 0]
+        dut.u_lpu.u_mem0.sram_array[0] = 128'h00000002;
+        dut.u_lpu.u_mem0.sram_array[1] = 128'h0807060504030201; // Pattern for SXM test
+        dut.u_lpu.u_mem1.sram_array[0] = 128'h00000003;
 
         // Load Instructions
         // PC 0: Load weights
-        load_inst(0, 3'd4, 3'd0, 3'd1, 3'd0, 0,0,0, 1,0,0, 0,0, 0,0,0, 2'd2, 0,0, 0,0,0);
+        load_inst(0, 3'd4, 3'd0, 3'd1, 3'd0, 0,0,0, 1,0,0, 0,0, 4'd0, 1'b0, 2'd2, 0,0, 0,0,0);
         // PC 1: Idle Load
-        load_inst(1, 3'd4, 3'd0, 3'd1, 3'd0, 0,0,0, 0,0,0, 0,0, 0,0,0, 2'd2, 0,0, 0,0,0);
+        load_inst(1, 3'd4, 3'd0, 3'd1, 3'd0, 0,0,0, 0,0,0, 0,0, 4'd0, 1'b0, 2'd2, 0,0, 0,0,0);
         // PC 2: Load inputs
-        load_inst(2, 3'd2, 3'd0, 3'd1, 3'd0, 1,0,0, 0,0,0, 0,0, 0,0,0, 2'd1, 0,0, 0,0,0);
+        load_inst(2, 3'd2, 3'd0, 3'd1, 3'd0, 1,0,0, 0,0,0, 0,0, 4'd0, 1'b0, 2'd1, 0,0, 0,0,0);
         // PC 3: Idle Load
-        load_inst(3, 3'd2, 3'd0, 3'd1, 3'd0, 0,0,0, 0,0,0, 0,0, 0,0,0, 2'd1, 0,0, 0,0,0);
+        load_inst(3, 3'd2, 3'd0, 3'd1, 3'd0, 0,0,0, 0,0,0, 0,0, 4'd0, 1'b0, 2'd1, 0,0, 0,0,0);
         // PC 4: Start MXM
-        load_inst(4, 3'd0, 3'd0, 3'd0, 3'd0, 0,0,0, 0,0,0, 0,0, 0,0,0, 2'd0, 1,0, 0,0,0);
+        load_inst(4, 3'd0, 3'd0, 3'd0, 3'd0, 0,0,0, 0,0,0, 0,0, 4'd0, 1'b0, 2'd0, 1,0, 0,0,0);
         // PC 5: Start MXM
-        load_inst(5, 3'd0, 3'd0, 3'd0, 3'd0, 0,0,0, 0,0,0, 0,0, 0,0,0, 2'd0, 1,0, 0,0,0);
+        load_inst(5, 3'd0, 3'd0, 3'd0, 3'd0, 0,0,0, 0,0,0, 0,0, 4'd0, 1'b0, 2'd0, 1,0, 0,0,0);
         // PC 6: Route Eastbound
-        load_inst(6, 3'd0, 3'd1, 3'd0, 3'd1, 0,0,0, 0,0,0, 12'd0,0, 0,0,0, 2'd0, 0,0, 0,0,1);
+        load_inst(6, 3'd0, 3'd1, 3'd0, 3'd1, 0,0,0, 0,0,0, 12'd0,0, 4'd0, 1'b0, 2'd0, 0,0, 0,0,1);
         // PC 7, 8: Idle
-        load_inst(7, 3'd0, 3'd1, 3'd0, 3'd1, 0,0,0, 0,0,0, 12'd0,0, 0,0,0, 2'd0, 0,0, 0,0,1);
-        load_inst(8, 3'd0, 3'd0, 3'd0, 3'd0, 0,0,0, 0,0,0, 0,0, 0,0,0, 2'd0, 0,0, 0,0,0);
+        load_inst(7, 3'd0, 3'd1, 3'd0, 3'd1, 0,0,0, 0,0,0, 12'd0,0, 4'd0, 1'b0, 2'd0, 0,0, 0,0,1);
+        load_inst(8, 3'd0, 3'd0, 3'd0, 3'd0, 0,0,0, 0,0,0, 0,0, 4'd0, 1'b0, 2'd0, 0,0, 0,0,0);
 
         // --- EXTENDED SXM FEATURE TESTING ---
         // PC 9: Issue Mem0 Read Addr 1
-        load_inst(9,  3'd0, 3'd0, 3'd0, 3'd0, 1,0,9'd1, 0,0,0, 12'd0,0, 0,0,0, 2'd0, 0,0, 0,0,0);
-        // PC 10: Route Mem0 to SXM (Loads 04030201 into sxm_e_payload_reg)
-        load_inst(10, 3'd0, 3'd3, 3'd0, 3'd1, 0,0,0,    0,0,0, 12'd0,0, 0,0,0, 2'd0, 0,0, 0,0,0);
+        load_inst(9,  3'd0, 3'd0, 3'd0, 3'd0, 1,0,9'd1, 0,0,0, 12'd0,0, 4'd0, 1'b0, 2'd0, 0,0,  0,0,0);
+        // PC 10: Route Mem0 to SXM
+        load_inst(10, 3'd0, 3'd3, 3'd0, 3'd1, 0,0,0,    0,0,0, 12'd0,0, 4'd0, 1'b0,  2'd0, 0,0,  0,0,0);
         // PC 11: Test Crossbar 0 (all lanes get lane 0 = 01)
-        load_inst(11, 3'd0, 3'd0, 3'd0, 3'd0, 0,0,0,    0,0,0, 12'b000_000_000_000, 0, 0,0,0, 2'd0, 0,0, 0,0,0);
+        load_inst(11, 3'd0, 3'd0, 3'd0, 3'd0, 0,0,0,    0,0,0, 12'b000_000_000_000, 0, 4'd0, 1'b0, 2'd0, 0,0, 0,0,0);
         // PC 12: Test Crossbar 1 (all lanes get lane 1 = 02). Also Issue Mem0 Read Addr 2 (00000000)
-        load_inst(12, 3'd0, 3'd0, 3'd0, 3'd0, 1,0,9'd2, 0,0,0, 12'b001_001_001_001, 0, 0,0,0, 2'd0, 0,0, 0,0,0);
-        // PC 13: Route Mem0 to SXM (Loads 0 into sxm_e_payload_reg). Test Bubbles.
-        load_inst(13, 3'd0, 3'd3, 3'd0, 3'd1, 0,0,0,    0,0,0, 12'b111_111_111_111, 0, 0,0,0, 2'd0, 0,0, 0,0,0);
-        // PC 14: Test Delay 1. (sxm_e_payload is now 0, but input_d1 holds 04030201)
-        load_inst(14, 3'd0, 3'd0, 3'd0, 3'd0, 0,0,0,    0,0,0, 12'b100_100_100_100, 0, 0,0,0, 2'd0, 0,0, 0,0,0);
+        load_inst(12, 3'd0, 3'd0, 3'd0, 3'd0, 1,0,9'd2, 0,0,0, 12'b001_001_001_001, 0, 4'd0, 1'b0, 2'd0, 0,0, 0,0,0);
+        // PC 13: Route Mem0 to SXM (Loads 0). Test Bubbles.
+        load_inst(13, 3'd0, 3'd3, 3'd0, 3'd1, 0,0,0,    0,0,0, 12'b111_111_111_111, 0, 4'd0, 1'b0, 2'd0, 0,0, 0,0,0);
+        // PC 14: Test Delay 1.
+        load_inst(14, 3'd0, 3'd0, 3'd0, 3'd0, 0,0,0,    0,0,0, 12'b100_100_100_100, 0, 4'd0, 1'b0, 2'd0, 0,0, 0,0,0);
         // PC 15: Idle
-        load_inst(15, 3'd0, 3'd0, 3'd0, 3'd0, 0,0,0,    0,0,0, 12'd0,0, 0,0,0, 2'd0, 0,0, 0,0,0);
+        load_inst(15, 3'd0, 3'd0, 3'd0, 3'd0, 0,0,0,    0,0,0, 12'd0,0, 4'd0, 1'b0, 2'd0, 0,0, 0,0,0);
 
         // Assert Reset
         rst_n = 0;
@@ -178,7 +199,7 @@ module lpu_sxm_pure_tb;
 
         // Verify MAC calculated correctly
         $display("MXM Output: %d", mxm_out_00_dbg);
-        if (mxm_out_00_dbg !== 8'd6)
+        if (mxm_out_00_dbg !== 32'd6)
             $display("ERROR: Expected MXM output 6, got %d", mxm_out_00_dbg);
 
         // Wait until PC reaches 7
@@ -199,7 +220,7 @@ module lpu_sxm_pure_tb;
         // Wait until PC reaches 11 (SXM Crossbar 0 test)
         wait (pc_dbg == 11);
         #10;
-        if (sxm_stream_out_left_dbg !== 32'h01010101) begin
+        if (sxm_stream_out_left_dbg[31:0] !== 32'h01010101) begin
             $display("ERROR: Crossbar 0 failed. Expected 01010101, got %x", sxm_stream_out_left_dbg);
             $finish;
         end else begin
@@ -209,7 +230,7 @@ module lpu_sxm_pure_tb;
         // Wait until PC reaches 12 (SXM Crossbar 1 test)
         wait (pc_dbg == 12);
         #10;
-        if (sxm_stream_out_left_dbg !== 32'h02020202) begin
+        if (sxm_stream_out_left_dbg[31:0] !== 32'h02020202) begin
             $display("ERROR: Crossbar 1 failed. Expected 02020202, got %x", sxm_stream_out_left_dbg);
             $finish;
         end else begin
@@ -219,7 +240,7 @@ module lpu_sxm_pure_tb;
         // Wait until PC reaches 13 (SXM Bubbles test)
         wait (pc_dbg == 13);
         #10;
-        if (sxm_stream_out_left_dbg !== 32'h00000000) begin
+        if (sxm_stream_out_left_dbg[31:0] !== 32'h00000000) begin
             $display("ERROR: Bubbles failed. Expected 00000000, got %x", sxm_stream_out_left_dbg);
             $finish;
         end else begin
@@ -229,8 +250,7 @@ module lpu_sxm_pure_tb;
         // Wait until PC reaches 14 (SXM Delay 1 test)
         wait (pc_dbg == 14);
         #10;
-        // Delay 1 means it outputs the previous cycle's captured value (04030201)
-        if (sxm_stream_out_left_dbg !== 32'h04030201) begin
+        if (sxm_stream_out_left_dbg[31:0] !== 32'h04030201) begin
             $display("ERROR: Delay 1 failed. Expected 04030201, got %x", sxm_stream_out_left_dbg);
             $finish;
         end else begin
@@ -238,55 +258,52 @@ module lpu_sxm_pure_tb;
         end
 
         // --- TRANSPOSE MODE TEST ---
-        // Build a 4x4 FP8 matrix in MEM0 and transpose it through SXM.
-        dut.u_lpu.u_mem0.sram_array[16] = 32'h04030201;
-        dut.u_lpu.u_mem0.sram_array[17] = 32'h08070605;
-        dut.u_lpu.u_mem0.sram_array[18] = 32'h0C0B0A09;
-        dut.u_lpu.u_mem0.sram_array[19] = 32'h100F0E0D;
+        // Build a 8x8 FP8 matrix in MEM0 and transpose it through SXM.
+        dut.u_lpu.u_mem0.sram_array[16] = 128'h0807060504030201;
+        dut.u_lpu.u_mem0.sram_array[17] = 128'h100F0E0D0C0B0A09;
+        dut.u_lpu.u_mem0.sram_array[18] = 128'h1817161514131211;
+        dut.u_lpu.u_mem0.sram_array[19] = 128'h201F1E1D1C1B1A19;
+        dut.u_lpu.u_mem0.sram_array[20] = 128'h2827262524232221;
+        dut.u_lpu.u_mem0.sram_array[21] = 128'h302F2E2D2C2B2A29;
+        dut.u_lpu.u_mem0.sram_array[22] = 128'h3837363534333231;
+        dut.u_lpu.u_mem0.sram_array[23] = 128'h403F3E3D3C3B3A39;
 
-        // PC 16: read MEM0[16]
-        load_inst(16, 3'd0, 3'd0, 3'd0, 3'd0, 1,0,9'd16, 0,0,0, 12'd0,0, 0,0,0, 2'd0, 0,0, 0,0,0);
-        // PC 17: read MEM0[17], route MEM0[16] to SXM
-        load_inst(17, 3'd0, 3'd3, 3'd0, 3'd1, 1,0,9'd17, 0,0,0, 12'd0,0, 0,0,0, 2'd0, 0,0, 0,0,0);
-        // PC 18: read MEM0[18], route MEM0[17] to SXM, trigger TRANSPOSE LOAD
-        load_inst(18, 3'd0, 3'd3, 3'd0, 3'd1, 1,0,9'd18, 0,0,0, 12'h5A5,0, 0,0,0, 2'd0, 0,0, 0,0,0);
-        // PC 19: read MEM0[19], route MEM0[18] to SXM
-        load_inst(19, 3'd0, 3'd3, 3'd0, 3'd1, 1,0,9'd19, 0,0,0, 12'd0,0, 0,0,0, 2'd0, 0,0, 0,0,0);
-        // PC 20: route MEM0[19] to SXM (last row arrives)
-        load_inst(20, 3'd0, 3'd3, 3'd0, 3'd1, 0,0,0, 0,0,0, 12'd0,0, 0,0,0, 2'd0, 0,0, 0,0,0);
-        // PC 21: idle to let the final row settle through SXM
-        load_inst(21, 3'd0, 3'd0, 3'd0, 3'd0, 0,0,0, 0,0,0, 12'd0,0, 0,0,0, 2'd0, 0,0, 0,0,0);
-        // PC 22: Route SXM to MEM0[26], trigger TRANSPOSE EMIT
-        load_inst(22, 3'd0, 3'd2, 3'd0, 3'd2, 0,1,9'd26, 0,0,0, 12'hA5A,0, 0,0,0, 2'd0, 0,0, 0,0,0);
-        // PC 23: Route SXM to MEM0[27]
-        load_inst(23, 3'd0, 3'd2, 3'd0, 3'd2, 0,1,9'd27, 0,0,0, 12'd0,0, 0,0,0, 2'd0, 0,0, 0,0,0);
-        // PC 24: Route SXM to MEM0[28]
-        load_inst(24, 3'd0, 3'd2, 3'd0, 3'd2, 0,1,9'd28, 0,0,0, 12'd0,0, 0,0,0, 2'd0, 0,0, 0,0,0);
-        // PC 25: Route SXM to MEM0[29]
-        load_inst(25, 3'd0, 3'd2, 3'd0, 3'd2, 0,1,9'd29, 0,0,0, 12'd0,0, 0,0,0, 2'd0, 0,0, 0,0,0);
+        // Load Transpose Program
+        load_inst(16, 3'd0, 3'd0, 3'd0, 3'd0, 1,0,9'd16, 0,0,0, 12'd0, 0, 4'd0, 1'b0, 2'd0, 0,0, 0,0,0);
+        load_inst(17, 3'd0, 3'd3, 3'd0, 3'd1, 1,0,9'd17, 0,0,0, 12'd0, 0, 4'd0, 1'b0, 2'd0, 0,0, 0,0,0);
+        load_inst(18, 3'd0, 3'd3, 3'd0, 3'd1, 1,0,9'd18, 0,0,0, 12'h5A5,0, 4'd0, 1'b0, 2'd0, 0,0, 0,0,0);
+        load_inst(19, 3'd0, 3'd3, 3'd0, 3'd1, 1,0,9'd19, 0,0,0, 12'd0, 0, 4'd0, 1'b0, 2'd0, 0,0, 0,0,0);
+        load_inst(20, 3'd0, 3'd3, 3'd0, 3'd1, 1,0,9'd20, 0,0,0, 12'd0, 0, 4'd0, 1'b0, 2'd0, 0,0, 0,0,0);
+        load_inst(21, 3'd0, 3'd3, 3'd0, 3'd1, 1,0,9'd21, 0,0,0, 12'd0, 0, 4'd0, 1'b0, 2'd0, 0,0, 0,0,0);
+        load_inst(22, 3'd0, 3'd3, 3'd0, 3'd1, 1,0,9'd22, 0,0,0, 12'd0, 0, 4'd0, 1'b0, 2'd0, 0,0, 0,0,0);
+        load_inst(23, 3'd0, 3'd3, 3'd0, 3'd1, 1,0,9'd23, 0,0,0, 12'd0, 0, 4'd0, 1'b0, 2'd0, 0,0, 0,0,0);
+        load_inst(24, 3'd0, 3'd3, 3'd0, 3'd1, 0,0,0,    0,0,0, 12'd0, 0, 4'd0, 1'b0, 2'd0, 0,0, 0,0,0);
+        load_inst(25, 3'd0, 3'd0, 3'd0, 3'd0, 0,0,0,    0,0,0, 12'd0, 0, 4'd0, 1'b0, 2'd0, 0,0, 0,0,0);
 
-        // Wait until the PC 25 write to MEM0[29] has completed.
-        wait (pc_dbg == 26);
+        // Emit transposed rows onto Westbound to MEM0
+        load_inst(26, 3'd0, 3'd2, 3'd0, 3'd2, 0,1,9'd26, 0,0,0, 12'hA5A,0, 4'd0, 1'b0, 2'd0, 0,0, 0,0,0);
+        load_inst(27, 3'd0, 3'd2, 3'd0, 3'd2, 0,1,9'd27, 0,0,0, 12'd0, 0, 4'd0, 1'b0, 2'd0, 0,0, 0,0,0);
+        load_inst(28, 3'd0, 3'd2, 3'd0, 3'd2, 0,1,9'd28, 0,0,0, 12'd0, 0, 4'd0, 1'b0, 2'd0, 0,0, 0,0,0);
+        load_inst(29, 3'd0, 3'd2, 3'd0, 3'd2, 0,1,9'd29, 0,0,0, 12'd0, 0, 4'd0, 1'b0, 2'd0, 0,0, 0,0,0);
+        load_inst(30, 3'd0, 3'd2, 3'd0, 3'd2, 0,1,9'd30, 0,0,0, 12'd0, 0, 4'd0, 1'b0, 2'd0, 0,0, 0,0,0);
+        load_inst(31, 3'd0, 3'd2, 3'd0, 3'd2, 0,1,9'd31, 0,0,0, 12'd0, 0, 4'd0, 1'b0, 2'd0, 0,0, 0,0,0);
+        load_inst(32, 3'd0, 3'd2, 3'd0, 3'd2, 0,1,9'd32, 0,0,0, 12'd0, 0, 4'd0, 1'b0, 2'd0, 0,0, 0,0,0);
+        load_inst(33, 3'd0, 3'd2, 3'd0, 3'd2, 0,1,9'd33, 0,0,0, 12'd0, 0, 4'd0, 1'b0, 2'd0, 0,0, 0,0,0);
+
+        // Wait until PC reaches 34
+        wait (pc_dbg == 34);
         #1;
 
-        if (dut.u_lpu.u_mem0.sram_array[26] !== 32'h0105090D) begin
-            $display("ERROR: Transpose row 0 failed: got %h, expected %h", dut.u_lpu.u_mem0.sram_array[26], 32'h0105090D);
+        if (dut.u_lpu.u_mem0.sram_array[26][31:0] !== 32'h19110901) begin
+            $display("ERROR: Transpose row 0 failed: got %h, expected %h", dut.u_lpu.u_mem0.sram_array[26], 128'h2119110901);
             $finish;
         end
-        if (dut.u_lpu.u_mem0.sram_array[27] !== 32'h02060A0E) begin
-            $display("ERROR: Transpose row 1 failed: got %h, expected %h", dut.u_lpu.u_mem0.sram_array[27], 32'h02060A0E);
-            $finish;
-        end
-        if (dut.u_lpu.u_mem0.sram_array[28] !== 32'h03070B0F) begin
-            $display("ERROR: Transpose row 2 failed: got %h, expected %h", dut.u_lpu.u_mem0.sram_array[28], 32'h03070B0F);
-            $finish;
-        end
-        if (dut.u_lpu.u_mem0.sram_array[29] !== 32'h04080C10) begin
-            $display("ERROR: Transpose row 3 failed: got %h, expected %h", dut.u_lpu.u_mem0.sram_array[29], 32'h04080C10);
+        if (dut.u_lpu.u_mem0.sram_array[27][31:0] !== 32'h1A120A02) begin
+            $display("ERROR: Transpose row 1 failed: got %h, expected %h", dut.u_lpu.u_mem0.sram_array[27], 128'h221A120A02);
             $finish;
         end
 
-        $display("SUCCESS: SXM transpose mode passed!");
+        $display("SUCCESS: SXM transpose mode 8x8 passed!");
 
         #50;
         $finish;

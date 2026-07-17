@@ -10,7 +10,7 @@
 module softmax #(
     parameter int LANES   = 4,
     parameter int LANE_W  = 32
-)(
+) (
     input  logic                     clk,
     input  logic                     rst_n,
 
@@ -37,6 +37,8 @@ module softmax #(
         ST_FP_MAX_L1_WAIT,
         ST_FP_MAX_L2_START,
         ST_FP_MAX_L2_WAIT,
+        ST_FP_MAX_L3_START,
+        ST_FP_MAX_L3_WAIT,
         ST_FP_DELTA_START,
         ST_FP_DELTA_WAIT,
         ST_FP_EXP_CAPTURE,
@@ -44,6 +46,8 @@ module softmax #(
         ST_FP_SUM_L1_WAIT,
         ST_FP_SUM_L2_START,
         ST_FP_SUM_L2_WAIT,
+        ST_FP_SUM_L3_START,
+        ST_FP_SUM_L3_WAIT,
         ST_FP_NORM_START,
         ST_FP_NORM_WAIT,
         ST_FP_DONE
@@ -116,7 +120,7 @@ module softmax #(
             end else begin
                 msb_idx = 0;
                 for (int idx = 0; idx < LANE_W; idx++) begin
-                    if (fixed_value[idx])
+                    if (((fixed_value >> idx) & 1'b1) != 1'b0)
                         msb_idx = idx;
                 end
 
@@ -176,7 +180,12 @@ module softmax #(
         end
     endgenerate
 
-    assign sum_exp = int_lane_exp[0] + int_lane_exp[1] + int_lane_exp[2] + int_lane_exp[3];
+    always_comb begin
+        sum_exp = '0;
+        for (int i = 0; i < LANES; i++) begin
+            sum_exp = sum_exp + int_lane_exp[i];
+        end
+    end
 
     lut_softmax_div #(.DW(LANE_W)) u_lut_softmax_div (
         .clk(clk),
@@ -196,17 +205,28 @@ module softmax #(
     end
 
     // ---------------------------------------------------------
-    // Floating-point softmax datapath
+    // Floating-point softmax datapath registers & signals
     // ---------------------------------------------------------
     logic [31:0] fp_input_reg [0:LANES-1];
+
     logic [31:0] fp_max_pair0_reg;
     logic [31:0] fp_max_pair1_reg;
+    logic [31:0] fp_max_pair2_reg;
+    logic [31:0] fp_max_pair3_reg;
+    logic [31:0] fp_max_quad0_reg;
+    logic [31:0] fp_max_quad1_reg;
     logic [31:0] fp_max_reg;
+
     logic [31:0] fp_delta_reg [0:LANES-1];
     logic [31:0] fp_exp_reg   [0:LANES-1];
     logic [31:0] fp_prob_reg  [0:LANES-1];
-    logic [31:0] fp_sum01_reg;
-    logic [31:0] fp_sum23_reg;
+
+    logic [31:0] fp_sum_pair0_reg;
+    logic [31:0] fp_sum_pair1_reg;
+    logic [31:0] fp_sum_pair2_reg;
+    logic [31:0] fp_sum_pair3_reg;
+    logic [31:0] fp_sum_quad0_reg;
+    logic [31:0] fp_sum_quad1_reg;
     logic [31:0] fp_sum_reg;
 
     logic signed [LANE_W-1:0] fp_delta_q8_8 [0:LANES-1];
@@ -215,36 +235,54 @@ module softmax #(
 
     logic fp_cmp_l1_start;
     logic fp_cmp_l2_start;
+    logic fp_cmp_l3_start;
     logic fp_delta_start;
     logic fp_sum_l1_start;
     logic fp_sum_l2_start;
+    logic fp_sum_l3_start;
     logic fp_norm_start;
 
-    logic fp_cmp01_done;
-    logic fp_cmp23_done;
-    logic fp_cmpw_done;
-    logic fp_cmp01_result;
-    logic fp_cmp23_result;
-    logic fp_cmpw_result;
+    logic fp_cmp01_done, fp_cmp23_done, fp_cmp45_done, fp_cmp67_done;
+    logic fp_cmp01_result, fp_cmp23_result, fp_cmp45_result, fp_cmp67_result;
+
+    logic fp_cmp_q0_done, fp_cmp_q1_done;
+    logic fp_cmp_q0_result, fp_cmp_q1_result;
+
+    logic fp_cmp_oct_done;
+    logic fp_cmp_oct_result;
 
     logic [31:0] fp_delta_result [0:LANES-1];
     logic [LANES-1:0] fp_delta_done;
-    logic [31:0] fp_sum01_result;
-    logic [31:0] fp_sum23_result;
-    logic        fp_sum01_done;
-    logic        fp_sum23_done;
-    logic [31:0] fp_sum_result;
-    logic        fp_sum_done;
+
+    logic [31:0] fp_sum_pair0_result, fp_sum_pair1_result, fp_sum_pair2_result, fp_sum_pair3_result;
+    logic        fp_sum_pair0_done, fp_sum_pair1_done, fp_sum_pair2_done, fp_sum_pair3_done;
+
+    logic [31:0] fp_sum_quad0_result, fp_sum_quad1_result;
+    logic        fp_sum_quad0_done, fp_sum_quad1_done;
+
+    logic [31:0] fp_sum_oct_result;
+    logic        fp_sum_oct_done;
+
     logic [31:0] fp_norm_result [0:LANES-1];
     logic [LANES-1:0] fp_norm_done;
 
     logic [31:0] fp_max_pair0_next;
     logic [31:0] fp_max_pair1_next;
-    logic [31:0] fp_max_next;
+    logic [31:0] fp_max_pair2_next;
+    logic [31:0] fp_max_pair3_next;
+    logic [31:0] fp_max_quad0_next;
+    logic [31:0] fp_max_quad1_next;
+    logic [31:0] fp_max_oct_next;
 
     assign fp_max_pair0_next = fp_cmp01_result ? fp_input_reg[1] : fp_input_reg[0];
     assign fp_max_pair1_next = fp_cmp23_result ? fp_input_reg[3] : fp_input_reg[2];
-    assign fp_max_next       = fp_cmpw_result  ? fp_max_pair1_reg : fp_max_pair0_reg;
+    assign fp_max_pair2_next = (LANES == 8) ? (fp_cmp45_result ? fp_input_reg[5] : fp_input_reg[4]) : 32'h0;
+    assign fp_max_pair3_next = (LANES == 8) ? (fp_cmp67_result ? fp_input_reg[7] : fp_input_reg[6]) : 32'h0;
+
+    assign fp_max_quad0_next = fp_cmp_q0_result ? fp_max_pair1_reg : fp_max_pair0_reg;
+    assign fp_max_quad1_next = (LANES == 8) ? (fp_cmp_q1_result ? fp_max_pair3_reg : fp_max_pair2_reg) : 32'h0;
+
+    assign fp_max_oct_next   = fp_cmp_oct_result ? fp_max_quad1_reg : fp_max_quad0_reg;
 
     always_comb begin
         for (int i = 0; i < LANES; i++) begin
@@ -264,47 +302,75 @@ module softmax #(
         end
     endgenerate
 
-    cvfpu_fp32_cmp u_fp_cmp01 (
-        .clk_i(clk),
-        .rst_ni(rst_n),
-        .start_i(fp_cmp_l1_start),
-        .cmp_mode_i(2'b00),
-        .invert_i(1'b0),
-        .a_i(fp_input_reg[0]),
-        .b_i(fp_input_reg[1]),
-        .result_o(fp_cmp01_result),
-        .done_o(fp_cmp01_done),
-        .busy_o()
-    );
-
-    cvfpu_fp32_cmp u_fp_cmp23 (
-        .clk_i(clk),
-        .rst_ni(rst_n),
-        .start_i(fp_cmp_l1_start),
-        .cmp_mode_i(2'b00),
-        .invert_i(1'b0),
-        .a_i(fp_input_reg[2]),
-        .b_i(fp_input_reg[3]),
-        .result_o(fp_cmp23_result),
-        .done_o(fp_cmp23_done),
-        .busy_o()
-    );
-
-    cvfpu_fp32_cmp u_fp_cmpw (
-        .clk_i(clk),
-        .rst_ni(rst_n),
-        .start_i(fp_cmp_l2_start),
-        .cmp_mode_i(2'b00),
-        .invert_i(1'b0),
-        .a_i(fp_max_pair0_reg),
-        .b_i(fp_max_pair1_reg),
-        .result_o(fp_cmpw_result),
-        .done_o(fp_cmpw_done),
-        .busy_o()
-    );
-
+    // ---------------------------------------------------------
+    // Dual-Lane Logic Tree Allocations
+    // ---------------------------------------------------------
     generate
-        for (genvar i = 0; i < LANES; i++) begin : gen_fp_delta
+        if (LANES == 8) begin : gen_tree_8
+            // Level 1 Max Comparators
+            cvfpu_fp32_cmp u_fp_cmp01(.clk_i(clk), .rst_ni(rst_n), .start_i(fp_cmp_l1_start), .cmp_mode_i(2'b0), .invert_i(1'b0), .a_i(fp_input_reg[0]), .b_i(fp_input_reg[1]), .result_o(fp_cmp01_result), .done_o(fp_cmp01_done), .busy_o());
+            cvfpu_fp32_cmp u_fp_cmp23(.clk_i(clk), .rst_ni(rst_n), .start_i(fp_cmp_l1_start), .cmp_mode_i(2'b0), .invert_i(1'b0), .a_i(fp_input_reg[2]), .b_i(fp_input_reg[3]), .result_o(fp_cmp23_result), .done_o(fp_cmp23_done), .busy_o());
+            cvfpu_fp32_cmp u_fp_cmp45(.clk_i(clk), .rst_ni(rst_n), .start_i(fp_cmp_l1_start), .cmp_mode_i(2'b0), .invert_i(1'b0), .a_i(fp_input_reg[4]), .b_i(fp_input_reg[5]), .result_o(fp_cmp45_result), .done_o(fp_cmp45_done), .busy_o());
+            cvfpu_fp32_cmp u_fp_cmp67(.clk_i(clk), .rst_ni(rst_n), .start_i(fp_cmp_l1_start), .cmp_mode_i(2'b0), .invert_i(1'b0), .a_i(fp_input_reg[6]), .b_i(fp_input_reg[7]), .result_o(fp_cmp67_result), .done_o(fp_cmp67_done), .busy_o());
+
+            // Level 2 Max Comparators
+            cvfpu_fp32_cmp u_fp_cmp_q0(.clk_i(clk), .rst_ni(rst_n), .start_i(fp_cmp_l2_start), .cmp_mode_i(2'b0), .invert_i(1'b0), .a_i(fp_max_pair0_reg), .b_i(fp_max_pair1_reg), .result_o(fp_cmp_q0_result), .done_o(fp_cmp_q0_done), .busy_o());
+            cvfpu_fp32_cmp u_fp_cmp_q1(.clk_i(clk), .rst_ni(rst_n), .start_i(fp_cmp_l2_start), .cmp_mode_i(2'b0), .invert_i(1'b0), .a_i(fp_max_pair2_reg), .b_i(fp_max_pair3_reg), .result_o(fp_cmp_q1_result), .done_o(fp_cmp_q1_done), .busy_o());
+
+            // Level 3 Max Comparator
+            cvfpu_fp32_cmp u_fp_cmp_oct(.clk_i(clk), .rst_ni(rst_n), .start_i(fp_cmp_l3_start), .cmp_mode_i(2'b0), .invert_i(1'b0), .a_i(fp_max_quad0_reg), .b_i(fp_max_quad1_reg), .result_o(fp_cmp_oct_result), .done_o(fp_cmp_oct_done), .busy_o());
+
+            // Level 1 Exponent Sums
+            cvfpu_fp32_addsub u_fp_sum_pair0(.clk_i(clk), .rst_ni(rst_n), .start_i(fp_sum_l1_start), .sub_i(1'b0), .a_i(fp_exp_reg[0]), .b_i(fp_exp_reg[1]), .result_o(fp_sum_pair0_result), .done_o(fp_sum_pair0_done), .busy_o());
+            cvfpu_fp32_addsub u_fp_sum_pair1(.clk_i(clk), .rst_ni(rst_n), .start_i(fp_sum_l1_start), .sub_i(1'b0), .a_i(fp_exp_reg[2]), .b_i(fp_exp_reg[3]), .result_o(fp_sum_pair1_result), .done_o(fp_sum_pair1_done), .busy_o());
+            cvfpu_fp32_addsub u_fp_sum_pair2(.clk_i(clk), .rst_ni(rst_n), .start_i(fp_sum_l1_start), .sub_i(1'b0), .a_i(fp_exp_reg[4]), .b_i(fp_exp_reg[5]), .result_o(fp_sum_pair2_result), .done_o(fp_sum_pair2_done), .busy_o());
+            cvfpu_fp32_addsub u_fp_sum_pair3(.clk_i(clk), .rst_ni(rst_n), .start_i(fp_sum_l1_start), .sub_i(1'b0), .a_i(fp_exp_reg[6]), .b_i(fp_exp_reg[7]), .result_o(fp_sum_pair3_result), .done_o(fp_sum_pair3_done), .busy_o());
+
+            // Level 2 Exponent Sums
+            cvfpu_fp32_addsub u_fp_sum_quad0(.clk_i(clk), .rst_ni(rst_n), .start_i(fp_sum_l2_start), .sub_i(1'b0), .a_i(fp_sum_pair0_reg), .b_i(fp_sum_pair1_reg), .result_o(fp_sum_quad0_result), .done_o(fp_sum_quad0_done), .busy_o());
+            cvfpu_fp32_addsub u_fp_sum_quad1(.clk_i(clk), .rst_ni(rst_n), .start_i(fp_sum_l2_start), .sub_i(1'b0), .a_i(fp_sum_pair2_reg), .b_i(fp_sum_pair3_reg), .result_o(fp_sum_quad1_result), .done_o(fp_sum_quad1_done), .busy_o());
+
+            // Level 3 Exponent Sum
+            cvfpu_fp32_addsub u_fp_sum_oct(.clk_i(clk), .rst_ni(rst_n), .start_i(fp_sum_l3_start), .sub_i(1'b0), .a_i(fp_sum_quad0_reg), .b_i(fp_sum_quad1_reg), .result_o(fp_sum_oct_result), .done_o(fp_sum_oct_done), .busy_o());
+        end else begin : gen_tree_4
+            // Level 1 Max Comparators
+            cvfpu_fp32_cmp u_fp_cmp01(.clk_i(clk), .rst_ni(rst_n), .start_i(fp_cmp_l1_start), .cmp_mode_i(2'b0), .invert_i(1'b0), .a_i(fp_input_reg[0]), .b_i(fp_input_reg[1]), .result_o(fp_cmp01_result), .done_o(fp_cmp01_done), .busy_o());
+            cvfpu_fp32_cmp u_fp_cmp23(.clk_i(clk), .rst_ni(rst_n), .start_i(fp_cmp_l1_start), .cmp_mode_i(2'b0), .invert_i(1'b0), .a_i(fp_input_reg[2]), .b_i(fp_input_reg[3]), .result_o(fp_cmp23_result), .done_o(fp_cmp23_done), .busy_o());
+
+            // Level 2 Max Comparator
+            cvfpu_fp32_cmp u_fp_cmp_q0(.clk_i(clk), .rst_ni(rst_n), .start_i(fp_cmp_l2_start), .cmp_mode_i(2'b0), .invert_i(1'b0), .a_i(fp_max_pair0_reg), .b_i(fp_max_pair1_reg), .result_o(fp_cmp_q0_result), .done_o(fp_cmp_q0_done), .busy_o());
+
+            // Level 1 Exponent Sums
+            cvfpu_fp32_addsub u_fp_sum_pair0(.clk_i(clk), .rst_ni(rst_n), .start_i(fp_sum_l1_start), .sub_i(1'b0), .a_i(fp_exp_reg[0]), .b_i(fp_exp_reg[1]), .result_o(fp_sum_pair0_result), .done_o(fp_sum_pair0_done), .busy_o());
+            cvfpu_fp32_addsub u_fp_sum_pair1(.clk_i(clk), .rst_ni(rst_n), .start_i(fp_sum_l1_start), .sub_i(1'b0), .a_i(fp_exp_reg[2]), .b_i(fp_exp_reg[3]), .result_o(fp_sum_pair1_result), .done_o(fp_sum_pair1_done), .busy_o());
+
+            // Level 2 Exponent Sum
+            cvfpu_fp32_addsub u_fp_sum_quad0(.clk_i(clk), .rst_ni(rst_n), .start_i(fp_sum_l2_start), .sub_i(1'b0), .a_i(fp_sum_pair0_reg), .b_i(fp_sum_pair1_reg), .result_o(fp_sum_quad0_result), .done_o(fp_sum_quad0_done), .busy_o());
+
+            // Dummies for unused 8-lane signals/ports
+            assign fp_cmp45_done = 1'b1;
+            assign fp_cmp67_done = 1'b1;
+            assign fp_cmp45_result = 1'b0;
+            assign fp_cmp67_result = 1'b0;
+            assign fp_cmp_q1_done = 1'b1;
+            assign fp_cmp_q1_result = 1'b0;
+            assign fp_cmp_oct_done = 1'b1;
+            assign fp_cmp_oct_result = 1'b0;
+
+            assign fp_sum_pair2_result = 32'd0;
+            assign fp_sum_pair3_result = 32'd0;
+            assign fp_sum_pair2_done = 1'b1;
+            assign fp_sum_pair3_done = 1'b1;
+            assign fp_sum_quad1_result = 32'd0;
+            assign fp_sum_quad1_done = 1'b1;
+            assign fp_sum_oct_result = 32'd0;
+            assign fp_sum_oct_done = 1'b1;
+        end
+    endgenerate
+
+    // Unified FP Delat & Normalizer Generators
+    generate
+        for (genvar i = 0; i < LANES; i++) begin : gen_fp_delta_inst
             cvfpu_fp32_addsub u_fp_delta (
                 .clk_i(clk),
                 .rst_ni(rst_n),
@@ -317,46 +383,8 @@ module softmax #(
                 .busy_o()
             );
         end
-    endgenerate
 
-    cvfpu_fp32_addsub u_fp_sum01 (
-        .clk_i(clk),
-        .rst_ni(rst_n),
-        .start_i(fp_sum_l1_start),
-        .sub_i(1'b0),
-        .a_i(fp_exp_reg[0]),
-        .b_i(fp_exp_reg[1]),
-        .result_o(fp_sum01_result),
-        .done_o(fp_sum01_done),
-        .busy_o()
-    );
-
-    cvfpu_fp32_addsub u_fp_sum23 (
-        .clk_i(clk),
-        .rst_ni(rst_n),
-        .start_i(fp_sum_l1_start),
-        .sub_i(1'b0),
-        .a_i(fp_exp_reg[2]),
-        .b_i(fp_exp_reg[3]),
-        .result_o(fp_sum23_result),
-        .done_o(fp_sum23_done),
-        .busy_o()
-    );
-
-    cvfpu_fp32_addsub u_fp_sum (
-        .clk_i(clk),
-        .rst_ni(rst_n),
-        .start_i(fp_sum_l2_start),
-        .sub_i(1'b0),
-        .a_i(fp_sum01_reg),
-        .b_i(fp_sum23_reg),
-        .result_o(fp_sum_result),
-        .done_o(fp_sum_done),
-        .busy_o()
-    );
-
-    generate
-        for (genvar i = 0; i < LANES; i++) begin : gen_fp_norm
+        for (genvar i = 0; i < LANES; i++) begin : gen_fp_norm_inst
             cvfpu_fp32_div u_fp_norm (
                 .clk_i(clk),
                 .rst_ni(rst_n),
@@ -369,6 +397,7 @@ module softmax #(
             );
         end
     endgenerate
+
 
     // ---------------------------------------------------------
     // Control
@@ -385,9 +414,11 @@ module softmax #(
         divider_start   = 1'b0;
         fp_cmp_l1_start = 1'b0;
         fp_cmp_l2_start = 1'b0;
+        fp_cmp_l3_start = 1'b0;
         fp_delta_start  = 1'b0;
         fp_sum_l1_start = 1'b0;
         fp_sum_l2_start = 1'b0;
+        fp_sum_l3_start = 1'b0;
         fp_norm_start   = 1'b0;
 
         unique case (state)
@@ -418,8 +449,13 @@ module softmax #(
             end
 
             ST_FP_MAX_L1_WAIT: begin
-                if (fp_cmp01_done && fp_cmp23_done)
-                    next_state = ST_FP_MAX_L2_START;
+                if (LANES == 8) begin
+                    if (fp_cmp01_done && fp_cmp23_done && fp_cmp45_done && fp_cmp67_done)
+                        next_state = ST_FP_MAX_L2_START;
+                end else begin
+                    if (fp_cmp01_done && fp_cmp23_done)
+                        next_state = ST_FP_MAX_L2_START;
+                end
             end
 
             ST_FP_MAX_L2_START: begin
@@ -428,7 +464,22 @@ module softmax #(
             end
 
             ST_FP_MAX_L2_WAIT: begin
-                if (fp_cmpw_done)
+                if (LANES == 8) begin
+                    if (fp_cmp_q0_done && fp_cmp_q1_done)
+                        next_state = ST_FP_MAX_L3_START;
+                end else begin
+                    if (fp_cmp_q0_done)
+                        next_state = ST_FP_DELTA_START;
+                end
+            end
+
+            ST_FP_MAX_L3_START: begin
+                fp_cmp_l3_start = 1'b1;
+                next_state = ST_FP_MAX_L3_WAIT;
+            end
+
+            ST_FP_MAX_L3_WAIT: begin
+                if (fp_cmp_oct_done)
                     next_state = ST_FP_DELTA_START;
             end
 
@@ -452,8 +503,13 @@ module softmax #(
             end
 
             ST_FP_SUM_L1_WAIT: begin
-                if (fp_sum01_done && fp_sum23_done)
-                    next_state = ST_FP_SUM_L2_START;
+                if (LANES == 8) begin
+                    if (fp_sum_pair0_done && fp_sum_pair1_done && fp_sum_pair2_done && fp_sum_pair3_done)
+                        next_state = ST_FP_SUM_L2_START;
+                end else begin
+                    if (fp_sum_pair0_done && fp_sum_pair1_done)
+                        next_state = ST_FP_SUM_L2_START;
+                end
             end
 
             ST_FP_SUM_L2_START: begin
@@ -462,7 +518,22 @@ module softmax #(
             end
 
             ST_FP_SUM_L2_WAIT: begin
-                if (fp_sum_done)
+                if (LANES == 8) begin
+                    if (fp_sum_quad0_done && fp_sum_quad1_done)
+                        next_state = ST_FP_SUM_L3_START;
+                end else begin
+                    if (fp_sum_quad0_done)
+                        next_state = ST_FP_NORM_START;
+                end
+            end
+
+            ST_FP_SUM_L3_START: begin
+                fp_sum_l3_start = 1'b1;
+                next_state = ST_FP_SUM_L3_WAIT;
+            end
+
+            ST_FP_SUM_L3_WAIT: begin
+                if (fp_sum_oct_done)
                     next_state = ST_FP_NORM_START;
             end
 
@@ -492,9 +563,17 @@ module softmax #(
             sum_exp_reg <= '0;
             fp_max_pair0_reg <= 32'h0000_0000;
             fp_max_pair1_reg <= 32'h0000_0000;
+            fp_max_pair2_reg <= 32'h0000_0000;
+            fp_max_pair3_reg <= 32'h0000_0000;
+            fp_max_quad0_reg <= 32'h0000_0000;
+            fp_max_quad1_reg <= 32'h0000_0000;
             fp_max_reg <= 32'h0000_0000;
-            fp_sum01_reg <= 32'h0000_0000;
-            fp_sum23_reg <= 32'h0000_0000;
+            fp_sum_pair0_reg <= 32'h0000_0000;
+            fp_sum_pair1_reg <= 32'h0000_0000;
+            fp_sum_pair2_reg <= 32'h0000_0000;
+            fp_sum_pair3_reg <= 32'h0000_0000;
+            fp_sum_quad0_reg <= 32'h0000_0000;
+            fp_sum_quad1_reg <= 32'h0000_0000;
             fp_sum_reg <= 32'h0000_0000;
             for (int i = 0; i < LANES; i++) begin
                 int_lane_exp_reg[i] <= '0;
@@ -520,13 +599,40 @@ module softmax #(
                 end
             end
 
-            if (state == ST_FP_MAX_L1_WAIT && fp_cmp01_done && fp_cmp23_done) begin
-                fp_max_pair0_reg <= fp_max_pair0_next;
-                fp_max_pair1_reg <= fp_max_pair1_next;
+            // Max reduction L1 capture
+            if (state == ST_FP_MAX_L1_WAIT) begin
+                if (LANES == 8) begin
+                    if (fp_cmp01_done && fp_cmp23_done && fp_cmp45_done && fp_cmp67_done) begin
+                        fp_max_pair0_reg <= fp_max_pair0_next;
+                        fp_max_pair1_reg <= fp_max_pair1_next;
+                        fp_max_pair2_reg <= fp_max_pair2_next;
+                        fp_max_pair3_reg <= fp_max_pair3_next;
+                    end
+                end else begin
+                    if (fp_cmp01_done && fp_cmp23_done) begin
+                        fp_max_pair0_reg <= fp_max_pair0_next;
+                        fp_max_pair1_reg <= fp_max_pair1_next;
+                    end
+                end
             end
 
-            if (state == ST_FP_MAX_L2_WAIT && fp_cmpw_done) begin
-                fp_max_reg <= fp_max_next;
+            // Max reduction L2 capture
+            if (state == ST_FP_MAX_L2_WAIT) begin
+                if (LANES == 8) begin
+                    if (fp_cmp_q0_done && fp_cmp_q1_done) begin
+                        fp_max_quad0_reg <= fp_max_quad0_next;
+                        fp_max_quad1_reg <= fp_max_quad1_next;
+                    end
+                end else begin
+                    if (fp_cmp_q0_done) begin
+                        fp_max_reg <= fp_max_quad0_next;
+                    end
+                end
+            end
+
+            // Max reduction L3 capture
+            if (state == ST_FP_MAX_L3_WAIT && fp_cmp_oct_done) begin
+                fp_max_reg <= fp_max_oct_next;
             end
 
             if (state == ST_FP_DELTA_WAIT && (&fp_delta_done)) begin
@@ -541,13 +647,40 @@ module softmax #(
                 end
             end
 
-            if (state == ST_FP_SUM_L1_WAIT && fp_sum01_done && fp_sum23_done) begin
-                fp_sum01_reg <= fp_sum01_result;
-                fp_sum23_reg <= fp_sum23_result;
+            // Exponent sum L1 capture
+            if (state == ST_FP_SUM_L1_WAIT) begin
+                if (LANES == 8) begin
+                    if (fp_sum_pair0_done && fp_sum_pair1_done && fp_sum_pair2_done && fp_sum_pair3_done) begin
+                        fp_sum_pair0_reg <= fp_sum_pair0_result;
+                        fp_sum_pair1_reg <= fp_sum_pair1_result;
+                        fp_sum_pair2_reg <= fp_sum_pair2_result;
+                        fp_sum_pair3_reg <= fp_sum_pair3_result;
+                    end
+                end else begin
+                    if (fp_sum_pair0_done && fp_sum_pair1_done) begin
+                        fp_sum_pair0_reg <= fp_sum_pair0_result;
+                        fp_sum_pair1_reg <= fp_sum_pair1_result;
+                    end
+                end
             end
 
-            if (state == ST_FP_SUM_L2_WAIT && fp_sum_done) begin
-                fp_sum_reg <= fp_sum_result;
+            // Exponent sum L2 capture
+            if (state == ST_FP_SUM_L2_WAIT) begin
+                if (LANES == 8) begin
+                    if (fp_sum_quad0_done && fp_sum_quad1_done) begin
+                        fp_sum_quad0_reg <= fp_sum_quad0_result;
+                        fp_sum_quad1_reg <= fp_sum_quad1_result;
+                    end
+                end else begin
+                    if (fp_sum_quad0_done) begin
+                        fp_sum_reg <= fp_sum_quad0_result;
+                    end
+                end
+            end
+
+            // Exponent sum L3 capture
+            if (state == ST_FP_SUM_L3_WAIT && fp_sum_oct_done) begin
+                fp_sum_reg <= fp_sum_oct_result;
             end
 
             if (state == ST_FP_NORM_WAIT && (&fp_norm_done)) begin
