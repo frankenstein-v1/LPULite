@@ -33,8 +33,8 @@ logic  [2:0] eastbound_consumer_sel;
 logic [1:0] mxm_ingress_mode;
 logic mxm_start;
 logic mxm_clear;
-logic [1:0] mxm_e_row_sel;
-logic [1:0] mxm_e_col_sel;
+logic [2:0] mxm_e_row_sel;
+logic [2:0] mxm_e_col_sel;
 logic mxm_e_valid_in;
 logic mxm_input_is_signed;
 logic mxm_wght_is_signed;
@@ -81,10 +81,10 @@ superlane_t sxm_stream_out_to_mxm_left;
 superlane_t sxm_stream_out_to_mxm_top;
 
 // mxm datapath
-logic signed [3:0][7:0]  mxm_input_in;
-logic [3:0]              wght_load;
-logic signed [3:0][7:0]  wght_val;
-logic signed [3:0][3:0][31:0] mxm_out;
+logic signed [MXM_SIZE-1:0][7:0]  mxm_input_in;
+logic [MXM_SIZE-1:0]              wght_load;
+logic signed [MXM_SIZE-1:0][7:0]  wght_val;
+logic signed [MXM_SIZE-1:0][MXM_SIZE-1:0][31:0] mxm_out;
 
 //icu instance
 icu u_icu(
@@ -187,10 +187,10 @@ always_ff @(posedge clk or negedge rst_n) begin
     end
 end
 
-logic [31:0] vxm_stream_out_live;
+packed_fp8_row_t vxm_stream_out_live;
 logic [31:0] vxm_stream_out_scale_live;
 logic        vxm_out_valid_live;
-logic [31:0] vxm_stream_out_buf;
+packed_fp8_row_t vxm_stream_out_buf;
 logic [31:0] vxm_stream_out_scale_buf;
 logic        vxm_stream_out_buf_valid_w;
 logic        vxm_stream_out_buf_valid_e;
@@ -305,7 +305,9 @@ end
 
 assign sxm_load_from_west = sxm_west_en && westbound_valid;
 
-sxm u_sxm(
+sxm #(
+    .LANES(MXM_SIZE)
+) u_sxm(
     .clk(clk),
     .rst_n(rst_n),
     .opcode_input(sxm_opcode_input),
@@ -319,14 +321,16 @@ sxm u_sxm(
 );
 
 generate
-    for (genvar i = 0; i < 4; i++) begin : g_mxm_feed
+    for (genvar i = 0; i < MXM_SIZE; i++) begin : g_mxm_feed
         assign mxm_input_in[i] = sxm_stream_out_to_mxm_left[i*8 +: 8];
         assign wght_val[i]     = sxm_stream_out_to_mxm_top[i*8 +: 8];
         assign wght_load[i]    = 1'b0;
     end
 endgenerate
 
-mxm u_mxm(
+mxm #(
+    .mxm_size(MXM_SIZE)
+) u_mxm(
     .clk(clk),
     .rst(~rst_n),
     .mxm_clear(mxm_clear),
@@ -400,7 +404,7 @@ always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
         vxm_input_overflow <= 1'b0;
         vxm_bias_reg <= '0;
-        vxm_layernorm_gamma_reg <= {32'h3f800000, 32'h3f800000, 32'h3f800000, 32'h3f800000};
+        vxm_layernorm_gamma_reg <= {MXM_SIZE{32'h3f800000}};
         vxm_layernorm_beta_reg <= '0;
     end else begin
         if (vxm_fifo_wr_en && vxm_fifo_full) begin
@@ -427,7 +431,7 @@ always_ff @(posedge clk or negedge rst_n) begin
 end
 
 row_fifo #(
-    .DATA_W(32),
+    .DATA_W(64),
     .DEPTH(4)
 ) u_vxm_output_fifo (
     .clk(clk),
@@ -455,7 +459,7 @@ row_fifo #(
 );
 
 vxm #(
-    .LANES(4),
+    .LANES(MXM_SIZE),
     .LANE_W(32),
     .ALU_W(32)
 ) u_vxm(

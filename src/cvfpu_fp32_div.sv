@@ -81,8 +81,8 @@ module cvfpu_fp32_div (
         end else begin
             start_q <= start_i;
             if (start_i) begin
-                result_o <= $shortrealtobits(
-                    $bitstoshortreal(dividend_i) / $bitstoshortreal(divisor_i)
+                result_o <= real_to_fp32(
+                    fp32_to_real(dividend_i) / fp32_to_real(divisor_i)
                 );
             end
         end

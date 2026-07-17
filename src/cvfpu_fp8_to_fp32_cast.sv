@@ -85,39 +85,44 @@ module cvfpu_fp8_to_fp32_cast (
     function automatic logic [31:0] fp8_e5m2_to_fp32_bits(
         input logic [7:0] fp8_bits
     );
-        logic       sign_bit;
-        logic [4:0] exp_bits;
-        logic [1:0] frac_bits;
-        integer     exp_unbiased;
-        shortreal   value;
-        shortreal   scale;
+        logic        sign;
+        logic [4:0]  exp_f8;
+        logic [1:0]  frac_f8;
+        logic [7:0]  exp_f32;
+        logic [22:0] frac_f32;
         begin
-            sign_bit = fp8_bits[7];
-            exp_bits = fp8_bits[6:2];
-            frac_bits = fp8_bits[1:0];
+            sign    = fp8_bits[7];
+            exp_f8  = fp8_bits[6:2];
+            frac_f8 = fp8_bits[1:0];
 
-            if ((exp_bits == 5'd0) && (frac_bits == 2'd0)) begin
-                fp8_e5m2_to_fp32_bits = sign_bit ? 32'h8000_0000 : 32'h0000_0000;
-            end else if (exp_bits == 5'h1f) begin
-                if (frac_bits == 2'd0)
-                    fp8_e5m2_to_fp32_bits = sign_bit ? 32'hff80_0000 : 32'h7f80_0000;
-                else
-                    fp8_e5m2_to_fp32_bits = 32'h7fc0_0000;
-            end else begin
-                if (exp_bits == 5'd0) begin
-                    scale = 2.0 ** (-16.0);
-                    value = frac_bits * scale;
+            if (exp_f8 == 5'd0) begin
+                if (frac_f8 == 2'd0) begin
+                    exp_f32  = 8'd0;
+                    frac_f32 = 23'd0;
+                end else if (frac_f8 == 2'b01) begin
+                    exp_f32  = 127 - 16;
+                    frac_f32 = 23'd0;
+                end else if (frac_f8 == 2'b10) begin
+                    exp_f32  = 127 - 15;
+                    frac_f32 = 23'd0;
                 end else begin
-                    exp_unbiased = exp_bits - 15;
-                    scale = 2.0 ** exp_unbiased;
-                    value = (1.0 + (frac_bits / 4.0)) * scale;
+                    exp_f32  = 127 - 15;
+                    frac_f32 = {1'b1, 22'd0};
                 end
-
-                if (sign_bit)
-                    value = -value;
-
-                fp8_e5m2_to_fp32_bits = $shortrealtobits(value);
+            end else if (exp_f8 == 5'h1f) begin
+                if (frac_f8 == 2'd0) begin
+                    exp_f32  = 8'hFF;
+                    frac_f32 = 23'd0;
+                end else begin
+                    exp_f32  = 8'hFF;
+                    frac_f32 = {1'b1, 22'd0};
+                end
+            end else begin
+                exp_f32  = exp_f8 - 5'd15 + 8'd127;
+                frac_f32 = {frac_f8, 21'd0};
             end
+
+            fp8_e5m2_to_fp32_bits = {sign, exp_f32, frac_f32};
         end
     endfunction
 

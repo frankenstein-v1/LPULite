@@ -30,7 +30,7 @@ module vxm #(
     input  logic [LANES*LANE_W-1:0] layernorm_beta,
 
     // Outputs
-    output logic [31:0] stream_out,
+    output logic [LANES*8-1:0] stream_out,
     output logic [31:0] stream_out_scale,
     output logic                    out_valid,
     input  logic                    out_ready
@@ -89,7 +89,7 @@ module vxm #(
     logic             fp_scale_done_all;
 
     //outputs for quantize & softmax & muxes
-    logic [31:0]              quantize_out;
+    logic [LANES*8-1:0]       quantize_out;
     logic [31:0]              quantize_scale_out;
     logic                     quantize_valid;
     logic [3:0][ROW_W-1:0]    softmax_out_vec;
@@ -130,7 +130,7 @@ module vxm #(
     logic                     quant_slot_available;
     logic                     fp_bias_stall;
     logic                     fp_scale_stall;
-    logic [31:0]              stream_out_reg;
+    logic [LANES*8-1:0]       stream_out_reg;
     logic [31:0]              stream_out_scale_reg;
     logic                     stream_out_valid_reg;
 

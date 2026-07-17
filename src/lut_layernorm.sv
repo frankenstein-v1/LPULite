@@ -18,7 +18,7 @@ module lut_layernorm #(
 
     localparam real EPSILON = 0.00001;
 
-    always_comb begin
+    always @(*) begin
         real x_lane [0:LANES-1];
         real gamma_lane [0:LANES-1];
         real beta_lane [0:LANES-1];
@@ -40,9 +40,9 @@ module lut_layernorm #(
             gamma_bits = gamma[i*LANE_W +: LANE_W];
             beta_bits = beta[i*LANE_W +: LANE_W];
 
-            x_lane[i] = $bitstoshortreal(x_bits);
-            gamma_lane[i] = $bitstoshortreal(gamma_bits);
-            beta_lane[i] = $bitstoshortreal(beta_bits);
+            x_lane[i] = fp32_to_real(x_bits);
+            gamma_lane[i] = fp32_to_real(gamma_bits);
+            beta_lane[i] = fp32_to_real(beta_bits);
             mean = mean + x_lane[i];
         end
 
@@ -59,7 +59,7 @@ module lut_layernorm #(
         for (int i = 0; i < LANES; i++) begin
             centered = x_lane[i] - mean;
             y_lane = (centered * inv_std * gamma_lane[i]) + beta_lane[i];
-            y_out[i*LANE_W +: LANE_W] = $shortrealtobits(shortreal'(y_lane));
+            y_out[i*LANE_W +: LANE_W] = real_to_fp32(y_lane);
         end
     end
 

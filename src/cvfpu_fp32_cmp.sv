@@ -91,13 +91,13 @@ module cvfpu_fp32_cmp (
 
 `else
     logic start_q;
-    shortreal a_value;
-    shortreal b_value;
+    real a_value;
+    real b_value;
     logic cmp_result;
 
-    always_comb begin
-        a_value = $bitstoshortreal(a_i);
-        b_value = $bitstoshortreal(b_i);
+    always @(*) begin
+        a_value = fp32_to_real(a_i);
+        b_value = fp32_to_real(b_i);
         unique case (cmp_mode_i)
             2'b00:   cmp_result = (a_value <= b_value);
             2'b01:   cmp_result = (a_value <  b_value);

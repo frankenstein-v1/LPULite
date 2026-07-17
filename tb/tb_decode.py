@@ -10,19 +10,12 @@ WC_NONE = 0; WC_MXM = 1; WC_SXM = 2; WC_MEM0 = 3; WC_VXM = 4
 EC_NONE = 0; EC_SXM = 1; EC_MEM0 = 2; EC_VXM = 3; EC_MEM1 = 4
 INGRESS_NONE = 0; INGRESS_INPUT = 1; INGRESS_WGHT = 2
 
-# Helper function to pack 4 bytes into a 32-bit word
+# Helper function to pack 8 bytes into a 64-bit word
 def pack_bytes(values):
     word = 0
     for idx, value in enumerate(values):
         word |= (value & 0xFF) << (8 * idx)
     return word
-
-# Helper function to pack 4 32-bit integers into a 128-bit row
-def pack_mxm_row(values):
-    row = 0
-    for idx, value in enumerate(values):
-        row |= (value & 0xFFFFFFFF) << (32 * idx)
-    return row
 
 def _set_field(word, value, lsb, width):
     mask = (1 << width) - 1
@@ -56,6 +49,8 @@ def build_instruction(
     mxm_use_fp=0,
     fp_quant_mode=0,
     mem_store_fmt=0,
+    vxm_layernorm_en=0,
+    vxm_operand_sel=0,
 ):
     word = 0
     word = _set_field(word, westbound_sel, 0, 3)
@@ -75,9 +70,9 @@ def build_instruction(
     word = _set_field(word, mxm_ingress_mode, 62, 2)
     word = _set_field(word, mxm_start, 64, 1)
     word = _set_field(word, mxm_clear, 65, 1)
-    word = _set_field(word, mxm_e_row_sel, 66, 2)
-    word = _set_field(word, mxm_e_col_sel, 68, 2)
-    word = _set_field(word, mxm_e_valid_in, 70, 1)
+    word = _set_field(word, mxm_e_row_sel, 86, 3)
+    word = _set_field(word, mxm_e_col_sel, 89, 3)
+    word = _set_field(word, mxm_e_valid_in, 92, 1)
     word = _set_field(word, mxm_input_is_signed, 77, 1)
     word = _set_field(word, mxm_wght_is_signed, 78, 1)
     word = _set_field(word, mxm_use_fp, 79, 1)
@@ -115,69 +110,65 @@ async def test_decode_mat_selection(dut):
     # Enable LayerNorm block in the vxm module
     dut.u_lpu.u_vxm.layernorm_bypass.value = 0
 
-    # ----------------------------------------------------
-    # 1. KV Cache Injection (MEM0):
-    # ----------------------------------------------------
-    # Keys K_0..K_3 are stored in MEM0[1..4] in column-major order:
-    # MEM0[1+k] stores [K_0[k], K_1[k], K_2[k], K_3[k]].
-    # We choose randomized but structured keys:
-    # K_0 = [12, -8, 5, 2]
-    # K_1 = [-15, 22, -10, 8]
-    # K_2 = [8, -14, 18, -9]
-    # K_3 = [50, -42, 38, -12] (Will produce the largest dot product with q)
-    preload_mem0_row(dut, addr=1, values=[12, -15, 8, 50])    # k=0
-    preload_mem0_row(dut, addr=2, values=[-8, 22, -14, -42])   # k=1
-    preload_mem0_row(dut, addr=3, values=[5, -10, 18, 38])     # k=2
-    preload_mem0_row(dut, addr=4, values=[2, 8, -9, -12])      # k=3
-    preload_mem0_row(dut, addr=5, values=[0, 0, 0, 0])
+    # 1. KV cache Injection: 8 key vectors of dimension 8
+    # Keys K_0..K_7 stored in MEM0[1..8] column-major
+    K = [
+        [12, -8, 5, 2, 1, 3, -4, 2],       # K_0
+        [-15, 22, -10, 8, 4, 2, 1, 0],      # K_1
+        [8, -14, 18, -9, 0, 1, 2, 3],       # K_2
+        [50, -42, 38, -12, 10, 20, 5, 2],   # K_3 (Produces high positive dot product with q)
+        [2, 4, 6, 8, 10, 12, 14, 16],       # K_4
+        [-1, -2, -3, -4, -5, -6, -7, -8],   # K_5
+        [0, 1, 0, 1, 0, 1, 0, 1],           # K_6
+        [5, 5, 5, 5, 5, 5, 5, 5],           # K_7
+    ]
+    for k in range(8):
+        preload_mem0_row(dut, addr=1 + k, values=[K[col][k] for col in range(8)])
+    preload_mem0_row(dut, addr=9, values=[0]*8)
 
-    # Values V_0..V_3 are stored in MEM0[11..14] in row-major order:
-    # All values are fully populated with randomized non-zero integers.
-    preload_mem0_row(dut, addr=11, values=[8, -12, 14, -6])      # V_0 ("cat")
-    preload_mem0_row(dut, addr=12, values=[-15, 20, -8, 12])     # V_1 ("sat")
-    preload_mem0_row(dut, addr=13, values=[25, -18, 30, -15])    # V_2 ("on")
-    preload_mem0_row(dut, addr=14, values=[42, -22, 50, -18])    # V_3 ("the")
-    preload_mem0_row(dut, addr=15, values=[0, 0, 0, 0])
+    # Values V_0..V_7 in MEM0[11..18], row-major
+    V = [
+        [8, -12, 14, -6, 2, 4, -1, 3],       # V_0
+        [-15, 20, -8, 12, 0, 1, -2, 2],      # V_1
+        [25, -18, 30, -15, 1, 2, 3, 4],      # V_2
+        [42, -22, 50, -18, 3, 6, -9, 12],    # V_3
+        [10, 10, 10, 10, 10, 10, 10, 10],    # V_4
+        [1, 2, 3, 4, 5, 6, 7, 8],            # V_5
+        [-2, -4, -3, -1, -5, 0, 1, 2],       # V_6
+        [5, -5, 5, -5, 5, -5, 5, -5],        # V_7
+    ]
+    for k in range(8):
+        preload_mem0_row(dut, addr=11 + k, values=V[k])
+    preload_mem0_row(dut, addr=19, values=[0]*8)
 
-    # ----------------------------------------------------
-    # 2. Embeddings & Weights Injection (MEM1):
-    # ----------------------------------------------------
-    # Query vector q = [2, -1, 3, 0] stored column-major in MEM1[0..3]:
-    # MEM1[k] contains [q[k], 0, 0, 0].
-    preload_mem1_row(dut, addr=0, values=[2, 0, 0, 0])
-    preload_mem1_row(dut, addr=1, values=[-1, 0, 0, 0])
-    preload_mem1_row(dut, addr=2, values=[3, 0, 0, 0])
-    preload_mem1_row(dut, addr=3, values=[0, 0, 0, 0])
+    # 2. Query vector q = [2, -1, 3, 0, 1, -2, 4, 0] stored column-major in MEM1[0..7]
+    q_vals = [2, -1, 3, 0, 1, -2, 4, 0]
+    for k in range(8):
+        preload_mem1_row(dut, addr=k, values=[q_vals[k]] + [0]*7)
 
-    # LM Head weight matrix W_B (for columns 4..7: "the", "mat", "sofa", "rug") in MEM1[30..33]
-    # W_B is stored column-major:
-    # W_B_0 ("the") = [10, -5, 12, -8]
-    # W_B_1 ("mat") = [38, 25, 45, 18] (Highly positive projection to select "mat")
-    # W_B_2 ("sofa") = [-15, 20, -8, 12]
-    # W_B_3 ("rug") = [8, -12, 10, -5]
-    # MEM1[30+k] contains [W_B_0[k], W_B_1[k], W_B_2[k], W_B_3[k]]
-    preload_mem1_row(dut, addr=30, values=[10, 38, -15, 8])   # k=0
-    preload_mem1_row(dut, addr=31, values=[-5, 25, 20, -12])  # k=1
-    preload_mem1_row(dut, addr=32, values=[12, 45, -8, 10])   # k=2
-    preload_mem1_row(dut, addr=33, values=[-8, 18, 12, -5])   # k=3
+    # LM Head weights in MEM1[30..37] (8 tokens: "the", "mat", "sofa", "rug", "cat", "sat", "on", "floor")
+    # W is stored column-major. We set column 1 ("mat") to have a strongly positive correlation
+    # with the expected LayerNorm output.
+    W = [
+        [5, 30, 2, -1, 0, 1, 2, 3],   # row 0
+        [-2, -30, -4, 3, 0, -1, 1, 0], # row 1
+        [8, 30, 4, -2, 0, 2, -1, 1],  # row 2
+        [-1, 30, -3, 4, 0, 1, 1, -1], # row 3
+        [1, -30, 1, 0, 0, -2, 1, 1],  # row 4
+        [3, 30, 4, -1, 0, 1, 2, -1],  # row 5
+        [-2, -30, 0, 2, 0, 0, 1, 0],  # row 6
+        [0, 30, -1, 3, 0, 2, 1, -2]   # row 7
+    ]
+    for k in range(8):
+        preload_mem1_row(dut, addr=30 + k, values=[W[row][k] for row in range(8)])
 
-    # W_A (for columns 0..3: "The", "cat", "sat", "on") in MEM1[20..23] -> randomized background
-    preload_mem1_row(dut, addr=20, values=[5, -3, 2, -1])
-    preload_mem1_row(dut, addr=21, values=[-2, 6, -4, 3])
-    preload_mem1_row(dut, addr=22, values=[8, -5, 4, -2])
-    preload_mem1_row(dut, addr=23, values=[-1, 2, -3, 4])
-
-
-    # ----------------------------------------------------
     # 3. Compile the Decode Phase Program:
-    # ----------------------------------------------------
     program = []
 
     # --- Phase 1: Attention Logits Calculation (q K^T) ---
-    # Clear MXM accumulator
     program.append(build_instruction(mxm_clear=1))
 
-    for k in range(4):
+    for k in range(8):
         # Load Key column k from MEM0
         program.append(build_instruction(mem0_read_en=1, mem0_addr=1 + k))
         program.append(build_instruction(westbound_sel=WB_MEM0, westbound_consumer_sel=WC_MXM, mxm_ingress_mode=INGRESS_WGHT))
@@ -196,14 +187,13 @@ async def test_decode_mat_selection(dut):
     program.append(build_instruction(vxm_ctrl=0b1100, vxm_data_sel=1))
     for _ in range(10):
         program.append(build_instruction())
-    for _ in range(4):
+    for _ in range(8):
         program.append(build_instruction(eastbound_sel=EB_VXM, eastbound_consumer_sel=EC_MEM0, mem0_write_en=1, mem0_addr=20))
 
     # --- Phase 2: Context vector calculation (S V) & LayerNorm ---
-    # Clear MXM accumulator
     program.append(build_instruction(mxm_clear=1))
 
-    for k in range(4):
+    for k in range(8):
         # Load Value row k from MEM0
         program.append(build_instruction(mem0_read_en=1, mem0_addr=11 + k))
         program.append(build_instruction(westbound_sel=WB_MEM0, westbound_consumer_sel=WC_MXM, mxm_ingress_mode=INGRESS_WGHT))
@@ -222,15 +212,14 @@ async def test_decode_mat_selection(dut):
     program.append(build_instruction(vxm_ctrl=0b0000, vxm_data_sel=1))
     for _ in range(10):
         program.append(build_instruction())
-    for _ in range(4):
+    for _ in range(8):
         program.append(build_instruction(eastbound_sel=EB_VXM, eastbound_consumer_sel=EC_MEM1, mem1_write_en=1, mem1_addr=10))
 
-    # --- Phase 3: LM Head Projection (x W_B) ---
-    # Clear MXM accumulator
+    # --- Phase 3: LM Head Projection (x W) ---
     program.append(build_instruction(mxm_clear=1))
 
-    for k in range(4):
-        # Load weight column k from MEM1 (W_B)
+    for k in range(8):
+        # Load weight column k from MEM1 (W)
         program.append(build_instruction(mem1_read_en=1, mem1_addr=30 + k))
         program.append(build_instruction(westbound_sel=WB_MEM1, westbound_consumer_sel=WC_MXM, mxm_ingress_mode=INGRESS_WGHT))
         # Load normalized input element k from MEM1 (x)
@@ -243,8 +232,8 @@ async def test_decode_mat_selection(dut):
     # NOPs to settle
     program.extend([build_instruction(), build_instruction()])
 
-    # Write output logits to MEM1[41] (Row 0 only, needs 4 cycles for streaming)
-    for _ in range(4):
+    # Write output logits to MEM1[41] (Row 0 only)
+    for _ in range(8):
         program.append(build_instruction(eastbound_sel=EB_MXM, eastbound_consumer_sel=EC_MEM1, mem1_write_en=1, mem1_addr=41, mxm_e_row_sel=0, mxm_e_valid_in=1))
 
     # 4. Preload instruction program into the ICU
@@ -255,22 +244,19 @@ async def test_decode_mat_selection(dut):
 
     # 5. Execute Program
     await reset_dut(dut)
-    total_cycles = len(program) + 10
+    total_cycles = len(program) + 15
     await tick(dut, total_cycles)
 
     # 6. Read and log all intermediate hardware states
-    # Read attention scores at MEM0[20]
     scores_word = int(dut.u_lpu.u_mem0.sram_array[20].value)
-    scores = [(scores_word >> (8 * i)) & 0xFF for i in range(4)]
+    scores = [(scores_word >> (8 * i)) & 0xFF for i in range(8)]
 
-    # Read context vector at MEM1[10] (before LayerNorm was written to it, but actually Phase 2 writes LayerNorm output to MEM1[10])
-    # Let's inspect the values in MEM1[10] which is the post-LayerNorm context vector
     layernorm_out_word = int(dut.u_lpu.u_mem1.sram_array[10].value)
     layernorm_out = []
-    for lane in range(4):
-        val = (layernorm_out_word >> (32 * lane)) & 0xFFFFFFFF
-        if val & 0x80000000:
-            val -= 0x100000000
+    for lane in range(8):
+        val = (layernorm_out_word >> (8 * lane)) & 0xFF
+        if val & 0x80:
+            val -= 256
         layernorm_out.append(val)
 
     # Read final logits from MEM1[41]
@@ -283,30 +269,23 @@ async def test_decode_mat_selection(dut):
             val -= 0x100000000
         logits.append(val)
 
-    dictionary = ["the", "mat", "sofa", "rug"]
+    dictionary = ["the", "mat", "sofa", "rug", "cat", "sat", "on", "floor"]
     max_idx = logits.index(max(logits))
     predicted_token = dictionary[max_idx]
 
     dut._log.info(f"\n=======================================================")
     dut._log.info(f"--- INTERMEDIATE DECODE PHASE PROCESS LOGS ---")
-    dut._log.info(f"1. Inputs:")
-    dut._log.info(f"   - Query Vector:            [2, -1, 3, 0]")
-    dut._log.info(f"   - Active Key Cache (K_3):  [50, -50, 50, 0]")
-    dut._log.info(f"   - Active Value Cache (V_3):[20, -10, 16, -4]")
-    dut._log.info(f"")
     dut._log.info(f"2. Phase 1: Attention & Softmax:")
     dut._log.info(f"   - Softmax Weights (MEM0[20]):  {scores} (Unsigned Q8)")
     dut._log.info(f"")
     dut._log.info(f"3. Phase 2: Context Mixing & LayerNorm:")
-    dut._log.info(f"   - Normalized Output (MEM1[10]): {layernorm_out} (Signed 32-bit)")
+    dut._log.info(f"   - Normalized Output (MEM1[10]): {layernorm_out} (Signed 8-bit)")
     dut._log.info(f"")
     dut._log.info(f"4. Phase 3: LM Head Projection & Output Selection:")
-    dut._log.info(f"   - LM Head Weights for 'mat':   [30, 30, 30, 30]")
-    dut._log.info(f"   - Final Logits (MEM1[41]):      {logits} (Corresponding to: {dictionary})")
+    dut._log.info(f"   - Final Logits (MEM1[41]):      {logits} (Corresponding to: {dictionary[:4]})")
     dut._log.info(f"   - Winner Token Selection:       '{predicted_token}' (Logit: {logits[max_idx]})")
     dut._log.info(f"")
     dut._log.info(f"Simulation Status: SUCCESS (Cycles: {total_cycles})")
     dut._log.info(f"=======================================================\n")
 
     assert predicted_token == "mat", f"Expected 'mat' to be selected, but got '{predicted_token}'"
-

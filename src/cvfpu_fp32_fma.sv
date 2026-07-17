@@ -85,10 +85,10 @@ module cvfpu_fp32_fma (
         end else begin
             start_q  <= start_i;
             if (start_i) begin
-                result_o <= $shortrealtobits(
-                    $bitstoshortreal(multiplicand_i) *
-                    $bitstoshortreal(multiplier_i) +
-                    $bitstoshortreal(addend_i)
+                result_o <= real_to_fp32(
+                    fp32_to_real(multiplicand_i) *
+                    fp32_to_real(multiplier_i) +
+                    fp32_to_real(addend_i)
                 );
             end
         end
