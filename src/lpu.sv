@@ -210,7 +210,9 @@ logic        vxm_result_take_east;
 logic        sxm_emit_valid;
 logic        sxm_load_from_west;
 
-westbound_bus u_westbound_bus(
+westbound_bus #(
+    .PAYLOAD_W($bits(superlane_t))
+) u_westbound_bus(
     .producer_sel(westbound_sel_t),
     .mem0_payload(fp8_row_mem_packed(mem0_stream_out)),
     .mem1_payload(fp8_row_mem_packed(mem1_stream_out)),
