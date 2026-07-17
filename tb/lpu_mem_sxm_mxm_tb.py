@@ -58,17 +58,15 @@ def _set_field(word, value, lsb, width):
     return word | ((value & mask) << lsb)
 
 
-MEM_ADDR_W = 11
-MEM_ADDR_LOW_W = 9
-MEM0_ADDR_HI_LSB = 90
-MEM1_ADDR_HI_LSB = 92
+MEM_ADDR_W = 15
+OP_TRANSPOSE_LOAD = 0x5A5
+OP_TRANSPOSE_EMIT = 0xA5A
 
 
-def _set_mem_addr(word, value, low_lsb, high_lsb):
+def _set_mem_addr(word, value, lsb):
     if value < 0 or value >= (1 << MEM_ADDR_W):
         raise ValueError(f"memory address {value} does not fit in {MEM_ADDR_W} bits")
-    word = _set_field(word, value, low_lsb, MEM_ADDR_LOW_W)
-    return _set_field(word, value >> MEM_ADDR_LOW_W, high_lsb, MEM_ADDR_W - MEM_ADDR_LOW_W)
+    return _set_field(word, value, lsb, MEM_ADDR_W)
 
 
 def build_instruction(
@@ -80,6 +78,9 @@ def build_instruction(
     mem1_read_en=0,
     mem1_addr=0,
     sxm_opcode_input=0,
+    sxm_transpose_load=0,
+    sxm_transpose_emit=0,
+    sxm_load_from_west=0,
     mxm_ingress_mode=INGRESS_NONE,
     mxm_start=0,
     mxm_clear=0,
@@ -88,19 +89,26 @@ def build_instruction(
     mxm_use_fp=0,
 ):
     word = 0
+    if sxm_opcode_input == OP_TRANSPOSE_LOAD:
+        sxm_transpose_load = 1
+    elif sxm_opcode_input == OP_TRANSPOSE_EMIT:
+        sxm_transpose_emit = 1
+
     word = _set_field(word, westbound_sel, 0, 3)
     word = _set_field(word, westbound_consumer_sel, 6, 3)
     word = _set_field(word, mem0_read_en, 12, 1)
-    word = _set_mem_addr(word, mem0_addr, 14, MEM0_ADDR_HI_LSB)
-    word = _set_field(word, mem1_read_en, 23, 1)
-    word = _set_mem_addr(word, mem1_addr, 25, MEM1_ADDR_HI_LSB)
-    word = _set_field(word, sxm_opcode_input, 34, 12)
-    word = _set_field(word, mxm_ingress_mode, 62, 2)
-    word = _set_field(word, mxm_start, 64, 1)
-    word = _set_field(word, mxm_clear, 65, 1)
-    word = _set_field(word, mxm_input_is_signed, 77, 1)
-    word = _set_field(word, mxm_wght_is_signed, 78, 1)
-    word = _set_field(word, mxm_use_fp, 79, 1)
+    word = _set_mem_addr(word, mem0_addr, 14)
+    word = _set_field(word, mem1_read_en, 29, 1)
+    word = _set_mem_addr(word, mem1_addr, 31)
+    word = _set_field(word, mxm_ingress_mode, 46, 2)
+    word = _set_field(word, mxm_start, 48, 1)
+    word = _set_field(word, mxm_clear, 49, 1)
+    word = _set_field(word, mxm_input_is_signed, 57, 1)
+    word = _set_field(word, mxm_wght_is_signed, 58, 1)
+    word = _set_field(word, mxm_use_fp, 59, 1)
+    word = _set_field(word, sxm_transpose_load, 63, 1)
+    word = _set_field(word, sxm_transpose_emit, 64, 1)
+    word = _set_field(word, sxm_load_from_west, 65, 1)
     return word
 
 

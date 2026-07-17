@@ -15,9 +15,11 @@ module icu #(
     output logic      mem1_write_en,
     output logic [MEM_ADDR_W-1:0] mem1_addr,
 
-    // SXM Control (24 bits)
+    // SXM Control. The 96-bit VLIW only carries transpose controls; these
+    // legacy opcode outputs are generated here for the current SXM interface.
     output logic [11:0] sxm_opcode_input,
     output logic [11:0] sxm_opcode_weight,
+    output logic        sxm_load_from_west,
 
     // VXM Control (4 bits)
     output logic [3:0] vxm_ctrl,
@@ -76,43 +78,51 @@ module icu #(
     assign westbound_consumer_sel = current_instruction[8:6];
     assign eastbound_consumer_sel = current_instruction[11:9];
 
+    // 96-bit VLIW layout:
+    //   [11:0]  bus control
+    //   [28:12] mem0 read/write/address
+    //   [45:29] mem1 read/write/address
+    //   [62:46] MXM + quant/store controls
+    //   [65:63] SXM transpose controls
+    //   [78:66] VXM controls
+    //   [95:79] reserved
+
     // mem0 control
     assign mem0_read_en  = current_instruction[12];
     assign mem0_write_en = current_instruction[13];
-    // Keep the original low 9 address bits in place for backward-compatible
-    // programs. The current 96-bit instruction format carries 11 memory-address
-    // bits; the new upper address bits are zero until the instruction format is
-    // widened or remapped.
-    assign mem0_addr     = {{(MEM_ADDR_W-11){1'b0}}, current_instruction[91:90], current_instruction[22:14]};
+    assign mem0_addr     = current_instruction[28:14];
 
     // mem1 control
-    assign mem1_read_en  = current_instruction[23];
-    assign mem1_write_en = current_instruction[24];
-    assign mem1_addr     = {{(MEM_ADDR_W-11){1'b0}}, current_instruction[93:92], current_instruction[33:25]};
-
-    // SXM control
-    assign sxm_opcode_input  = current_instruction[45:34];
-    assign sxm_opcode_weight = current_instruction[57:46];
-    
-    // VXM control
-    assign vxm_ctrl      = current_instruction[74:71];
-    assign vxm_data_sel  = current_instruction[76];
+    assign mem1_read_en  = current_instruction[29];
+    assign mem1_write_en = current_instruction[30];
+    assign mem1_addr     = current_instruction[45:31];
 
     // MXM control
-    assign mxm_ingress_mode = current_instruction[63:62];
-    assign mxm_start        = current_instruction[64];
-    assign mxm_clear        = current_instruction[65];
-    assign mxm_e_row_sel    = current_instruction[88:86];
-    assign mxm_e_col_sel    = current_instruction[91:89];
-    assign mxm_e_valid_in   = current_instruction[92];
-    assign mxm_input_is_signed = current_instruction[77];
-    assign mxm_wght_is_signed  = current_instruction[78];
-    assign mxm_use_fp          = current_instruction[79];
-    assign fp_quant_mode       = current_instruction[80];
-    assign mem_store_fmt       = current_instruction[82:81];
-    assign vxm_rmsnorm_en      = current_instruction[83];
-    assign vxm_operand_sel     = current_instruction[86:84];
-    assign vxm_rope_en         = current_instruction[87];
-    assign vxm_residual_op     = current_instruction[90:88];
+    assign mxm_ingress_mode    = current_instruction[47:46];
+    assign mxm_start           = current_instruction[48];
+    assign mxm_clear           = current_instruction[49];
+    assign mxm_e_row_sel       = current_instruction[52:50];
+    assign mxm_e_col_sel       = current_instruction[55:53];
+    assign mxm_e_valid_in      = current_instruction[56];
+    assign mxm_input_is_signed = current_instruction[57];
+    assign mxm_wght_is_signed  = current_instruction[58];
+    assign mxm_use_fp          = current_instruction[59];
+    assign fp_quant_mode       = current_instruction[60];
+    assign mem_store_fmt       = current_instruction[62:61];
+
+    // SXM transpose-only control
+    assign sxm_opcode_input  = current_instruction[63] ? 12'h5A5 :
+                               current_instruction[64] ? 12'hA5A :
+                                                         12'h000;
+    assign sxm_opcode_weight = 12'h000;
+    assign sxm_load_from_west = current_instruction[65];
+    
+    // VXM control
+    assign vxm_ctrl        = current_instruction[69:66];
+    assign vxm_data_sel    = current_instruction[70];
+    assign vxm_operand_sel = current_instruction[73:71];
+    assign vxm_rmsnorm_en  = current_instruction[74];
+    assign vxm_rope_en     = current_instruction[75];
+    assign vxm_residual_op = current_instruction[78:76];
 
 endmodule
