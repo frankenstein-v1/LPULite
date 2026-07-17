@@ -3,7 +3,7 @@
 
 
 module eastbound_bus #(
-    parameter int PAYLOAD_E = 32
+    parameter int PAYLOAD_E = $bits(mxm_row_t)
 )(
 
     input eastbound_producer_e producer_sel,

@@ -1,7 +1,7 @@
 `timescale 1ns/1ps
 
 module mxm_eastbound_adapter #(
-    parameter int MXM_SIZE  = 4,
+    parameter int MXM_SIZE  = 8,
     parameter int PAYLOAD_W = 32
 ) (
     // Full MXM output matrix.
@@ -15,7 +15,7 @@ module mxm_eastbound_adapter #(
     input  logic mxm_valid_in,
 
     // Packed MXM row feed into eastbound_bus. Column 0 occupies the least-significant
-    // PAYLOAD_W bits so existing 32-bit consumers can keep sampling payload[31:0].
+    // PAYLOAD_W bits, and the full payload carries MXM_SIZE FP32 lanes.
     output logic [MXM_SIZE*PAYLOAD_W-1:0] mxm_payload,
     output logic                 mxm_valid
 );
