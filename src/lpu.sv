@@ -256,7 +256,7 @@ end
 
 mxm_eastbound_adapter #(
     .MXM_SIZE(MXM_SIZE),
-    .PAYLOAD_W(32)
+    .PAYLOAD_W(MXM_ACC_W)
 ) u_mxm_to_eastbound (
     .mxm_out(mxm_out),
     .mxm_row_sel(mxm_e_row_sel),
