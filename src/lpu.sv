@@ -17,6 +17,7 @@ logic [MEM_ADDR_W-1:0] mem1_addr;
 //icu sxm outputs
 logic [11:0] sxm_opcode_input;
 logic [11:0] sxm_opcode_weight;
+logic sxm_load_from_west_ctrl;
 
 //icxu vxm outs
 logic [3:0] vxm_ctrl;
@@ -102,6 +103,7 @@ icu u_icu(
     .mem1_addr(mem1_addr),
     .sxm_opcode_input(sxm_opcode_input),
     .sxm_opcode_weight(sxm_opcode_weight),
+    .sxm_load_from_west(sxm_load_from_west_ctrl),
     .vxm_ctrl(vxm_ctrl),
     .vxm_data_sel(vxm_data_sel),
     .vxm_operand_sel(vxm_operand_sel),
@@ -309,7 +311,7 @@ always_ff @(posedge clk or negedge rst_n) begin
     end
 end
 
-assign sxm_load_from_west = sxm_west_en && westbound_valid;
+assign sxm_load_from_west = sxm_load_from_west_ctrl || (sxm_west_en && westbound_valid);
 
 sxm #(
     .LANES(MXM_SIZE)
