@@ -137,43 +137,38 @@ def preload_program(dut, instructions, *, trailing_nops=32):
 
 
 def append_sxm_transpose_load_from_mem1(program, *, source_base):
-    program.extend(
-        [
-            build_instruction(mem1_read_en=1, mem1_addr=source_base + 0),
-            build_instruction(
-                mem1_read_en=1,
-                mem1_addr=source_base + 1,
-                westbound_sel=WB_MEM1,
-                westbound_consumer_sel=WC_SXM,
-            ),
-            build_instruction(
-                mem1_read_en=1,
-                mem1_addr=source_base + 2,
-                westbound_sel=WB_MEM1,
-                westbound_consumer_sel=WC_SXM,
-                sxm_opcode_input=0x5A5,
-            ),
-            build_instruction(
-                mem1_read_en=1,
-                mem1_addr=source_base + 3,
-                westbound_sel=WB_MEM1,
-                westbound_consumer_sel=WC_SXM,
-            ),
-            build_instruction(
-                westbound_sel=WB_MEM1,
-                westbound_consumer_sel=WC_SXM,
-            ),
-            build_instruction(),
-        ]
-    )
+    program.append(build_instruction(mem1_read_en=1, mem1_addr=source_base + 0))
+    program.append(build_instruction(
+        mem1_read_en=1,
+        mem1_addr=source_base + 1,
+        westbound_sel=WB_MEM1,
+        westbound_consumer_sel=WC_SXM,
+    ))
+    program.append(build_instruction(
+        mem1_read_en=1,
+        mem1_addr=source_base + 2,
+        westbound_sel=WB_MEM1,
+        westbound_consumer_sel=WC_SXM,
+        sxm_opcode_input=0x5A5,
+    ))
+    for r in range(3, 8):
+        program.append(build_instruction(
+            mem1_read_en=1,
+            mem1_addr=source_base + r,
+            westbound_sel=WB_MEM1,
+            westbound_consumer_sel=WC_SXM,
+        ))
+    program.append(build_instruction(
+        westbound_sel=WB_MEM1,
+        westbound_consumer_sel=WC_SXM,
+    ))
+    program.append(build_instruction())
 
 
 def read_mxm_matrix(dut):
     return [
-        [signed_value(dut.mxm_out_00_dbg), signed_value(dut.mxm_out_01_dbg), signed_value(dut.mxm_out_02_dbg), signed_value(dut.mxm_out_03_dbg)],
-        [signed_value(dut.mxm_out_10_dbg), signed_value(dut.mxm_out_11_dbg), signed_value(dut.mxm_out_12_dbg), signed_value(dut.mxm_out_13_dbg)],
-        [signed_value(dut.mxm_out_20_dbg), signed_value(dut.mxm_out_21_dbg), signed_value(dut.mxm_out_22_dbg), signed_value(dut.mxm_out_23_dbg)],
-        [signed_value(dut.mxm_out_30_dbg), signed_value(dut.mxm_out_31_dbg), signed_value(dut.mxm_out_32_dbg), signed_value(dut.mxm_out_33_dbg)],
+        [signed_value(getattr(dut, f"mxm_out_{r}{c}_dbg")) for c in range(8)]
+        for r in range(8)
     ]
 
 
@@ -181,12 +176,12 @@ def read_mxm_matrix(dut):
 async def test_lpu_mem_sxm_mxm_qkt_single_k_slice(dut):
     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
 
-    q_column0 = [3, -2, 5, 1]
-    k_column0 = [7, 4, -3, 2]
+    q_column0 = [3, -2, 5, 1, 0, 0, 0, 0]
+    k_column0 = [7, 4, -3, 2, 0, 0, 0, 0]
 
     preload_mem0_word(dut, addr=0, values=q_column0)
     for row_idx, lane0_value in enumerate(k_column0):
-        preload_mem1_word(dut, addr=row_idx, values=[lane0_value, 0, 0, 0])
+        preload_mem1_word(dut, addr=row_idx, values=[lane0_value] + [0]*7)
 
     program = [
         build_instruction(mxm_clear=1),
@@ -222,7 +217,7 @@ async def test_lpu_mem_sxm_mxm_qkt_single_k_slice(dut):
     preload_program(dut, program)
 
     await reset_dut(dut)
-    await tick(dut, len(program) + 6)
+    await tick(dut, len(program) + 12)
 
     assert int(dut.input_loaded_dbg.value) == 1
     assert int(dut.wght_loaded_dbg.value) == 1
@@ -241,12 +236,12 @@ async def test_lpu_mem_sxm_mxm_qkt_single_k_slice(dut):
 async def test_lpu_mem_sxm_mxm_qkt_single_k_slice_fp(dut):
     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
 
-    q_column0 = [1.0, -0.5, 2.0, 0.5]
-    k_column0 = [2.0, 0.5, -1.0, 4.0]
+    q_column0 = [1.0, -0.5, 2.0, 0.5, 0.0, 0.0, 0.0, 0.0]
+    k_column0 = [2.0, 0.5, -1.0, 4.0, 0.0, 0.0, 0.0, 0.0]
 
     preload_mem0_word(dut, addr=0, values=[fp8_e5m2_bits(v) for v in q_column0])
     for row_idx, lane0_value in enumerate(k_column0):
-        preload_mem1_word(dut, addr=row_idx, values=[fp8_e5m2_bits(lane0_value), 0, 0, 0])
+        preload_mem1_word(dut, addr=row_idx, values=[fp8_e5m2_bits(lane0_value)] + [0]*7)
 
     fp_cfg = dict(mxm_use_fp=1, mxm_input_is_signed=0, mxm_wght_is_signed=0)
     program = [
@@ -288,25 +283,19 @@ async def test_lpu_mem_sxm_mxm_qkt_single_k_slice_fp(dut):
     preload_program(dut, program)
 
     await reset_dut(dut)
-    await tick(dut, len(program) + 8)
+    await tick(dut, len(program) + 12)
 
     expected = [
         [q_value * k_value for k_value in k_column0]
         for q_value in q_column0
     ]
     observed_bits = [
-        [int(dut.mxm_out_00_dbg.value) & 0xFFFFFFFF, int(dut.mxm_out_01_dbg.value) & 0xFFFFFFFF,
-         int(dut.mxm_out_02_dbg.value) & 0xFFFFFFFF, int(dut.mxm_out_03_dbg.value) & 0xFFFFFFFF],
-        [int(dut.mxm_out_10_dbg.value) & 0xFFFFFFFF, int(dut.mxm_out_11_dbg.value) & 0xFFFFFFFF,
-         int(dut.mxm_out_12_dbg.value) & 0xFFFFFFFF, int(dut.mxm_out_13_dbg.value) & 0xFFFFFFFF],
-        [int(dut.mxm_out_20_dbg.value) & 0xFFFFFFFF, int(dut.mxm_out_21_dbg.value) & 0xFFFFFFFF,
-         int(dut.mxm_out_22_dbg.value) & 0xFFFFFFFF, int(dut.mxm_out_23_dbg.value) & 0xFFFFFFFF],
-        [int(dut.mxm_out_30_dbg.value) & 0xFFFFFFFF, int(dut.mxm_out_31_dbg.value) & 0xFFFFFFFF,
-         int(dut.mxm_out_32_dbg.value) & 0xFFFFFFFF, int(dut.mxm_out_33_dbg.value) & 0xFFFFFFFF],
+        [int(getattr(dut, f"mxm_out_{r}{c}_dbg").value) & 0xFFFFFFFF for c in range(8)]
+        for r in range(8)
     ]
 
-    for r in range(4):
-        for c in range(4):
+    for r in range(8):
+        for c in range(8):
             exp_bits = f32_bits(expected[r][c])
             got_bits = observed_bits[r][c]
             assert got_bits == exp_bits, (

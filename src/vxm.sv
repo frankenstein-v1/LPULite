@@ -1,7 +1,7 @@
 `timescale 1ns/1ns
 
 module vxm #(
-    parameter int LANES   = 4,
+    parameter int LANES   = 8,
     parameter int LANE_W  = 32, // Upgraded to 32 bits
     parameter int ALU_W   = 32 // Upgraded ALU width to 32 bits per user request
 ) (
@@ -38,7 +38,7 @@ module vxm #(
     input  logic [LANES*LANE_W-1:0] rmsnorm_beta,
 
     // Outputs
-    output logic [31:0] stream_out,
+    output logic [LANES*8-1:0] stream_out,
     output logic [31:0] stream_out_scale,
     output logic                    out_valid,
     input  logic                    out_ready
@@ -98,7 +98,7 @@ module vxm #(
     logic             fp_scale_done_all;
 
     //outputs for quantize & softmax & muxes
-    logic [31:0]              quantize_out;
+    logic [LANES*8-1:0]       quantize_out;
     logic [31:0]              quantize_scale_out;
     logic                     quantize_valid;
     logic [3:0][ROW_W-1:0]    softmax_out_vec;
@@ -163,7 +163,7 @@ module vxm #(
     logic                     residual_active_fp_mode;
     logic                     residual_result_mode_softmax;
     logic                     residual_result_fp_mode;
-    logic [31:0]              stream_out_reg;
+    logic [LANES*8-1:0]       stream_out_reg;
     logic [31:0]              stream_out_scale_reg;
     logic                     stream_out_valid_reg;
 

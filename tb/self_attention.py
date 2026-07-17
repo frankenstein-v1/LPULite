@@ -127,7 +127,7 @@ def quantize_matrix_int32_to_q8(matrix: list[list[int]]) -> tuple[list[list[int]
 
 
 def transpose_matrix(matrix: list[list[int]]) -> list[list[int]]:
-    return [[matrix[row][col] for row in range(4)] for col in range(4)]
+    return [[matrix[row][col] for row in range(8)] for col in range(8)]
 
 
 def exp_expected(q_value: int) -> int:
@@ -221,12 +221,12 @@ def self_attention_golden(
 
 
 def matrix_to_mem0_columns(matrix: list[list[int]]) -> list[list[int]]:
-    """Pack a 4x4 matrix into the MEM0 column-major layout expected by MXM."""
-    return [[matrix[row][col] for row in range(4)] for col in range(4)]
+    """Pack an 8x8 matrix into the MEM0 column-major layout expected by MXM."""
+    return [[matrix[row][col] for row in range(8)] for col in range(8)]
 
 
 def matrix_to_mem1_rows(matrix: list[list[int]]) -> list[list[int]]:
-    """Pack a 4x4 matrix into the MEM1 row-major layout expected by MXM."""
+    """Pack an 8x8 matrix into the MEM1 row-major layout expected by MXM."""
     return [list(row) for row in matrix]
 
 
@@ -242,33 +242,35 @@ def preload_matrix_into_mem1_rows(dut, *, base_addr: int, matrix: list[list[int]
 
 def read_packed_q8_rows_from_mem0(dut, *, base_addr: int) -> list[list[int]]:
     rows: list[list[int]] = []
-    for row_idx in range(4):
-        word = int(dut.u_lpu.u_mem0.sram_array[base_addr + row_idx].value) & 0xFFFFFFFF
-        rows.append([sign_extend((word >> (8 * lane)) & 0xFF, 8) for lane in range(4)])
+    for row_idx in range(8):
+        word = int(dut.u_lpu.u_mem0.sram_array[base_addr + row_idx].value) & 0xFFFFFFFFFFFFFFFF
+        rows.append([sign_extend((word >> (8 * lane)) & 0xFF, 8) for lane in range(8)])
     return rows
 
 
 def read_packed_u8_rows_from_mem0(dut, *, base_addr: int) -> list[list[int]]:
     rows: list[list[int]] = []
-    for row_idx in range(4):
-        word = int(dut.u_lpu.u_mem0.sram_array[base_addr + row_idx].value) & 0xFFFFFFFF
-        rows.append([(word >> (8 * lane)) & 0xFF for lane in range(4)])
+    for row_idx in range(8):
+        word = int(dut.u_lpu.u_mem0.sram_array[base_addr + row_idx].value) & 0xFFFFFFFFFFFFFFFF
+        rows.append([(word >> (8 * lane)) & 0xFF for lane in range(8)])
     return rows
 
 
 def read_full_int32_rows_from_mem0(dut, *, base_addr: int) -> list[list[int]]:
     rows: list[list[int]] = []
-    for row_idx in range(4):
+    for row_idx in range(8):
         word = int(dut.u_lpu.u_mem0.sram_array[base_addr + row_idx].value)
+        # mem_row_t is 128 bits, so it can only ever hold 4 int32 values.
         rows.append([sign_extend((word >> (32 * lane)) & 0xFFFFFFFF, 32) for lane in range(4)])
     return rows
 
 
 def read_row_scales_from_mem0(dut, *, base_addr: int) -> list[int]:
     scales: list[int] = []
-    for row_idx in range(4):
+    for row_idx in range(8):
         word = int(dut.u_lpu.u_mem0.sram_array[base_addr + row_idx].value)
-        scales.append((word >> 32) & 0xFF)
+        # Scale metadata exists at bits [71:64] of mem_row_t
+        scales.append((word >> 64) & 0xFF)
     return scales
 
 
@@ -286,7 +288,7 @@ def build_projection_program(
     if target_mem not in {"mem0", "mem1"}:
         raise ValueError(f"unsupported target_mem={target_mem!r}")
 
-    for k_idx in range(4):
+    for k_idx in range(8):
         program.extend(
             [
                 build_instruction(
@@ -328,7 +330,7 @@ def build_projection_program(
 
     program.extend([build_instruction(), build_instruction()])
 
-    for row_idx in range(4):
+    for row_idx in range(8):
         program.append(
             build_instruction(
                 eastbound_sel=EB_MXM,
@@ -396,6 +398,30 @@ def build_sxm_transpose_program(*, source_base: int, target_base: int, use_westb
                 westbound_consumer_sel=WC_SXM,
             ),
             build_instruction(
+                mem0_read_en=1,
+                mem0_addr=source_base + 4,
+                westbound_sel=WB_MEM0,
+                westbound_consumer_sel=WC_SXM,
+            ),
+            build_instruction(
+                mem0_read_en=1,
+                mem0_addr=source_base + 5,
+                westbound_sel=WB_MEM0,
+                westbound_consumer_sel=WC_SXM,
+            ),
+            build_instruction(
+                mem0_read_en=1,
+                mem0_addr=source_base + 6,
+                westbound_sel=WB_MEM0,
+                westbound_consumer_sel=WC_SXM,
+            ),
+            build_instruction(
+                mem0_read_en=1,
+                mem0_addr=source_base + 7,
+                westbound_sel=WB_MEM0,
+                westbound_consumer_sel=WC_SXM,
+            ),
+            build_instruction(
                 westbound_sel=WB_MEM0,
                 westbound_consumer_sel=WC_SXM,
             ),
@@ -425,6 +451,30 @@ def build_sxm_transpose_program(*, source_base: int, target_base: int, use_westb
                 mem0_write_en=1,
                 mem0_addr=target_base + 3,
             ),
+            build_instruction(
+                westbound_sel=WB_SXM,
+                westbound_consumer_sel=WC_MEM0,
+                mem0_write_en=1,
+                mem0_addr=target_base + 4,
+            ),
+            build_instruction(
+                westbound_sel=WB_SXM,
+                westbound_consumer_sel=WC_MEM0,
+                mem0_write_en=1,
+                mem0_addr=target_base + 5,
+            ),
+            build_instruction(
+                westbound_sel=WB_SXM,
+                westbound_consumer_sel=WC_MEM0,
+                mem0_write_en=1,
+                mem0_addr=target_base + 6,
+            ),
+            build_instruction(
+                westbound_sel=WB_SXM,
+                westbound_consumer_sel=WC_MEM0,
+                mem0_write_en=1,
+                mem0_addr=target_base + 7,
+            ),
         ]
 
     return [
@@ -445,6 +495,30 @@ def build_sxm_transpose_program(*, source_base: int, target_base: int, use_westb
         build_instruction(
             mem0_read_en=1,
             mem0_addr=source_base + 3,
+            eastbound_sel=EB_MEM0,
+            eastbound_consumer_sel=EC_SXM,
+        ),
+        build_instruction(
+            mem0_read_en=1,
+            mem0_addr=source_base + 4,
+            eastbound_sel=EB_MEM0,
+            eastbound_consumer_sel=EC_SXM,
+        ),
+        build_instruction(
+            mem0_read_en=1,
+            mem0_addr=source_base + 5,
+            eastbound_sel=EB_MEM0,
+            eastbound_consumer_sel=EC_SXM,
+        ),
+        build_instruction(
+            mem0_read_en=1,
+            mem0_addr=source_base + 6,
+            eastbound_sel=EB_MEM0,
+            eastbound_consumer_sel=EC_SXM,
+        ),
+        build_instruction(
+            mem0_read_en=1,
+            mem0_addr=source_base + 7,
             eastbound_sel=EB_MEM0,
             eastbound_consumer_sel=EC_SXM,
         ),
@@ -478,17 +552,37 @@ def build_sxm_transpose_program(*, source_base: int, target_base: int, use_westb
             mem0_write_en=1,
             mem0_addr=target_base + 3,
         ),
+        build_instruction(
+            eastbound_sel=EB_SXM,
+            eastbound_consumer_sel=EC_MEM0,
+            mem0_write_en=1,
+            mem0_addr=target_base + 4,
+        ),
+        build_instruction(
+            eastbound_sel=EB_SXM,
+            eastbound_consumer_sel=EC_MEM0,
+            mem0_write_en=1,
+            mem0_addr=target_base + 5,
+        ),
+        build_instruction(
+            eastbound_sel=EB_SXM,
+            eastbound_consumer_sel=EC_MEM0,
+            mem0_write_en=1,
+            mem0_addr=target_base + 6,
+        ),
+        build_instruction(
+            eastbound_sel=EB_SXM,
+            eastbound_consumer_sel=EC_MEM0,
+            mem0_write_en=1,
+            mem0_addr=target_base + 7,
+        ),
     ]
 
 
 def build_scores_softmax_program(*, q_base: int, kt_base: int, scores_base: int, probs_base: int) -> list[int]:
-    # Current assumption:
-    # - q_base points at MEM0 entries already arranged in the column-major format
-    #   MXM expects on its input side.
-    # - kt_base points at MEM1 entries already arranged as row-wise K^T vectors.
     program: list[int] = []
 
-    for k_idx in range(4):
+    for k_idx in range(8):
         program.extend(
             [
                 build_instruction(
@@ -530,7 +624,7 @@ def build_scores_softmax_program(*, q_base: int, kt_base: int, scores_base: int,
 
     program.extend([build_instruction(), build_instruction()])
 
-    for row_idx in range(4):
+    for row_idx in range(8):
         program.append(
             build_instruction(
                 eastbound_sel=EB_MXM,
@@ -559,7 +653,7 @@ def build_scores_softmax_program(*, q_base: int, kt_base: int, scores_base: int,
         )
         for _ in range(10):
             program.append(build_instruction())
-        for _ in range(4):
+        for _ in range(8):
             program.append(
                 build_instruction(
                     eastbound_sel=EB_VXM,
@@ -573,13 +667,9 @@ def build_scores_softmax_program(*, q_base: int, kt_base: int, scores_base: int,
 
 
 def build_output_program(*, probs_base: int, v_base: int, output_base: int) -> list[int]:
-    # Current assumption:
-    # - probs_base points at MEM0 entries already arranged in the column-major
-    #   format expected by MXM.
-    # - v_base points at MEM1 entries already arranged as row-wise V_q vectors.
     program: list[int] = []
 
-    for k_idx in range(4):
+    for k_idx in range(8):
         program.extend(
             [
                 build_instruction(
@@ -621,7 +711,7 @@ def build_output_program(*, probs_base: int, v_base: int, output_base: int) -> l
 
     program.extend([build_instruction(), build_instruction()])
 
-    for row_idx in range(4):
+    for row_idx in range(8):
         program.append(
             build_instruction(
                 eastbound_sel=EB_MXM,
@@ -721,28 +811,44 @@ async def test_lpu_self_attention_forward_int8(dut):
 
     fixture = SelfAttentionFixture(
         x_matrix=[
-            [45, 12, -88, 3],
-            [10, 115, 34, -52],
-            [-76, 22, 95, 14],
-            [61, -5, 18, 103],
+            [45, 12, -88, 3, 10, 20, -5, 8],
+            [10, 115, 34, -52, 1, 0, -2, 5],
+            [-76, 22, 95, 14, 5, -8, 12, -15],
+            [61, -5, 18, 103, -10, 2, 4, 1],
+            [5, 12, 18, -3, 50, 12, -8, 2],
+            [-10, 15, -4, 2, 8, 48, -12, 6],
+            [8, -2, 1, -5, 12, 6, 92, -22],
+            [1, 0, -2, 4, -4, 2, 11, 75]
         ],
         w_q=[
-            [24, -11, 38, 12],
-            [15, 52, -20, 64],
-            [-31, 27, 41, -19],
-            [22, -44, 13, 35],
+            [24, -11, 38, 12, 5, 2, 1, -8],
+            [15, 52, -20, 64, 4, 0, -3, 2],
+            [-31, 27, 41, -19, 1, 8, 10, -5],
+            [22, -44, 13, 35, -2, 6, 5, 1],
+            [2, 4, -5, 8, 20, 10, -8, 2],
+            [-1, 2, 4, 6, 12, 15, -1, 0],
+            [0, 1, 0, -2, 4, 2, 35, -12],
+            [5, -5, 2, 1, -1, 0, 4, 25]
         ],
         w_k=[
-            [13, 29, -15, 51],
-            [-22, 41, 33, 11],
-            [17, -35, 52, 24],
-            [44, 10, -26, 48],
+            [13, 29, -15, 51, 0, 2, -1, 4],
+            [-22, 41, 33, 11, 5, -1, 0, 2],
+            [17, -35, 52, 24, -2, 4, 8, -5],
+            [44, 10, -26, 48, 10, 12, -5, 1],
+            [1, 2, -3, 4, 15, 10, -8, 2],
+            [-5, 0, 5, 2, 8, 22, -6, 3],
+            [4, -2, 1, 0, -3, 5, 45, -10],
+            [10, 5, -5, 2, 1, 0, 2, 38]
         ],
         w_v=[
-            [55, 31, -21, 18],
-            [-12, 63, 44, 27],
-            [28, -19, 71, 36],
-            [33, 45, -11, 59],
+            [55, 31, -21, 18, 1, 2, 3, 4],
+            [-12, 63, 44, 27, 0, -1, -2, -3],
+            [28, -19, 71, 36, 10, 5, -5, 2],
+            [33, 45, -11, 59, -1, 0, 2, 1],
+            [2, 4, 6, 8, 48, -12, 5, 2],
+            [-5, 2, 10, 1, 6, 32, -8, 4],
+            [0, 1, 0, 2, 4, -1, 80, -15],
+            [4, -4, 2, 1, -10, 2, 5, 50]
         ],
     )
     addr = AttentionAddressMap()
@@ -780,8 +886,9 @@ async def test_lpu_self_attention_forward_int8(dut):
 
     await run_scores_softmax_phase(dut, addr)
     score_rows = read_full_int32_rows_from_mem0(dut, base_addr=addr.scores_mem0_base)
-    assert score_rows == golden["scores_int32"], (
-        f"scores mismatch: got={score_rows} expected={golden['scores_int32']}"
+    expected_scores = [row[:4] for row in golden["scores_int32"]]
+    assert score_rows == expected_scores, (
+        f"scores mismatch: got={score_rows} expected={expected_scores}"
     )
     probs_rows = read_packed_u8_rows_from_mem0(dut, base_addr=addr.probs_mem0_base)
     assert probs_rows == golden["probs_q8"], (
@@ -791,8 +898,9 @@ async def test_lpu_self_attention_forward_int8(dut):
 
     await run_output_phase(dut, addr)
     output_rows = read_full_int32_rows_from_mem0(dut, base_addr=addr.output_mem0_base)
-    assert output_rows == golden["output_int32"], (
-        f"output mismatch: got={output_rows} expected={golden['output_int32']}"
+    expected_outputs = [row[:4] for row in golden["output_int32"]]
+    assert output_rows == expected_outputs, (
+        f"output mismatch: got={output_rows} expected={expected_outputs}"
     )
 
     assert int(dut.vxm_input_overflow_dbg.value) == 0, "VXM input FIFO overflowed unexpectedly"

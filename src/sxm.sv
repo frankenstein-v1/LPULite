@@ -6,7 +6,9 @@
 // Transpose-only block. It captures one square tile from either bus and emits
 // the transposed tile to both bus directions.
 
-module sxm (
+module sxm #(
+    parameter int LANES = $bits(superlane_t) / $bits(fp8_t)
+) (
     input  logic clk,
     input  logic rst_n,
     input  logic [11:0] opcode_input,
@@ -21,7 +23,6 @@ module sxm (
 
     localparam logic [11:0] OP_TRANSPOSE_LOAD = 12'h5A5;
     localparam logic [11:0] OP_TRANSPOSE_EMIT = 12'hA5A;
-    localparam int LANES = $bits(superlane_t) / $bits(fp8_t);
     localparam int IDX_W = (LANES <= 1) ? 1 : $clog2(LANES);
     localparam logic [IDX_W-1:0] IDX_ONE = {{(IDX_W-1){1'b0}}, 1'b1};
     localparam logic [IDX_W-1:0] LAST_LOAD_IDX = LANES - 2;

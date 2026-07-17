@@ -9,6 +9,7 @@ def test_vxm():
     build_dir = (tb_dir / f"sim_build_vxm_{sim}").resolve()
 
     sources = [
+        src_dir / "lpu_pkg.sv",
         src_dir / "lut_rmsnorm.sv",
         src_dir / "cvfpu_fp32_addsub.sv",
         src_dir / "cvfpu_fp32_div.sv",
