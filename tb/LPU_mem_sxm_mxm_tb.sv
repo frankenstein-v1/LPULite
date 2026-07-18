@@ -66,7 +66,17 @@ module lpu_mem_sxm_mxm_cocotb_top (
 
     lpu u_lpu (
         .clk(clk),
-        .rst_n(rst_n)
+        .rst_n(rst_n),
+        .run_en(1'b1),
+        .pc_load_en(1'b0),
+        .pc_load_value(32'd0),
+        .ext_en(1'b0),
+        .ext_write(1'b0),
+        .ext_target(2'd0),
+        .ext_addr(32'd0),
+        .ext_wdata(96'd0),
+        .ext_rdata(),
+        .cycle_counter()
     );
 
     assign pc_dbg                    = u_lpu.u_icu.pc;

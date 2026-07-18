@@ -22,6 +22,7 @@ def test_lpu():
         src_dir / "cvfpu_fp32_sqrt.sv",
         src_dir / "acc.sv",
         src_dir / "mem.sv",
+        src_dir / "mem_row_dequant.sv",
         src_dir / "mxm.sv",
         src_dir / "sxm.sv",
         src_dir / "row_fifo.sv",
@@ -47,13 +48,21 @@ def test_lpu():
     
     runner = get_runner("icarus")
     
+    build_args = ["-g2012"]
+    rmsnorm_chunks = os.getenv("LPU_RMSNORM_CHUNKS")
+    if rmsnorm_chunks:
+        build_args.append(f"-Plpu_cocotb_top.RMSNORM_CHUNKS={int(rmsnorm_chunks)}")
+    softmax_chunks = os.getenv("LPU_SOFTMAX_CHUNKS")
+    if softmax_chunks:
+        build_args.append(f"-Plpu_cocotb_top.SOFTMAX_CHUNKS={int(softmax_chunks)}")
+
     runner.build(
         sources=sources,
         includes=[src_dir],
         hdl_toplevel="lpu_cocotb_top",
         always=True,
         waves=True,
-        build_args=["-g2012"],
+        build_args=build_args,
         verbose=True,
     )
     

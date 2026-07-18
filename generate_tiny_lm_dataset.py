@@ -5,6 +5,7 @@ import argparse
 
 parser = argparse.ArgumentParser(description="Tiny LPU LM Dataset Generator")
 parser.add_argument("--vocab-size", type=int, default=256, help="Target vocabulary size (default: 256)")
+parser.add_argument("--out-dir", type=Path, default=Path("output"), help="Output directory for dataset and vocab")
 args = parser.parse_args()
 
 TARGET_VOCAB_SIZE = args.vocab_size
@@ -26,7 +27,7 @@ TARGET_VOCAB_SIZE = args.vocab_size
 SEED = 42
 random.seed(SEED)
 
-OUT_DIR = Path("output")
+OUT_DIR = args.out_dir
 OUT_DIR.mkdir(exist_ok=True)
 
 # ============================================================

@@ -52,10 +52,19 @@ model = None
 
 def encode_line(line, seq_len=None):
     """Converts a sentence into token IDs and pads to seq_len."""
-    global tokenizer, PAD_ID
+    global tokenizer, vocab, PAD_ID, UNK_ID
     if seq_len is None:
         seq_len = SEQ_LEN
-    ids = tokenizer.encode(line, bos=True, eos=False)
+    uses_byte_vocab = any(token.startswith("<0x") and token.endswith(">") for token in vocab)
+    if uses_byte_vocab:
+        ids = tokenizer.encode(line, bos=True, eos=False)
+    else:
+        bos_entry = vocab.get("<bos>", {"id": 2})
+        bos_id = bos_entry["id"] if isinstance(bos_entry, dict) else bos_entry
+        ids = [bos_id]
+        for token in line.lower().split():
+            entry = vocab.get(token)
+            ids.append(entry["id"] if isinstance(entry, dict) else (entry if entry is not None else UNK_ID))
 
     if len(ids) > seq_len:
         ids = ids[:seq_len]
@@ -63,6 +72,25 @@ def encode_line(line, seq_len=None):
     while len(ids) < seq_len:
         ids.append(PAD_ID)
 
+    return ids
+
+
+def encode_prompt_text(prompt, bos=True, eos=False):
+    global tokenizer, vocab, UNK_ID
+    uses_byte_vocab = any(token.startswith("<0x") and token.endswith(">") for token in vocab)
+    if uses_byte_vocab:
+        return tokenizer.encode(prompt, bos=bos, eos=eos)
+
+    ids = []
+    if bos:
+        bos_entry = vocab.get("<bos>", {"id": 2})
+        ids.append(bos_entry["id"] if isinstance(bos_entry, dict) else bos_entry)
+    for token in prompt.lower().split():
+        entry = vocab.get(token)
+        ids.append(entry["id"] if isinstance(entry, dict) else (entry if entry is not None else UNK_ID))
+    if eos:
+        eos_entry = vocab.get("<eos>", {"id": 3})
+        ids.append(eos_entry["id"] if isinstance(eos_entry, dict) else eos_entry)
     return ids
 
 
@@ -378,7 +406,7 @@ def generate(prompt, max_new_tokens=5):
     global model, tokenizer, SEQ_LEN, PAD_ID, DEVICE
     model.eval()
 
-    ids = tokenizer.encode(prompt, bos=True, eos=False)
+    ids = encode_prompt_text(prompt, bos=True, eos=False)
 
     for _ in range(max_new_tokens):
         context = ids[-(SEQ_LEN - 1):]
@@ -394,7 +422,7 @@ def generate(prompt, max_new_tokens=5):
         next_id = int(torch.argmax(next_logits).item())
         ids.append(next_id)
         next_token = tokenizer.id_to_token.get(next_id, "")
-        if next_token == "." or next_id == 2 or next_token == "\n</s>\n":
+        if next_token in ("<eos>", "\n</s>\n") or next_id in (2, 3):
             break
 
     if len(ids) > 0 and ids[0] == 1:
@@ -403,7 +431,7 @@ def generate(prompt, max_new_tokens=5):
 
 
 def tensor_to_list(t):
-    return t.detach().cpu().numpy().tolist()
+    return t.detach().cpu().tolist()
 
 
 # ============================================================
@@ -416,7 +444,7 @@ if __name__ == "__main__":
 
     import argparse
     parser = argparse.ArgumentParser(description="Train Tiny LPU LM")
-    parser.add_argument("--preset", type=str, default="tiny", choices=["tiny", "stories260k"], help="Preset configuration")
+    parser.add_argument("--preset", type=str, default="tiny", choices=["tiny", "stories10k", "stories260k"], help="Preset configuration")
     parser.add_argument("--dim", type=int, default=None)
     parser.add_argument("--ffn-dim", type=int, default=None)
     parser.add_argument("--layers", type=int, default=None)
@@ -428,6 +456,9 @@ if __name__ == "__main__":
     parser.add_argument("--batch-size", type=int, default=None)
     parser.add_argument("--lr", type=float, default=None)
     parser.add_argument("--patience", type=int, default=None)
+    parser.add_argument("--data-dir", type=Path, default=None)
+    parser.add_argument("--model-path", type=Path, default=None)
+    parser.add_argument("--export-path", type=Path, default=None)
     args = parser.parse_args()
 
     # Apply preset defaults
@@ -443,6 +474,20 @@ if __name__ == "__main__":
             "epochs": 80,
             "batch_size": 32,
             "lr": 1e-3,
+            "patience": 10,
+        }
+    elif args.preset == "stories10k":
+        preset_config = {
+            "dim": 32,
+            "ffn_dim": 48,
+            "layers": 1,
+            "heads": 4,
+            "kv_heads": 2,
+            "seq_len": 64,
+            "vocab_size": 128,
+            "epochs": 40,
+            "batch_size": 64,
+            "lr": 2e-3,
             "patience": 10,
         }
     else:  # tiny
@@ -472,12 +517,32 @@ if __name__ == "__main__":
     BATCH_SIZE = args.batch_size if args.batch_size is not None else preset_config["batch_size"]
     LR = args.lr if args.lr is not None else preset_config["lr"]
     PATIENCE = args.patience if args.patience is not None else preset_config["patience"]
+    if args.preset == "stories10k":
+        default_data_dir = Path("model") / "stories10k"
+        default_model_path = Path("model") / "stories10k" / "stories10k_model.pt"
+        default_export_path = Path("model") / "stories10k" / "stories10k_weights_export.json"
+    else:
+        default_data_dir = DATA_DIR
+        default_model_path = MODEL_PATH
+        default_export_path = EXPORT_PATH
+
+    data_dir = args.data_dir if args.data_dir is not None else default_data_dir
+    model_path = args.model_path if args.model_path is not None else default_model_path
+    export_path = args.export_path if args.export_path is not None else default_export_path
+    train_path = data_dir / "dataset_train.txt"
+    val_path = data_dir / "dataset_val.txt"
+    vocab_path = data_dir / "vocab.json"
+    model_path.parent.mkdir(parents=True, exist_ok=True)
+    export_path.parent.mkdir(parents=True, exist_ok=True)
 
     print(f"Using device: {DEVICE}")
     print(f"Configuration: dim={DIM}, ffn_dim={FFN_DIM}, layers={LAYERS}, heads={HEADS}, kv_heads={KV_HEADS}, seq_len={SEQ_LEN}, vocab_size={VOCAB_SIZE}")
+    print(f"Data directory: {data_dir}")
+    print(f"Model path:     {model_path}")
+    print(f"Export path:    {export_path}")
 
     # Load vocab and initialize Tokenizer
-    tokenizer = Tokenizer(VOCAB_PATH)
+    tokenizer = Tokenizer(vocab_path)
     vocab = tokenizer.vocab
     id_to_token = tokenizer.id_to_token
 
@@ -486,8 +551,8 @@ if __name__ == "__main__":
     UNK_ID = vocab.get("<unk>", {}).get("id", 0)
 
     # Load dataset
-    train_data = load_dataset(TRAIN_PATH)
-    val_data = load_dataset(VAL_PATH)
+    train_data = load_dataset(train_path)
+    val_data = load_dataset(val_path)
 
     print(f"Train examples: {len(train_data)}")
     print(f"Val examples:   {len(val_data)}")
@@ -558,7 +623,7 @@ if __name__ == "__main__":
                         "ffn_dim": FFN_DIM,
                     },
                 },
-                MODEL_PATH,
+                model_path,
             )
             print("  saved best model")
         else:
@@ -570,28 +635,28 @@ if __name__ == "__main__":
             break
 
     # Load best model
-    checkpoint = torch.load(MODEL_PATH, map_location=DEVICE)
+    checkpoint = torch.load(model_path, map_location=DEVICE)
     model.load_state_dict(checkpoint["model_state_dict"])
     model.eval()
 
     print()
     print(f"Best validation loss: {best_val_loss:.4f}")
-    print(f"Best model saved to: {MODEL_PATH}")
+    print(f"Best model saved to: {model_path}")
 
     # Generation tests
     print()
     print("Generation tests:")
     print()
     prompts = [
-        "lebron is",
-        "messi is",
-        "ronaldo is",
-        "ranvijay is",
-        "satvik is",
-        "cat wears",
-        "lily likes",
-        "sky is",
-        "dog sees",
+        "one day , lily",
+        "tom has a",
+        "mia finds a",
+        "max sees the",
+        "lily and tom",
+        "once upon a time",
+        "anna sees mia",
+        "the dog is",
+        "sam went to the",
     ]
     for prompt in prompts:
         print(f"{prompt!r} -> {generate(prompt)}")
@@ -614,8 +679,8 @@ if __name__ == "__main__":
     for name, tensor in state.items():
         export["weights"][name] = tensor_to_list(tensor)
 
-    with open(EXPORT_PATH, "w", encoding="utf-8") as f:
+    with open(export_path, "w", encoding="utf-8") as f:
         json.dump(export, f)
 
     print()
-    print(f"Exported weights to: {EXPORT_PATH}")
+    print(f"Exported weights to: {export_path}")
