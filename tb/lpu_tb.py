@@ -24,6 +24,7 @@ VXM_OPERAND_GAMMA = 2
 VXM_OPERAND_BETA = 3
 VXM_OPERAND_ROPE_COS = 4
 VXM_OPERAND_ROPE_SIN = 5
+VXM_OPERAND_SCALE = 6
 
 VXM_RES_PASS = 0
 VXM_RES_CLEAR = 1
@@ -317,6 +318,7 @@ def build_instruction(
     vxm_layernorm_en=0,
     vxm_rope_en=0,
     vxm_residual_op=VXM_RES_PASS,
+    vxm_softmax_chunked_en=0,
     vxm_operand_sel=VXM_OPERAND_DATA,
 ):
     word = 0
@@ -367,6 +369,7 @@ def build_instruction(
     word = _set_field(word, vxm_layernorm_en, 74, 1)
     word = _set_field(word, vxm_rope_en, 75, 1)
     word = _set_field(word, vxm_residual_op, 76, 3)
+    word = _set_field(word, vxm_softmax_chunked_en, 79, 1)
 
     return word
 

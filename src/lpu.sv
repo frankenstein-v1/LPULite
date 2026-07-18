@@ -45,6 +45,7 @@ logic [1:0] mem_store_fmt;
 logic vxm_rmsnorm_en;
 logic vxm_rope_en;
 logic [2:0] vxm_residual_op;
+logic vxm_softmax_chunked_en;
 
 localparam logic [2:0] VXM_OPERAND_DATA     = 3'd0;
 localparam logic [2:0] VXM_OPERAND_BIAS     = 3'd1;
@@ -52,6 +53,8 @@ localparam logic [2:0] VXM_OPERAND_GAMMA    = 3'd2;
 localparam logic [2:0] VXM_OPERAND_BETA     = 3'd3;
 localparam logic [2:0] VXM_OPERAND_ROPE_COS = 3'd4;
 localparam logic [2:0] VXM_OPERAND_ROPE_SIN = 3'd5;
+localparam logic [2:0] VXM_OPERAND_SCALE    = 3'd6;
+localparam logic [2:0] VXM_RES_EMIT         = 3'd4;
 
 // Encoded bus select views. Keep these as plain vectors for Icarus compatibility.
 logic [2:0] westbound_consumer_sel_t;
@@ -84,6 +87,21 @@ logic vxm_west_en;
 
 superlane_t sxm_stream_out_to_mxm_left;
 superlane_t sxm_stream_out_to_mxm_top;
+
+packed_fp8_row_t vxm_stream_out_live;
+logic [31:0] vxm_stream_out_scale_live;
+logic        vxm_out_valid_live;
+packed_fp8_row_t vxm_stream_out_buf;
+logic [31:0] vxm_stream_out_scale_buf;
+logic        vxm_stream_out_buf_valid_w;
+logic        vxm_stream_out_buf_valid_e;
+logic        vxm_out_ready;
+logic        vxm_result_wr_en;
+logic        vxm_result_rd_en;
+logic        vxm_result_full;
+logic        vxm_result_empty;
+logic        vxm_result_take_west;
+logic        vxm_result_take_east;
 
 // mxm datapath
 logic signed [MXM_SIZE-1:0][7:0]  mxm_input_in;
@@ -124,7 +142,8 @@ icu u_icu(
     .mem_store_fmt(mem_store_fmt),
     .vxm_rmsnorm_en(vxm_rmsnorm_en),
     .vxm_rope_en(vxm_rope_en),
-    .vxm_residual_op(vxm_residual_op)
+    .vxm_residual_op(vxm_residual_op),
+    .vxm_softmax_chunked_en(vxm_softmax_chunked_en)
 );
 
 //mux logic for mem0 input
@@ -143,8 +162,12 @@ assign mem0_write_en_eff = mem0_write_from_west || mem0_write_from_east;
 always_comb begin
     mem0_stream_in = '0;
 
-    if (mem0_write_from_west)
-        mem0_stream_in = mem_row_t'(make_fp8_row_mem(westbound_payload, '0));
+    if (mem0_write_from_west) begin
+        if (westbound_sel_t == WB_VXM)
+            mem0_stream_in = mem_row_t'(make_fp8_row_mem(westbound_payload, vxm_stream_out_scale_buf));
+        else
+            mem0_stream_in = mem_row_t'(make_fp8_row_mem(westbound_payload, '0));
+    end
     else if (mem0_write_from_east)
         mem0_stream_in = eastbound_to_mem_row(eastbound_payload);
 end
@@ -195,20 +218,6 @@ always_ff @(posedge clk or negedge rst_n) begin
     end
 end
 
-packed_fp8_row_t vxm_stream_out_live;
-logic [31:0] vxm_stream_out_scale_live;
-logic        vxm_out_valid_live;
-packed_fp8_row_t vxm_stream_out_buf;
-logic [31:0] vxm_stream_out_scale_buf;
-logic        vxm_stream_out_buf_valid_w;
-logic        vxm_stream_out_buf_valid_e;
-logic        vxm_out_ready;
-logic        vxm_result_wr_en;
-logic        vxm_result_rd_en;
-logic        vxm_result_full;
-logic        vxm_result_empty;
-logic        vxm_result_take_west;
-logic        vxm_result_take_east;
 logic        sxm_emit_valid;
 logic        sxm_load_from_west;
 
@@ -364,6 +373,7 @@ mxm #(
 mxm_row_t vxm_stream_in_data;
 mxm_row_t vxm_stream_in_bias;
 mxm_row_t vxm_bias_reg;
+logic [31:0] vxm_scale_factor_reg;
 mxm_row_t vxm_rmsnorm_gamma_reg;
 mxm_row_t vxm_rmsnorm_beta_reg;
 superlane_t vxm_rope_cos_fp8_reg;
@@ -376,6 +386,7 @@ logic     vxm_fifo_full;
 logic     vxm_fifo_empty;
 mxm_row_t vxm_fifo_data_out;
 logic     vxm_input_overflow;
+logic     vxm_residual_emit_cmd;
 logic     vxm_load_operand;
 logic     vxm_load_operand_east;
 logic     vxm_load_operand_west;
@@ -396,10 +407,11 @@ end
 // For now VXM consumes full-width rows from the eastbound bus only.
 // ICU still controls whether that traffic appears on eastbound via the bus selectors.
 assign vxm_fifo_wr_en = vxm_load_operand_east && (vxm_operand_sel == VXM_OPERAND_DATA);
-assign vxm_fifo_rd_en = !vxm_fifo_empty && vxm_in_ready;
-assign vxm_stream_in_data = vxm_fifo_data_out;
+assign vxm_residual_emit_cmd = (vxm_residual_op == VXM_RES_EMIT);
+assign vxm_fifo_rd_en = !vxm_fifo_empty && vxm_in_ready && !vxm_residual_emit_cmd;
+assign vxm_stream_in_data = vxm_residual_emit_cmd ? '0 : vxm_fifo_data_out;
 assign vxm_stream_in_bias = vxm_bias_reg;
-assign vxm_in_valid = !vxm_fifo_empty;
+assign vxm_in_valid = !vxm_fifo_empty || vxm_residual_emit_cmd;
 
 assign vxm_result_take_west = !vxm_result_empty && (westbound_sel_t == WB_VXM);
 assign vxm_result_take_east = !vxm_result_empty &&
@@ -429,6 +441,7 @@ always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
         vxm_input_overflow <= 1'b0;
         vxm_bias_reg <= '0;
+        vxm_scale_factor_reg <= 32'h3f80_0000;
         vxm_rmsnorm_gamma_reg <= {MXM_SIZE{32'h3f800000}};
         vxm_rmsnorm_beta_reg <= '0;
         vxm_rope_cos_fp8_reg <= {MXM_SIZE{8'h3c}};
@@ -448,6 +461,9 @@ always_ff @(posedge clk or negedge rst_n) begin
                 end
                 VXM_OPERAND_BETA: begin
                     vxm_rmsnorm_beta_reg <= vxm_operand_payload;
+                end
+                VXM_OPERAND_SCALE: begin
+                    vxm_scale_factor_reg <= vxm_operand_payload[31:0];
                 end
                 VXM_OPERAND_ROPE_COS: begin
                     vxm_rope_cos_fp8_reg <= vxm_operand_payload[$bits(superlane_t)-1:0];
@@ -507,6 +523,8 @@ vxm #(
     .rope_cos_fp8(vxm_rope_cos_fp8_reg),
     .rope_sin_fp8(vxm_rope_sin_fp8_reg),
     .residual_op(vxm_residual_op),
+    .softmax_chunked_en(vxm_softmax_chunked_en),
+    .scale_factor(vxm_scale_factor_reg),
     .rmsnorm_bypass(~vxm_rmsnorm_en),
     .rmsnorm_gamma(vxm_rmsnorm_gamma_reg),
     .rmsnorm_beta(vxm_rmsnorm_beta_reg),

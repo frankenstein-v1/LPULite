@@ -20,6 +20,7 @@ def test_vxm():
         src_dir / "residual_add.sv",
         src_dir / "vxm.sv",
         src_dir / "softmax.sv",
+        src_dir / "softmax_chunked.sv",
         src_dir / "quant.sv",
         src_dir / "lut_softmax_exp.sv",
         src_dir / "lut_softmax_div.sv"

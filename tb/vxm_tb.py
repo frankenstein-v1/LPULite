@@ -348,6 +348,10 @@ async def reset_dut(dut):
         dut.rope_sin_fp8.value = 0
     if hasattr(dut, "residual_op"):
         dut.residual_op.value = 0
+    if hasattr(dut, "softmax_chunked_en"):
+        dut.softmax_chunked_en.value = 0
+    if hasattr(dut, "scale_factor"):
+        dut.scale_factor.value = float_to_bits(1.0)
     dut.out_ready.value = 1
     if hasattr(dut, "layernorm_bypass"):
         dut.layernorm_bypass.value = 1

@@ -14,6 +14,7 @@ VERILOG_SOURCES = $(REPO_ROOT)/src/cvfpu_fp8_to_fp32_cast.sv \
                   $(REPO_ROOT)/src/vxm.sv \
                   $(REPO_ROOT)/src/row_fifo.sv \
                   $(REPO_ROOT)/src/softmax.sv \
+                  $(REPO_ROOT)/src/softmax_chunked.sv \
                   $(REPO_ROOT)/src/quant.sv \
                   $(REPO_ROOT)/src/exp.sv \
                   $(REPO_ROOT)/src/divider.sv
