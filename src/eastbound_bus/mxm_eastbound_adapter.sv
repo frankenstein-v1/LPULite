@@ -23,8 +23,10 @@ module mxm_eastbound_adapter #(
     logic signed [PAYLOAD_W-1:0] mxm_out_unpacked [MXM_SIZE-1:0][MXM_SIZE-1:0];
 
     generate
-        for (genvar row = 0; row < MXM_SIZE; row++) begin : g_row
-            for (genvar col = 0; col < MXM_SIZE; col++) begin : g_col
+        genvar row;
+        genvar col;
+        for (row = 0; row < MXM_SIZE; row++) begin : g_row
+            for (col = 0; col < MXM_SIZE; col++) begin : g_col
                 assign mxm_out_unpacked[row][col] = mxm_out[row][col];
             end
         end

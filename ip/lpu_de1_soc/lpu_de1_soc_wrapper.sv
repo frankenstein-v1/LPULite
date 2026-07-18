@@ -1,11 +1,11 @@
 `timescale 1ns/1ps
-`include "lpu_pkg.sv"
 
 module lpu_de1_soc_wrapper (
     input logic clk, input logic rst_n,
     input logic [15:0] avs_address, input logic avs_read, input logic avs_write,
     input logic [31:0] avs_writedata,
-    output logic [31:0] avs_readdata, output logic avs_waitrequest
+    output logic [31:0] avs_readdata, output logic avs_waitrequest,
+    output logic avs_readdatavalid
 );
     logic run_enable;
     logic [95:0] imem_assembly;
@@ -27,6 +27,7 @@ module lpu_de1_soc_wrapper (
     integer lane_index;
 
     assign avs_waitrequest = 1'b0;
+    assign avs_readdatavalid = avs_read;
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             run_enable <= 1'b0; imem_assembly <= '0; mem0_assembly <= '0; mem1_assembly <= '0;

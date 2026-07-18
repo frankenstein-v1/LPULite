@@ -118,7 +118,10 @@ module rmsnorm #(
     assign launch_mul_gamma = (state_q == ST_MUL_GAMMA);
 
     generate
-        for (genvar i = 0; i < LANES; i++) begin : g_rms_lanes
+        genvar i;
+        genvar j;
+        genvar m;
+        for (i = 0; i < LANES; i++) begin : g_rms_lanes
             logic [31:0] x_lane;
             logic [31:0] gamma_lane;
             logic [31:0] square_lane;
@@ -168,7 +171,7 @@ module rmsnorm #(
             );
         end
 
-        for (genvar j = 0; j < 4; j++) begin : g_sum1
+        for (j = 0; j < 4; j++) begin : g_sum1
             cvfpu_fp32_addsub u_sum1 (
                 .clk_i    (clk),
                 .rst_ni   (rst_n),
@@ -182,7 +185,7 @@ module rmsnorm #(
             );
         end
 
-        for (genvar m = 0; m < 2; m++) begin : g_sum2
+        for (m = 0; m < 2; m++) begin : g_sum2
             cvfpu_fp32_addsub u_sum2 (
                 .clk_i    (clk),
                 .rst_ni   (rst_n),
