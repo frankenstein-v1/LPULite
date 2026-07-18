@@ -1,0 +1,23 @@
+package require qsys
+create_system platform_designer_system
+set_project_property DEVICE_FAMILY "Cyclone V"
+set_project_property DEVICE 5CSEMA5F31C6N
+add_instance clk_0 clock_source
+set_instance_parameter_value clk_0 clockFrequency {50000000.0}
+add_instance reset_bridge_0 altera_reset_bridge
+set_instance_parameter_value reset_bridge_0 ACTIVE_LOW_RESET {1}
+set_instance_parameter_value reset_bridge_0 SYNCHRONOUS_EDGES {none}
+add_instance jtag_master altera_jtag_avalon_master
+add_instance lpu_de1_soc_0 lpu_de1_soc
+add_connection clk_0.clk reset_bridge_0.clk
+add_connection clk_0.clk jtag_master.clk
+add_connection clk_0.clk lpu_de1_soc_0.clk
+add_connection reset_bridge_0.out_reset jtag_master.reset
+add_connection reset_bridge_0.out_reset lpu_de1_soc_0.rst_n
+add_connection jtag_master.master lpu_de1_soc_0.avs
+set_connection_parameter_value jtag_master.master/lpu_de1_soc_0.avs baseAddress {0x00000000}
+add_interface clk clock sink
+set_interface_property clk EXPORT_OF clk_0.clk
+add_interface reset reset sink
+set_interface_property reset EXPORT_OF reset_bridge_0.in_reset
+save_system platform_designer_system.qsys
