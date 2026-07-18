@@ -24,18 +24,13 @@ module rmsnorm #(
     localparam logic [31:0] FP32_ONE  = 32'h3f80_0000;
     localparam logic [31:0] FP32_EPS  = 32'h3727_c5ac; // 1.0e-5
 
-    function automatic logic [31:0] element_count_as_fp32();
-        begin
-            unique case (LANES * CHUNKS)
-                8:       element_count_as_fp32 = 32'h4100_0000;
-                16:      element_count_as_fp32 = 32'h4180_0000;
-                32:      element_count_as_fp32 = 32'h4200_0000;
-                64:      element_count_as_fp32 = 32'h4280_0000;
-                128:     element_count_as_fp32 = 32'h4300_0000;
-                default: element_count_as_fp32 = 32'h4280_0000;
-            endcase
-        end
-    endfunction
+    localparam logic [31:0] ELEMENT_COUNT_FP32 = 
+        (LANES * CHUNKS == 8)   ? 32'h4100_0000 :
+        (LANES * CHUNKS == 16)  ? 32'h4180_0000 :
+        (LANES * CHUNKS == 32)  ? 32'h4200_0000 :
+        (LANES * CHUNKS == 64)  ? 32'h4280_0000 :
+        (LANES * CHUNKS == 128) ? 32'h4300_0000 :
+                                  32'h4280_0000;
 
     typedef enum logic [4:0] {
         ST_CAPTURE,
@@ -231,7 +226,7 @@ module rmsnorm #(
         .rst_ni     (rst_n),
         .start_i    (launch_div),
         .dividend_i (sum_sq_acc),
-        .divisor_i  (element_count_as_fp32()),
+        .divisor_i  (ELEMENT_COUNT_FP32),
         .result_o   (mean_square),
         .done_o     (div_done),
         .busy_o     (/* unused */)

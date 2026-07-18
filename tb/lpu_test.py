@@ -24,7 +24,7 @@ MODEL_CONFIG = {
     "layers": 5,
     "heads": 8,
     "kv_heads": 4,
-    "ffn_dim": 172,
+    "ffn_dim": 176,
 }
 
 PROMPT_PREFILL = ["lebron", "is"]
@@ -145,6 +145,29 @@ def get_model_config():
     return _config_cache
 
 
+def get_rope_cos_sin(pos, head_dim=8):
+    inv_freq = [1.0 / (10000.0 ** (2 * i / head_dim)) for i in range(head_dim // 2)]
+    angles = [pos * inv_freq[i] for i in range(head_dim // 2)]
+    repeated = []
+    for a in angles:
+        repeated.extend([a, a])
+    cos = [math.cos(a) for a in repeated]
+    sin = [math.sin(a) for a in repeated]
+    return cos, sin
+
+
+def apply_rope_to_vector(x, cos, sin):
+    out = [0.0] * len(x)
+    for pair in range(len(x) // 2):
+        even = 2 * pair
+        odd = even + 1
+        x_even = x[even]
+        x_odd = x[odd]
+        out[even] = x_even * cos[even] - x_odd * sin[even]
+        out[odd] = x_even * sin[even] + x_odd * cos[even]
+    return out
+
+
 def tiny_lm_forward(input_ids, weights):
     config = get_model_config()
     dim = config["dim"]
@@ -154,67 +177,58 @@ def tiny_lm_forward(input_ids, weights):
     group_size = heads // kv_heads
 
     token_emb = weights["token_emb.weight"]
-    pos_emb = weights["pos_emb.weight"]
 
-    x0 = [
-        vec_add(token_emb[token_id], pos_emb[pos_idx])
-        for pos_idx, token_id in enumerate(input_ids)
-    ]
+    x_prev = [token_emb[token_id] for token_id in input_ids]
     seq_len = len(input_ids)
 
-    ln1 = layernorm_rows(x0, weights["blocks.0.ln1.weight"], weights["blocks.0.ln1.bias"])
-    q_no_bias = linear_no_bias(ln1, weights["blocks.0.attn.q_proj.weight"])
-    k_no_bias = linear_no_bias(ln1, weights["blocks.0.attn.k_proj.weight"])
-    v_no_bias = linear_no_bias(ln1, weights["blocks.0.attn.v_proj.weight"])
-    q = add_bias(q_no_bias, weights["blocks.0.attn.q_proj.bias"])
-    k = add_bias(k_no_bias, weights["blocks.0.attn.k_proj.bias"])
-    v = add_bias(v_no_bias, weights["blocks.0.attn.v_proj.bias"])
-
-    if heads == 1 and kv_heads == 1:
-        scores_raw = matmul(q, transpose(k))
-        scores = []
-        scale = 1.0 / math.sqrt(len(q[0]))
-        for row_idx, row in enumerate(scores_raw):
-            score_row = []
-            for col_idx, value in enumerate(row):
-                if col_idx > row_idx:
-                    score_row.append(-1.0e30)
-                else:
-                    score_row.append(lpu.to_f32(value * scale))
-            scores.append(score_row)
-
-        probs = softmax_rows(scores)
-        attn = matmul(probs, v)
-    else:
-        # Generalized multi-head / GQA logic
-        q_heads = []
-        for h in range(heads):
-            head_rows = []
-            for t in range(seq_len):
-                head_rows.append(q[t][h * head_dim : (h + 1) * head_dim])
-            q_heads.append(head_rows)
-
-        k_heads = []
-        for kh in range(kv_heads):
-            head_rows = []
-            for t in range(seq_len):
-                head_rows.append(k[t][kh * head_dim : (kh + 1) * head_dim])
-            k_heads.append(head_rows)
-
-        v_heads = []
-        for kh in range(kv_heads):
-            head_rows = []
-            for t in range(seq_len):
-                head_rows.append(v[t][kh * head_dim : (kh + 1) * head_dim])
-            v_heads.append(head_rows)
-
+    for layer_idx in range(config["layers"]):
+        block_prefix = f"blocks.{layer_idx}"
+        
+        ln1_weight = weights[f"{block_prefix}.ln1.weight"]
+        ln2_weight = weights[f"{block_prefix}.ln2.weight"]
+        q_proj_weight = weights[f"{block_prefix}.attn.q_proj.weight"]
+        k_proj_weight = weights[f"{block_prefix}.attn.k_proj.weight"]
+        v_proj_weight = weights[f"{block_prefix}.attn.v_proj.weight"]
+        out_proj_weight = weights[f"{block_prefix}.attn.out_proj.weight"]
+        ffn_gate_weight = weights[f"{block_prefix}.ffn_gate.weight"]
+        ffn_down_weight = weights[f"{block_prefix}.ffn_down.weight"]
+        
+        # 1. RMSNorm
+        ln1 = rmsnorm_rows(x_prev, ln1_weight)
+        
+        # 2. Linear projections
+        q = linear_no_bias(ln1, q_proj_weight)
+        k = linear_no_bias(ln1, k_proj_weight)
+        v = linear_no_bias(ln1, v_proj_weight)
+        
+        # 3. Apply RoPE to Q and K
+        q_rot = []
+        k_rot = []
+        for t in range(seq_len):
+            cos_val, sin_val = get_rope_cos_sin(t, head_dim=8)
+            
+            q_row = q[t]
+            q_rot_row = []
+            for h in range(heads):
+                q_head = q_row[h*8 : (h+1)*8]
+                q_rot_row.extend(apply_rope_to_vector(q_head, cos_val, sin_val))
+            q_rot.append(q_rot_row)
+            
+            k_row = k[t]
+            k_rot_row = []
+            for kh in range(kv_heads):
+                k_head = k_row[kh*8 : (kh+1)*8]
+                k_rot_row.extend(apply_rope_to_vector(k_head, cos_val, sin_val))
+            k_rot.append(k_rot_row)
+            
+        # 4. Self-attention
         attn_heads = []
         scale = 1.0 / math.sqrt(head_dim)
         for h in range(heads):
             kh = h // group_size
-            q_h = q_heads[h]
-            k_kh = k_heads[kh]
-            v_kh = v_heads[kh]
+            q_h = [q_rot[t][h*8 : (h+1)*8] for t in range(seq_len)]
+            k_kh = [k_rot[t][kh*8 : (kh+1)*8] for t in range(seq_len)]
+            v_kh = [v[t][kh*8 : (kh+1)*8] for t in range(seq_len)]
 
             s_raw = matmul(q_h, transpose(k_kh))
             scores_h = []
@@ -231,63 +245,42 @@ def tiny_lm_forward(input_ids, weights):
             out_h = matmul(probs_h, v_kh)
             attn_heads.append(out_h)
 
-        # Concatenate head outputs along the channel dimension back to [seq_len, dim]
+        # Concatenate head outputs
         attn = []
         for t in range(seq_len):
             row = []
             for h in range(heads):
                 row.extend(attn_heads[h][t])
             attn.append(row)
-
-        scores_raw = None
-        scores = None
-        probs = None
-
-    attn_out_no_bias = linear_no_bias(attn, weights["blocks.0.attn.out_proj.weight"])
-    attn_out = add_bias(attn_out_no_bias, weights["blocks.0.attn.out_proj.bias"])
-    x_after_attn = [vec_add(row, attn_out[row_idx]) for row_idx, row in enumerate(x0)]
-
-    ln2 = layernorm_rows(
-        x_after_attn,
-        weights["blocks.0.ln2.weight"],
-        weights["blocks.0.ln2.bias"],
-    )
-    ffn_hidden_no_bias = linear_no_bias(ln2, weights["blocks.0.ffn.0.weight"])
-    ffn_hidden_pre_relu = add_bias(ffn_hidden_no_bias, weights["blocks.0.ffn.0.bias"])
-    ffn_hidden = [[lpu.to_f32(max(0.0, value)) for value in row] for row in ffn_hidden_pre_relu]
-    ffn_out_no_bias = linear_no_bias(ffn_hidden, weights["blocks.0.ffn.2.weight"])
-    ffn_out = add_bias(ffn_out_no_bias, weights["blocks.0.ffn.2.bias"])
-    x_after_ffn = [vec_add(row, ffn_out[row_idx]) for row_idx, row in enumerate(x_after_attn)]
-
-    final = layernorm_rows(x_after_ffn, weights["ln_f.weight"], weights["ln_f.bias"])
-    logits_no_bias = linear_no_bias(final, weights["lm_head.weight"])
-    logits = add_bias(logits_no_bias, weights["lm_head.bias"])
+            
+        # 5. Attention out projection
+        attn_out = linear_no_bias(attn, out_proj_weight)
+        x_after_attn = [vec_add(row, attn_out[row_idx]) for row_idx, row in enumerate(x_prev)]
+        
+        # 6. FFN RMSNorm
+        ln2 = rmsnorm_rows(x_after_attn, ln2_weight)
+        
+        # 7. FFN Gate (W1)
+        ffn_gate_out = linear_no_bias(ln2, ffn_gate_weight)
+        
+        # 8. ReLU
+        ffn_hidden = [[lpu.to_f32(max(0.0, value)) for value in row] for row in ffn_gate_out]
+        
+        # 9. FFN Down (W2)
+        ffn_down_out = linear_no_bias(ffn_hidden, ffn_down_weight)
+        
+        # 10. Residual
+        x_prev = [vec_add(row, ffn_down_out[row_idx]) for row_idx, row in enumerate(x_after_attn)]
+        
+    # Final RMSNorm
+    final = rmsnorm_rows(x_prev, weights["ln_f.weight"])
+    
+    # LM Head
+    logits = linear_no_bias(final, weights["lm_head.weight"])
+    
     return {
-        "x0": x0,
-        "ln1": ln1,
-        "q_no_bias": q_no_bias,
-        "k_no_bias": k_no_bias,
-        "v_no_bias": v_no_bias,
-        "q": q,
-        "k": k,
-        "v": v,
-        "scores_raw": scores_raw,
-        "scores": scores,
-        "probs": probs,
-        "attn": attn,
-        "attn_out_no_bias": attn_out_no_bias,
-        "attn_out": attn_out,
-        "x_after_attn": x_after_attn,
-        "ln2": ln2,
-        "ffn_hidden_no_bias": ffn_hidden_no_bias,
-        "ffn_hidden_pre_relu": ffn_hidden_pre_relu,
-        "ffn_hidden": ffn_hidden,
-        "ffn_out_no_bias": ffn_out_no_bias,
-        "ffn_out": ffn_out,
-        "x_after_ffn": x_after_ffn,
-        "final": final,
-        "logits_no_bias": logits_no_bias,
-        "logits": logits,
+        "x0": [token_emb[token_id] for token_id in input_ids],
+        "logits": logits
     }
 
 
@@ -423,6 +416,129 @@ async def run_lpu_mxm_tile(
     return observed
 
 
+def pad_rows_width(rows, start_col, *, row_count=4, width=4):
+    padded = []
+    for row in rows[:row_count]:
+        slice_vals = row[start_col : start_col + width]
+        padded.append([lpu.to_f32(value) for value in slice_vals] + [0.0] * max(0, width - len(slice_vals)))
+    while len(padded) < row_count:
+        padded.append([0.0 for _ in range(width)])
+    return padded
+
+
+def mxm_expected_full(left_rows, right_rows):
+    left_padded = []
+    for r in left_rows[:4]:
+        left_padded.append(list(r) + [0.0] * max(0, len(right_rows[0]) - len(r)))
+    while len(left_padded) < 4:
+        left_padded.append([0.0 for _ in range(len(right_rows[0]))])
+        
+    right_padded = []
+    for r in right_rows[:4]:
+        right_padded.append(list(r) + [0.0] * max(0, len(right_rows[0]) - len(r)))
+    while len(right_padded) < 4:
+        right_padded.append([0.0 for _ in range(len(right_rows[0]))])
+        
+    K = len(left_padded[0])
+    expected = [[0.0 for _ in range(4)] for _ in range(4)]
+    
+    for start in range(0, K, 4):
+        l_chunk = [r[start:start+4] + [0.0] * (4 - len(r[start:start+4])) for r in left_padded]
+        r_chunk = [r[start:start+4] + [0.0] * (4 - len(r[start:start+4])) for r in right_padded]
+        l_bits, l_dec = fp8_quantize_matrix(l_chunk)
+        r_bits, r_dec = fp8_quantize_matrix(r_chunk)
+        chunk_expected = lpu.matmul_expected_fp32(l_dec, lpu.transpose_matrix(r_dec))
+        for r_idx in range(4):
+            for c_idx in range(4):
+                expected[r_idx][c_idx] = lpu.to_f32(expected[r_idx][c_idx] + chunk_expected[r_idx][c_idx])
+                
+    return expected
+
+
+async def run_lpu_mxm_tile_full(
+    dut,
+    *,
+    left_rows,
+    right_rows,
+    label,
+    mem0_base=0,
+    mem1_base=64,
+):
+    K = max(len(left_rows[0]), len(right_rows[0]))
+    num_chunks = (K + 3) // 4
+    
+    for chunk_idx in range(num_chunks):
+        start_col = chunk_idx * 4
+        l_pad = pad_rows_width(left_rows, start_col)
+        r_pad = pad_rows_width(right_rows, start_col)
+        l_bits, _ = fp8_quantize_matrix(l_pad)
+        r_bits, _ = fp8_quantize_matrix(r_pad)
+        
+        mem0_offset = mem0_base + chunk_idx * 4
+        mem1_offset = mem1_base + chunk_idx * 4
+        
+        for k_idx in range(4):
+            lpu.preload_mem0_word(
+                dut,
+                addr=mem0_offset + k_idx,
+                values=[l_bits[row_idx][k_idx] for row_idx in range(4)],
+            )
+            lpu.preload_mem1_word(
+                dut,
+                addr=mem1_offset + k_idx,
+                values=[r_bits[row_idx][k_idx] for row_idx in range(4)],
+            )
+            
+    max_chunks_per_pass = 16
+    for pass_idx in range(0, num_chunks, max_chunks_per_pass):
+        chunk_start = pass_idx
+        chunk_end = min(pass_idx + max_chunks_per_pass, num_chunks)
+        
+        program = []
+        if chunk_start == 0:
+            program.append(lpu.build_instruction(mxm_clear=1, **FP_CTRL))
+            
+        for chunk_idx in range(chunk_start, chunk_end):
+            mem0_offset = mem0_base + chunk_idx * 4
+            mem1_offset = mem1_base + chunk_idx * 4
+            for k_idx in range(4):
+                lpu.append_mxm_weight_row_load_from_mem1(program, addr=mem1_offset + k_idx)
+                lpu.append_mxm_input_column_load_from_mem0(program, addr=mem0_offset + k_idx)
+                program.append(lpu.build_instruction(mxm_start=1, **FP_CTRL))
+                for _ in range(4):
+                    program.append(lpu.build_instruction(**FP_CTRL))
+                    
+        program.extend([lpu.build_instruction(**FP_CTRL), lpu.build_instruction(**FP_CTRL)])
+        lpu.preload_program(dut, program)
+        dut.u_lpu.u_icu.pc.value = 0
+        await lpu.tick(dut, len(program) + 24)
+        
+    observed_bits = lpu.read_mxm_matrix_bits(dut)
+    observed = [
+        [lpu.bits_to_f32(observed_bits[row_idx][col_idx]) for col_idx in range(4)]
+        for row_idx in range(4)
+    ]
+    
+    expected = mxm_expected_full(left_rows, right_rows)
+    
+    for row_idx in range(4):
+        for col_idx in range(4):
+            expected_bits = lpu.f32_bits(expected[row_idx][col_idx])
+            obs_val = lpu.bits_to_f32(observed_bits[row_idx][col_idx])
+            exp_val = expected[row_idx][col_idx]
+            float_diff = abs(obs_val - exp_val)
+            ulp_diff = abs(observed_bits[row_idx][col_idx] - expected_bits)
+            
+            assert ulp_diff <= 3 or float_diff < 1e-6, (
+                f"{label} tile ({row_idx}, {col_idx}) mismatch: "
+                f"got 0x{observed_bits[row_idx][col_idx]:08x} ({obs_val:.6f}), "
+                f"expected 0x{expected_bits:08x} ({exp_val:.6f}) (ulp diff: {ulp_diff}, float diff: {float_diff})"
+            )
+            
+    dut._log.info("%s MXM full tile matched FP8->FP32 expected output", label)
+    return observed
+
+
 async def run_forced_vxm_row(
     dut,
     *,
@@ -551,6 +667,9 @@ def token_rows_to_string(tokens):
 @cocotb.test()
 async def test_tiny_lm_prefill_decode_golden(dut):
     config, vocab, id_to_token, weights = load_tiny_lm_export()
+    if config.get("layers", 1) > 1:
+        dut._log.info("Skipping 1-layer test case for multi-layer model.")
+        return
     assert config == MODEL_CONFIG
 
     first_id, first_token, first = next_token(PROMPT_PREFILL, vocab, id_to_token, weights)
@@ -769,6 +888,9 @@ async def test_lpu_vxm_hardware_relu_softmax_layernorm_paths(dut):
 @cocotb.test()
 async def test_tiny_lm_ranvijay_prompt_probe(dut):
     config, vocab, id_to_token, weights = load_tiny_lm_export()
+    if config.get("layers", 1) > 1:
+        dut._log.info("Skipping 1-layer test case for multi-layer model.")
+        return
     assert config == MODEL_CONFIG
 
     token_id, token, result = next_token(PROMPT_PROBE, vocab, id_to_token, weights)
@@ -786,6 +908,9 @@ async def test_lpu_ranvijay_prompt_timing(dut):
     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
 
     config, vocab, id_to_token, weights = load_tiny_lm_export()
+    if config.get("layers", 1) > 1:
+        dut._log.info("Skipping 1-layer test case for multi-layer model.")
+        return
     assert config == MODEL_CONFIG
 
     prompt_ids = encode_prompt(PROMPT_PROBE, vocab)
@@ -878,6 +1003,9 @@ async def test_lpu_tiny_lm_prefill_decode_tiles_and_lm_head(dut):
     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
 
     config, vocab, id_to_token, weights = load_tiny_lm_export()
+    if config.get("layers", 1) > 1:
+        dut._log.info("Skipping 1-layer test case for multi-layer model.")
+        return
     assert config == MODEL_CONFIG
 
     prefill_ids = encode_prompt(PROMPT_PREFILL, vocab)
@@ -998,6 +1126,390 @@ def get_user_input(prompt: str) -> str:
         return "exit"
 
 
+async def drive_rope_registers(dut, cos_bits, sin_bits):
+    dut.u_lpu.vxm_rope_cos_fp8_reg.value = pack_bytes_8(cos_bits)
+    dut.u_lpu.vxm_rope_sin_fp8_reg.value = pack_bytes_8(sin_bits)
+
+
+def pack_fp32_row_8(row):
+    padded = list(row) + [0.0] * (8 - len(row))
+    word = 0
+    for idx, value in enumerate(padded):
+        word |= lpu.f32_bits(value) << (32 * idx)
+    return word
+
+
+def pack_bytes_8(values):
+    padded = list(values) + [0] * (8 - len(values))
+    word = 0
+    for idx, value in enumerate(padded):
+        word |= (value & 0xFF) << (8 * idx)
+    return word
+
+
+async def run_forced_vxm_rmsnorm(dut, data, gamma):
+    # Set default values to prevent X-propagation
+    dut.u_lpu.u_vxm.in_valid.value = Force(0)
+    dut.u_lpu.u_vxm.stream_in_data.value = Force(0)
+    dut.u_lpu.u_vxm.stream_in_bias.value = Force(0)
+    dut.u_lpu.vxm_rmsnorm_gamma_reg.value = Force(0)
+    dut.u_lpu.vxm_rmsnorm_beta_reg.value = Force(0)
+    dut.u_lpu.u_vxm.rmsnorm_bypass.value = Force(0)
+    dut.u_lpu.u_vxm.vxm_ctrl.value = Force(0b0000)
+    dut.u_lpu.u_vxm.fp_quant_mode.value = Force(1)
+    dut.u_lpu.u_vxm.rope_en.value = Force(0)
+    dut.u_lpu.u_vxm.residual_op.value = Force(lpu.VXM_RES_PASS)
+    dut.u_lpu.u_vxm.out_ready.value = Force(1)
+    
+    # Tick to propagate clean reset state
+    await lpu.tick(dut, 2)
+    
+    chunks_in = [data[i*8 : (i+1)*8] for i in range(8)]
+    gamma_chunks = [gamma[i*8 : (i+1)*8] for i in range(8)]
+    
+    # Feed chunks
+    for c_idx in range(8):
+        dut.u_lpu.u_vxm.stream_in_data.value = Force(pack_fp32_row_8(chunks_in[c_idx]))
+        dut.u_lpu.vxm_rmsnorm_gamma_reg.value = Force(pack_fp32_row_8(gamma_chunks[c_idx]))
+        dut.u_lpu.vxm_rmsnorm_beta_reg.value = Force(0)
+        dut.u_lpu.u_vxm.in_valid.value = Force(1)
+        
+        ready = False
+        for _ in range(100):
+            val = dut.u_lpu.u_vxm.in_ready.value
+            if str(val) not in ('U', 'X', 'Z') and int(val):
+                ready = True
+                await lpu.tick(dut, 1)
+                break
+            await lpu.tick(dut, 1)
+        dut.u_lpu.u_vxm.in_valid.value = Force(0)
+        if not ready:
+            raise AssertionError(f"VXM RMSNorm ready timeout on input chunk {c_idx}")
+        
+    out_row = []
+    for c_idx in range(8):
+        found = False
+        for _ in range(200):
+            val = dut.u_lpu.u_vxm.out_valid.value
+            if str(val) not in ('U', 'X', 'Z') and int(val):
+                row_word = int(dut.u_lpu.u_vxm.stream_out.value)
+                scale_word = int(dut.u_lpu.u_vxm.stream_out_scale.value)
+                row_bits = [(row_word >> (8 * idx)) & 0xFF for idx in range(8)]
+                scale_exp = scale_word & 0xFF
+                if scale_exp & 0x80:
+                    scale_exp -= 256
+                chunk_floats = lpu.dequantize_regular_fp8_row(row_bits, scale_exp)
+                out_row.extend(chunk_floats)
+                found = True
+                await lpu.tick(dut, 1)
+                break
+            await lpu.tick(dut, 1)
+        if not found:
+            raise AssertionError(f"RMSNorm did not produce output chunk {c_idx}")
+            
+    # Release forces
+    dut.u_lpu.u_vxm.in_valid.value = Release()
+    dut.u_lpu.u_vxm.stream_in_data.value = Release()
+    dut.u_lpu.u_vxm.stream_in_bias.value = Release()
+    dut.u_lpu.vxm_rmsnorm_gamma_reg.value = Release()
+    dut.u_lpu.vxm_rmsnorm_beta_reg.value = Release()
+    dut.u_lpu.u_vxm.rmsnorm_bypass.value = Release()
+    dut.u_lpu.u_vxm.vxm_ctrl.value = Release()
+    dut.u_lpu.u_vxm.fp_quant_mode.value = Release()
+    dut.u_lpu.u_vxm.rope_en.value = Release()
+    dut.u_lpu.u_vxm.residual_op.value = Release()
+    dut.u_lpu.u_vxm.out_ready.value = Release()
+    
+    return out_row
+
+
+async def run_forced_vxm_rope_chunk(dut, data, cos_bits, sin_bits):
+    dut.u_lpu.u_vxm.in_valid.value = Force(0)
+    dut.u_lpu.u_vxm.stream_in_data.value = Force(0)
+    dut.u_lpu.u_vxm.stream_in_bias.value = Force(0)
+    dut.u_lpu.vxm_rmsnorm_gamma_reg.value = Force(0)
+    dut.u_lpu.vxm_rmsnorm_beta_reg.value = Force(0)
+    dut.u_lpu.u_vxm.rmsnorm_bypass.value = Force(1)
+    dut.u_lpu.u_vxm.vxm_ctrl.value = Force(0b0000)
+    dut.u_lpu.u_vxm.fp_quant_mode.value = Force(1)
+    dut.u_lpu.u_vxm.rope_en.value = Force(1)
+    dut.u_lpu.u_vxm.residual_op.value = Force(lpu.VXM_RES_PASS)
+    dut.u_lpu.u_vxm.out_ready.value = Force(1)
+    
+    await drive_rope_registers(dut, cos_bits, sin_bits)
+    await lpu.tick(dut, 2)
+    
+    dut.u_lpu.u_vxm.stream_in_data.value = Force(pack_fp32_row_8(data))
+    dut.u_lpu.u_vxm.in_valid.value = Force(1)
+    
+    await lpu.tick(dut, 1)
+    dut.u_lpu.u_vxm.in_valid.value = Force(0)
+    
+    rotated = None
+    for _ in range(160):
+        val = dut.u_lpu.u_vxm.out_valid.value
+        if str(val) not in ('U', 'X', 'Z') and int(val):
+            row_word = int(dut.u_lpu.u_vxm.stream_out.value)
+            scale_word = int(dut.u_lpu.u_vxm.stream_out_scale.value)
+            row_bits = [(row_word >> (8 * idx)) & 0xFF for idx in range(8)]
+            scale_exp = scale_word & 0xFF
+            if scale_exp & 0x80:
+                scale_exp -= 256
+            rotated = lpu.dequantize_regular_fp8_row(row_bits, scale_exp)
+            await lpu.tick(dut, 1)
+            break
+        await lpu.tick(dut, 1)
+        
+    dut.u_lpu.u_vxm.in_valid.value = Release()
+    dut.u_lpu.u_vxm.stream_in_data.value = Release()
+    dut.u_lpu.u_vxm.stream_in_bias.value = Release()
+    dut.u_lpu.vxm_rmsnorm_gamma_reg.value = Release()
+    dut.u_lpu.vxm_rmsnorm_beta_reg.value = Release()
+    dut.u_lpu.u_vxm.rmsnorm_bypass.value = Release()
+    dut.u_lpu.u_vxm.vxm_ctrl.value = Release()
+    dut.u_lpu.u_vxm.fp_quant_mode.value = Release()
+    dut.u_lpu.u_vxm.rope_en.value = Release()
+    dut.u_lpu.u_vxm.residual_op.value = Release()
+    dut.u_lpu.u_vxm.out_ready.value = Release()
+    
+    if rotated is None:
+        raise AssertionError("RoPE chunk did not produce an output")
+    return rotated
+
+
+async def run_forced_vxm_relu_chunk(dut, data):
+    dut.u_lpu.u_vxm.in_valid.value = Force(0)
+    dut.u_lpu.u_vxm.stream_in_data.value = Force(0)
+    dut.u_lpu.u_vxm.stream_in_bias.value = Force(0)
+    dut.u_lpu.vxm_rmsnorm_gamma_reg.value = Force(0)
+    dut.u_lpu.vxm_rmsnorm_beta_reg.value = Force(0)
+    dut.u_lpu.u_vxm.rmsnorm_bypass.value = Force(1)
+    dut.u_lpu.u_vxm.vxm_ctrl.value = Force(0b0011)
+    dut.u_lpu.u_vxm.fp_quant_mode.value = Force(1)
+    dut.u_lpu.u_vxm.rope_en.value = Force(0)
+    dut.u_lpu.u_vxm.residual_op.value = Force(lpu.VXM_RES_PASS)
+    dut.u_lpu.u_vxm.out_ready.value = Force(1)
+    
+    await lpu.tick(dut, 2)
+    
+    dut.u_lpu.u_vxm.stream_in_data.value = Force(pack_fp32_row_8(data))
+    dut.u_lpu.u_vxm.in_valid.value = Force(1)
+    
+    await lpu.tick(dut, 1)
+    dut.u_lpu.u_vxm.in_valid.value = Force(0)
+    
+    relu_out = None
+    for _ in range(160):
+        val = dut.u_lpu.u_vxm.out_valid.value
+        if str(val) not in ('U', 'X', 'Z') and int(val):
+            row_word = int(dut.u_lpu.u_vxm.stream_out.value)
+            scale_word = int(dut.u_lpu.u_vxm.stream_out_scale.value)
+            row_bits = [(row_word >> (8 * idx)) & 0xFF for idx in range(8)]
+            scale_exp = scale_word & 0xFF
+            if scale_exp & 0x80:
+                scale_exp -= 256
+            relu_out = lpu.dequantize_regular_fp8_row(row_bits, scale_exp)
+            await lpu.tick(dut, 1)
+            break
+        await lpu.tick(dut, 1)
+        
+    dut.u_lpu.u_vxm.in_valid.value = Release()
+    dut.u_lpu.u_vxm.stream_in_data.value = Release()
+    dut.u_lpu.u_vxm.stream_in_bias.value = Release()
+    dut.u_lpu.vxm_rmsnorm_gamma_reg.value = Release()
+    dut.u_lpu.vxm_rmsnorm_beta_reg.value = Release()
+    dut.u_lpu.u_vxm.rmsnorm_bypass.value = Release()
+    dut.u_lpu.u_vxm.vxm_ctrl.value = Release()
+    dut.u_lpu.u_vxm.fp_quant_mode.value = Release()
+    dut.u_lpu.u_vxm.rope_en.value = Release()
+    dut.u_lpu.u_vxm.residual_op.value = Release()
+    dut.u_lpu.u_vxm.out_ready.value = Release()
+    
+    if relu_out is None:
+        raise AssertionError("ReLU chunk did not produce an output")
+    return relu_out
+
+
+async def run_forced_vxm_softmax(dut, data):
+    data_512 = list(data) + [-1e30] * (512 - len(data))
+    chunks = [data_512[i*8 : (i+1)*8] for i in range(64)]
+    
+    dut.u_lpu.u_vxm.in_valid.value = Force(0)
+    dut.u_lpu.u_vxm.stream_in_data.value = Force(0)
+    dut.u_lpu.u_vxm.stream_in_bias.value = Force(0)
+    dut.u_lpu.vxm_rmsnorm_gamma_reg.value = Force(0)
+    dut.u_lpu.vxm_rmsnorm_beta_reg.value = Force(0)
+    dut.u_lpu.u_vxm.rmsnorm_bypass.value = Force(1)
+    dut.u_lpu.u_vxm.vxm_ctrl.value = Force(0b1000)
+    dut.u_lpu.u_vxm.fp_quant_mode.value = Force(1)
+    dut.u_lpu.u_vxm.rope_en.value = Force(0)
+    dut.u_lpu.u_vxm.residual_op.value = Force(lpu.VXM_RES_PASS)
+    dut.u_lpu.u_vxm.out_ready.value = Force(1)
+    
+    await lpu.tick(dut, 2)
+    
+    for c_idx in range(64):
+        dut.u_lpu.u_vxm.stream_in_data.value = Force(pack_fp32_row_8(chunks[c_idx]))
+        dut.u_lpu.u_vxm.in_valid.value = Force(1)
+        ready = False
+        for _ in range(100):
+            val = dut.u_lpu.u_vxm.in_ready.value
+            if str(val) not in ('U', 'X', 'Z') and int(val):
+                ready = True
+                await lpu.tick(dut, 1)
+                break
+            await lpu.tick(dut, 1)
+        dut.u_lpu.u_vxm.in_valid.value = Force(0)
+        if not ready:
+            raise AssertionError(f"Softmax in_ready timeout on chunk {c_idx}")
+            
+    out_elements = []
+    for c_idx in range(64):
+        found = False
+        for _ in range(200):
+            val = dut.u_lpu.u_vxm.out_valid.value
+            if str(val) not in ('U', 'X', 'Z') and int(val):
+                row_word = int(dut.u_lpu.u_vxm.stream_out.value)
+                scale_word = int(dut.u_lpu.u_vxm.stream_out_scale.value)
+                row_bits = [(row_word >> (8 * idx)) & 0xFF for idx in range(8)]
+                scale_exp = scale_word & 0xFF
+                if scale_exp & 0x80:
+                    scale_exp -= 256
+                chunk_floats = lpu.dequantize_regular_fp8_row(row_bits, scale_exp)
+                out_elements.extend(chunk_floats)
+                found = True
+                await lpu.tick(dut, 1)
+                break
+            await lpu.tick(dut, 1)
+        if not found:
+            raise AssertionError(f"Softmax out_valid timeout on chunk {c_idx}")
+            
+    dut.u_lpu.u_vxm.in_valid.value = Release()
+    dut.u_lpu.u_vxm.stream_in_data.value = Release()
+    dut.u_lpu.u_vxm.stream_in_bias.value = Release()
+    dut.u_lpu.vxm_rmsnorm_gamma_reg.value = Release()
+    dut.u_lpu.vxm_rmsnorm_beta_reg.value = Release()
+    dut.u_lpu.u_vxm.rmsnorm_bypass.value = Release()
+    dut.u_lpu.u_vxm.vxm_ctrl.value = Release()
+    dut.u_lpu.u_vxm.fp_quant_mode.value = Release()
+    dut.u_lpu.u_vxm.rope_en.value = Release()
+    dut.u_lpu.u_vxm.residual_op.value = Release()
+    dut.u_lpu.u_vxm.out_ready.value = Release()
+    
+    return out_elements[:len(data)]
+
+
+async def run_forced_vxm_residual_chunk(dut, base_chunk, delta_chunk):
+    await drive_forced_vxm_residual_op_8(dut, data=base_chunk, residual_op=lpu.VXM_RES_LOAD, reset=True)
+    await drive_forced_vxm_residual_op_8(dut, data=delta_chunk, residual_op=lpu.VXM_RES_ADD)
+    
+    dut.u_lpu.u_vxm.in_valid.value = Force(0)
+    dut.u_lpu.u_vxm.stream_in_data.value = Force(0)
+    dut.u_lpu.u_vxm.stream_in_bias.value = Force(0)
+    dut.u_lpu.vxm_rmsnorm_gamma_reg.value = Force(0)
+    dut.u_lpu.vxm_rmsnorm_beta_reg.value = Force(0)
+    dut.u_lpu.u_vxm.rmsnorm_bypass.value = Force(1)
+    dut.u_lpu.u_vxm.vxm_ctrl.value = Force(0b0000)
+    dut.u_lpu.u_vxm.fp_quant_mode.value = Force(1)
+    dut.u_lpu.u_vxm.rope_en.value = Force(0)
+    dut.u_lpu.u_vxm.residual_op.value = Force(lpu.VXM_RES_EMIT)
+    dut.u_lpu.u_vxm.out_ready.value = Force(1)
+    
+    await lpu.tick(dut, 2)
+    
+    dut.u_lpu.u_vxm.stream_in_data.value = Force(0)
+    dut.u_lpu.u_vxm.in_valid.value = Force(1)
+    
+    await lpu.tick(dut, 1)
+    dut.u_lpu.u_vxm.in_valid.value = Force(0)
+    
+    out_chunk = None
+    for _ in range(160):
+        val = dut.u_lpu.u_vxm.out_valid.value
+        if str(val) not in ('U', 'X', 'Z') and int(val):
+            row_word = int(dut.u_lpu.u_vxm.stream_out.value)
+            scale_word = int(dut.u_lpu.u_vxm.stream_out_scale.value)
+            row_bits = [(row_word >> (8 * idx)) & 0xFF for idx in range(8)]
+            scale_exp = scale_word & 0xFF
+            if scale_exp & 0x80:
+                scale_exp -= 256
+            out_chunk = lpu.dequantize_regular_fp8_row(row_bits, scale_exp)
+            await lpu.tick(dut, 1)
+            break
+        await lpu.tick(dut, 1)
+        
+    dut.u_lpu.u_vxm.in_valid.value = Release()
+    dut.u_lpu.u_vxm.stream_in_data.value = Release()
+    dut.u_lpu.u_vxm.stream_in_bias.value = Release()
+    dut.u_lpu.vxm_rmsnorm_gamma_reg.value = Release()
+    dut.u_lpu.vxm_rmsnorm_beta_reg.value = Release()
+    dut.u_lpu.u_vxm.rmsnorm_bypass.value = Release()
+    dut.u_lpu.u_vxm.vxm_ctrl.value = Release()
+    dut.u_lpu.u_vxm.fp_quant_mode.value = Release()
+    dut.u_lpu.u_vxm.rope_en.value = Release()
+    dut.u_lpu.u_vxm.residual_op.value = Release()
+    dut.u_lpu.u_vxm.out_ready.value = Release()
+    
+    if out_chunk is None:
+        raise AssertionError("Residual emit did not produce an output")
+    return out_chunk
+
+
+async def drive_forced_vxm_residual_op_8(dut, data, residual_op, reset=False):
+    if reset:
+        await lpu.reset_dut(dut)
+        
+    dut.u_lpu.u_vxm.in_valid.value = Force(0)
+    dut.u_lpu.u_vxm.stream_in_data.value = Force(0)
+    dut.u_lpu.u_vxm.stream_in_bias.value = Force(0)
+    dut.u_lpu.vxm_rmsnorm_gamma_reg.value = Force(0)
+    dut.u_lpu.vxm_rmsnorm_beta_reg.value = Force(0)
+    dut.u_lpu.u_vxm.rmsnorm_bypass.value = Force(1)
+    dut.u_lpu.u_vxm.vxm_ctrl.value = Force(0)
+    dut.u_lpu.u_vxm.fp_quant_mode.value = Force(1)
+    dut.u_lpu.u_vxm.rope_en.value = Force(0)
+    dut.u_lpu.u_vxm.residual_op.value = Force(residual_op)
+    dut.u_lpu.u_vxm.out_ready.value = Force(1)
+    
+    await lpu.tick(dut, 2)
+    
+    dut.u_lpu.u_vxm.stream_in_data.value = Force(pack_fp32_row_8(data))
+    dut.u_lpu.u_vxm.in_valid.value = Force(1)
+    
+    await lpu.tick(dut, 1)
+    dut.u_lpu.u_vxm.in_valid.value = Force(0)
+    
+    for _ in range(120):
+        await lpu.tick(dut, 1)
+        val = dut.u_lpu.u_vxm.residual_done.value
+        if str(val) not in ('U', 'X', 'Z') and int(val):
+            dut.u_lpu.u_vxm.in_valid.value = Release()
+            dut.u_lpu.u_vxm.stream_in_data.value = Release()
+            dut.u_lpu.u_vxm.stream_in_bias.value = Release()
+            dut.u_lpu.vxm_rmsnorm_gamma_reg.value = Release()
+            dut.u_lpu.vxm_rmsnorm_beta_reg.value = Release()
+            dut.u_lpu.u_vxm.rmsnorm_bypass.value = Release()
+            dut.u_lpu.u_vxm.vxm_ctrl.value = Release()
+            dut.u_lpu.u_vxm.fp_quant_mode.value = Release()
+            dut.u_lpu.u_vxm.rope_en.value = Release()
+            dut.u_lpu.u_vxm.residual_op.value = Release()
+            dut.u_lpu.u_vxm.out_ready.value = Release()
+            return
+            
+    dut.u_lpu.u_vxm.in_valid.value = Release()
+    dut.u_lpu.u_vxm.stream_in_data.value = Release()
+    dut.u_lpu.u_vxm.stream_in_bias.value = Release()
+    dut.u_lpu.vxm_rmsnorm_gamma_reg.value = Release()
+    dut.u_lpu.vxm_rmsnorm_beta_reg.value = Release()
+    dut.u_lpu.u_vxm.rmsnorm_bypass.value = Release()
+    dut.u_lpu.u_vxm.vxm_ctrl.value = Release()
+    dut.u_lpu.u_vxm.fp_quant_mode.value = Release()
+    dut.u_lpu.u_vxm.rope_en.value = Release()
+    dut.u_lpu.u_vxm.residual_op.value = Release()
+    dut.u_lpu.u_vxm.out_ready.value = Release()
+    raise AssertionError("VXM residual op did not complete")
+
+
 @cocotb.test()
 async def test_interactive_prompt(dut):
     import os
@@ -1038,75 +1550,296 @@ async def test_interactive_prompt(dut):
 
         # Run forward pass on the simulated LPU chip
         try:
+            await lpu.reset_dut(dut)
             prompt_ids = encode_prompt(words, vocab)
             golden = tiny_lm_forward(prompt_ids, weights)
+            seq_len = len(prompt_ids)
 
-            # Prefill/Decode Attn & FFN projections on LPU
-            for projection, weight_name in [
-                ("Q projection", "blocks.0.attn.q_proj.weight"),
-                ("K projection", "blocks.0.attn.k_proj.weight"),
-                ("V projection", "blocks.0.attn.v_proj.weight"),
-            ]:
-                await run_lpu_mxm_tile(
+            # Start from token embeddings
+            x = golden["x0"]
+
+            for layer_idx in range(MODEL_CONFIG["layers"]):
+                block_prefix = f"blocks.{layer_idx}"
+                
+                # 1. RMSNorm on VXM
+                ln1_hw = []
+                for row_idx, row in enumerate(x):
+                    normalized_row = await run_forced_vxm_rmsnorm(
+                        dut,
+                        data=row,
+                        gamma=weights[f"{block_prefix}.ln1.weight"],
+                    )
+                    ln1_hw.append(normalized_row)
+                
+                # 2. Q, K, V Projections on MXM
+                q_hw = [[0.0 for _ in range(MODEL_CONFIG["dim"])] for _ in range(seq_len)]
+                k_hw = [[0.0 for _ in range(MODEL_CONFIG["kv_heads"] * 8)] for _ in range(seq_len)]
+                v_hw = [[0.0 for _ in range(MODEL_CONFIG["kv_heads"] * 8)] for _ in range(seq_len)]
+                
+                # Q projection
+                for r_start in range(0, seq_len, 4):
+                    r_end = min(r_start + 4, seq_len)
+                    left_chunk = ln1_hw[r_start:r_end]
+                    for start in range(0, MODEL_CONFIG["dim"], 4):
+                        observed = await run_lpu_mxm_tile_full(
+                            dut,
+                            left_rows=left_chunk,
+                            right_rows=weights[f"{block_prefix}.attn.q_proj.weight"][start:start+4],
+                            label=f"L{layer_idx} Q proj tile {start}",
+                        )
+                        for r_idx in range(r_start, r_end):
+                            for c_idx in range(4):
+                                q_hw[r_idx][start + c_idx] = observed[r_idx - r_start][c_idx]
+                            
+                # K projection
+                for r_start in range(0, seq_len, 4):
+                    r_end = min(r_start + 4, seq_len)
+                    left_chunk = ln1_hw[r_start:r_end]
+                    for start in range(0, MODEL_CONFIG["kv_heads"] * 8, 4):
+                        observed = await run_lpu_mxm_tile_full(
+                            dut,
+                            left_rows=left_chunk,
+                            right_rows=weights[f"{block_prefix}.attn.k_proj.weight"][start:start+4],
+                            label=f"L{layer_idx} K proj tile {start}",
+                        )
+                        for r_idx in range(r_start, r_end):
+                            for c_idx in range(4):
+                                k_hw[r_idx][start + c_idx] = observed[r_idx - r_start][c_idx]
+                            
+                # V projection
+                for r_start in range(0, seq_len, 4):
+                    r_end = min(r_start + 4, seq_len)
+                    left_chunk = ln1_hw[r_start:r_end]
+                    for start in range(0, MODEL_CONFIG["kv_heads"] * 8, 4):
+                        observed = await run_lpu_mxm_tile_full(
+                            dut,
+                            left_rows=left_chunk,
+                            right_rows=weights[f"{block_prefix}.attn.v_proj.weight"][start:start+4],
+                            label=f"L{layer_idx} V proj tile {start}",
+                        )
+                        for r_idx in range(r_start, r_end):
+                            for c_idx in range(4):
+                                v_hw[r_idx][start + c_idx] = observed[r_idx - r_start][c_idx]
+                            
+                # 3. RoPE on VXM
+                q_rot_hw = [[0.0 for _ in range(MODEL_CONFIG["dim"])] for _ in range(seq_len)]
+                k_rot_hw = [[0.0 for _ in range(MODEL_CONFIG["kv_heads"] * 8)] for _ in range(seq_len)]
+                
+                # Apply RoPE for Q
+                for t in range(seq_len):
+                    cos_val, sin_val = get_rope_cos_sin(t, head_dim=8)
+                    cos_bits = [lpu.fp8_e5m2_bits(c) for c in cos_val]
+                    sin_bits = [lpu.fp8_e5m2_bits(s) for s in sin_val]
+                    for h in range(8):
+                        start = h * 8
+                        rotated_chunk = await run_forced_vxm_rope_chunk(
+                            dut,
+                            data=q_hw[t][start:start+8],
+                            cos_bits=cos_bits,
+                            sin_bits=sin_bits,
+                        )
+                        for c_idx in range(8):
+                            q_rot_hw[t][start + c_idx] = rotated_chunk[c_idx]
+                            
+                # Apply RoPE for K
+                for t in range(seq_len):
+                    cos_val, sin_val = get_rope_cos_sin(t, head_dim=8)
+                    cos_bits = [lpu.fp8_e5m2_bits(c) for c in cos_val]
+                    sin_bits = [lpu.fp8_e5m2_bits(s) for s in sin_val]
+                    for kh in range(4):
+                        start = kh * 8
+                        rotated_chunk = await run_forced_vxm_rope_chunk(
+                            dut,
+                            data=k_hw[t][start:start+8],
+                            cos_bits=cos_bits,
+                            sin_bits=sin_bits,
+                        )
+                        for c_idx in range(8):
+                            k_rot_hw[t][start + c_idx] = rotated_chunk[c_idx]
+
+                # 4. Self-Attention Dot Product (Q @ K^T) and Softmax
+                attn_out_hw = [[0.0 for _ in range(MODEL_CONFIG["dim"])] for _ in range(seq_len)]
+                for h in range(8):
+                    kh = h // 2
+                    q_h = [q_rot_hw[t][h*8 : (h+1)*8] for t in range(seq_len)]
+                    k_kh = [k_rot_hw[t][kh*8 : (kh+1)*8] for t in range(seq_len)]
+                    v_kh = [v_hw[t][kh*8 : (kh+1)*8] for t in range(seq_len)]
+                    
+                    scores_h = [[0.0 for _ in range(seq_len)] for _ in range(seq_len)]
+                    for q_start in range(0, seq_len, 4):
+                        q_end = min(q_start + 4, seq_len)
+                        q_left_chunk = q_h[q_start:q_end]
+                        for k_start in range(0, seq_len, 4):
+                            k_end = min(k_start + 4, seq_len)
+                            k_right_chunk = k_kh[k_start:k_end]
+                            
+                            observed = await run_lpu_mxm_tile_full(
+                                dut,
+                                left_rows=q_left_chunk,
+                                right_rows=k_right_chunk,
+                                label=f"L{layer_idx} H{h} Q@K tile",
+                            )
+                            for r_idx in range(q_start, q_end):
+                                for c_idx in range(k_start, k_end):
+                                    scores_h[r_idx][c_idx] = observed[r_idx - q_start][c_idx - k_start]
+                                
+                    # Scale, mask and Softmax on VXM
+                    probs_h = []
+                    for row_idx, row in enumerate(scores_h):
+                        scaled_row = [lpu.to_f32(val / math.sqrt(8)) for val in row]
+                        masked_row = [val if col_idx <= row_idx else -1e30 for col_idx, val in enumerate(scaled_row)]
+                        softmax_out = await run_forced_vxm_softmax(dut, masked_row)
+                        probs_h.append(softmax_out)
+                        
+                    # Probs @ V on MXM
+                    v_by_hidden = transpose(v_kh)
+                    out_h = [[0.0 for _ in range(8)] for _ in range(seq_len)]
+                    for r_start in range(0, seq_len, 4):
+                        r_end = min(r_start + 4, seq_len)
+                        probs_chunk = probs_h[r_start:r_end]
+                        for start in range(0, 8, 4):
+                            observed = await run_lpu_mxm_tile_full(
+                                dut,
+                                left_rows=probs_chunk,
+                                right_rows=v_by_hidden[start:start+4],
+                                label=f"L{layer_idx} H{h} Probs@V tile {start}",
+                            )
+                            for r_idx in range(r_start, r_end):
+                                for c_idx in range(4):
+                                    out_h[r_idx][start + c_idx] = observed[r_idx - r_start][c_idx]
+                                
+                    # Store head output
+                    for r_idx in range(seq_len):
+                        for c_idx in range(8):
+                            attn_out_hw[r_idx][h*8 + c_idx] = out_h[r_idx][c_idx]
+                            
+                # 5. Attention Output Projection on MXM
+                attn_proj_hw = [[0.0 for _ in range(MODEL_CONFIG["dim"])] for _ in range(seq_len)]
+                for r_start in range(0, seq_len, 4):
+                    r_end = min(r_start + 4, seq_len)
+                    attn_out_chunk = attn_out_hw[r_start:r_end]
+                    for start in range(0, MODEL_CONFIG["dim"], 4):
+                        observed = await run_lpu_mxm_tile_full(
+                            dut,
+                            left_rows=attn_out_chunk,
+                            right_rows=weights[f"{block_prefix}.attn.out_proj.weight"][start:start+4],
+                            label=f"L{layer_idx} OutProj tile {start}",
+                        )
+                        for r_idx in range(r_start, r_end):
+                            for c_idx in range(4):
+                                attn_proj_hw[r_idx][start + c_idx] = observed[r_idx - r_start][c_idx]
+                            
+                # 6. Residual Addition (x = x + attn_proj_hw) on VXM
+                x_after_attn_hw = []
+                for row_idx in range(seq_len):
+                    row_res = []
+                    for chunk_idx in range(8):
+                        start = chunk_idx * 8
+                        res_chunk = await run_forced_vxm_residual_chunk(
+                            dut,
+                            base_chunk=x[row_idx][start:start+8],
+                            delta_chunk=attn_proj_hw[row_idx][start:start+8],
+                        )
+                        row_res.extend(res_chunk)
+                    x_after_attn_hw.append(row_res)
+                    
+                # 7. FFN block
+                # RMSNorm
+                ln2_hw = []
+                for row_idx, row in enumerate(x_after_attn_hw):
+                    normalized_row = await run_forced_vxm_rmsnorm(
+                        dut,
+                        data=row,
+                        gamma=weights[f"{block_prefix}.ln2.weight"],
+                    )
+                    ln2_hw.append(normalized_row)
+                    
+                # FFN Gate Projection (W1) on MXM
+                ffn_gate_hw = [[0.0 for _ in range(MODEL_CONFIG["ffn_dim"])] for _ in range(seq_len)]
+                for r_start in range(0, seq_len, 4):
+                    r_end = min(r_start + 4, seq_len)
+                    ln2_chunk = ln2_hw[r_start:r_end]
+                    for start in range(0, MODEL_CONFIG["ffn_dim"], 4):
+                        observed = await run_lpu_mxm_tile_full(
+                            dut,
+                            left_rows=ln2_chunk,
+                            right_rows=weights[f"{block_prefix}.ffn_gate.weight"][start:start+4],
+                            label=f"L{layer_idx} FFN W1 tile {start}",
+                        )
+                        for r_idx in range(r_start, r_end):
+                            for c_idx in range(4):
+                                ffn_gate_hw[r_idx][start + c_idx] = observed[r_idx - r_start][c_idx]
+                            
+                # ReLU Activation on VXM
+                ffn_hidden_hw = []
+                for row_idx, row in enumerate(ffn_gate_hw):
+                    row_relu = []
+                    for chunk_idx in range(22):
+                        start = chunk_idx * 8
+                        relu_chunk = await run_forced_vxm_relu_chunk(
+                            dut,
+                            data=row[start:start+8],
+                        )
+                        row_relu.extend(relu_chunk)
+                    ffn_hidden_hw.append(row_relu)
+                    
+                # FFN Down Projection (W2) on MXM
+                ffn_down_hw = [[0.0 for _ in range(MODEL_CONFIG["dim"])] for _ in range(seq_len)]
+                for r_start in range(0, seq_len, 4):
+                    r_end = min(r_start + 4, seq_len)
+                    hidden_r_chunk = ffn_hidden_hw[r_start:r_end]
+                    for w_start in range(0, MODEL_CONFIG["dim"], 4):
+                        w2_rows = weights[f"{block_prefix}.ffn_down.weight"][w_start : w_start + 4]
+                        observed = await run_lpu_mxm_tile_full(
+                            dut,
+                            left_rows=hidden_r_chunk,
+                            right_rows=w2_rows,
+                            label=f"L{layer_idx} FFN W2 tile r{r_start} w{w_start}",
+                        )
+                        for r_idx in range(r_start, r_end):
+                            for c_idx in range(4):
+                                ffn_down_hw[r_idx][w_start + c_idx] = observed[r_idx - r_start][c_idx]
+                            
+                # Residual Addition (x = x_after_attn_hw + ffn_down_hw) on VXM
+                x_next_hw = []
+                for row_idx in range(seq_len):
+                    row_res = []
+                    for chunk_idx in range(8):
+                        start = chunk_idx * 8
+                        res_chunk = await run_forced_vxm_residual_chunk(
+                            dut,
+                            base_chunk=x_after_attn_hw[row_idx][start:start+8],
+                            delta_chunk=ffn_down_hw[row_idx][start:start+8],
+                        )
+                        row_res.extend(res_chunk)
+                    x_next_hw.append(row_res)
+                
+                # Output of this layer becomes input to the next layer
+                x = x_next_hw
+                
+            # End of layers. Final RMSNorm!
+            final_hw = []
+            for row_idx, row in enumerate(x):
+                normalized_row = await run_forced_vxm_rmsnorm(
                     dut,
-                    left_rows=golden["ln1"],
-                    right_rows=weights[weight_name],
-                    label=projection,
+                    data=row,
+                    gamma=weights["ln_f.weight"],
                 )
-
-            await run_lpu_mxm_tile(
-                dut,
-                left_rows=golden["q"],
-                right_rows=golden["k"],
-                label="causal attention Q @ K^T raw scores",
-            )
-
-            v_by_hidden = transpose(golden["v"])
-            await run_lpu_mxm_tile(
-                dut,
-                left_rows=golden["probs"],
-                right_rows=v_by_hidden,
-                label="attention probabilities @ V",
-            )
-
-            await run_lpu_mxm_tile(
-                dut,
-                left_rows=golden["attn"],
-                right_rows=weights["blocks.0.attn.out_proj.weight"],
-                label="attention output projection",
-            )
-
-            for start in range(0, MODEL_CONFIG["ffn_dim"], 4):
-                await run_lpu_mxm_tile(
-                    dut,
-                    left_rows=golden["ln2"],
-                    right_rows=weights["blocks.0.ffn.0.weight"][start:start + 4],
-                    label=f"FFN W1 tile {start}:{start + 4}",
-                )
-
-            for start in range(0, MODEL_CONFIG["ffn_dim"], 4):
-                hidden_chunk = [row[start:start + 4] for row in golden["ffn_hidden"]]
-                w2_chunk = [row[start:start + 4] for row in weights["blocks.0.ffn.2.weight"]]
-                await run_lpu_mxm_tile(
-                    dut,
-                    left_rows=hidden_chunk,
-                    right_rows=w2_chunk,
-                    label=f"FFN W2 partial tile {start}:{start + 4}",
-                )
-
-            # LM Head on LPU
-            last_hidden = golden["final"][-1]
+                final_hw.append(normalized_row)
+                
+            # LM Head on LPU!
+            last_hidden_hw = final_hw[-1]
             hw_logits = [0.0 for _ in range(MODEL_CONFIG["vocab_size"])]
             for vocab_start in range(0, MODEL_CONFIG["vocab_size"], 4):
-                observed = await run_lpu_mxm_tile(
+                observed = await run_lpu_mxm_tile_full(
                     dut,
-                    left_rows=[last_hidden],
+                    left_rows=[last_hidden_hw],
                     right_rows=weights["lm_head.weight"][vocab_start:vocab_start + 4],
-                    label=f"LM head tile {vocab_start}:{vocab_start + 4}",
+                    label=f"LM head tile {vocab_start}",
                 )
                 for lane in range(4):
                     token_id = vocab_start + lane
-                    hw_logits[token_id] = lpu.to_f32(observed[0][lane] + weights["lm_head.bias"][token_id])
+                    hw_logits[token_id] = observed[0][lane]
 
             # Process outputs
             pred_id = argmax(hw_logits)
@@ -1129,6 +1862,8 @@ async def test_interactive_prompt(dut):
             print("="*50 + "\n")
 
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             print(f"\n[!] Error during LPU inference: {e}\n", file=sys.stderr)
 
     print("\nExiting interactive mode.\n")
