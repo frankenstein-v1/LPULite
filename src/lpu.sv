@@ -3,7 +3,26 @@
 
 module lpu (
     input logic clk,
-    input logic rst_n
+    input logic rst_n,
+
+    // External Program Loader Interface (IMEM)
+    input  logic         ext_imem_write_en,
+    input  logic [9:0]   ext_imem_addr,
+    input  logic [95:0]  ext_imem_data_in,
+
+    // External MEM0 Interface
+    input  logic                 ext_mem0_write_en,
+    input  logic                 ext_mem0_read_en,
+    input  logic [MEM_ADDR_W-1:0] ext_mem0_addr,
+    input  logic [71:0]          ext_mem0_data_in,
+    output logic [71:0]          ext_mem0_data_out,
+
+    // External MEM1 Interface
+    input  logic                 ext_mem1_write_en,
+    input  logic                 ext_mem1_read_en,
+    input  logic [MEM_ADDR_W-1:0] ext_mem1_addr,
+    input  logic [71:0]          ext_mem1_data_in,
+    output logic [71:0]          ext_mem1_data_out
 );
 
 //icu mem outputs
@@ -109,6 +128,7 @@ logic signed [MXM_SIZE-1:0][7:0]  wght_val;
 logic signed [MXM_SIZE-1:0][MXM_SIZE-1:0][31:0] mxm_out;
 
 //icu instance
+//icu instance
 icu u_icu(
     .clk(clk),
     .rst_n(rst_n),
@@ -141,7 +161,12 @@ icu u_icu(
     .mem_store_fmt(mem_store_fmt),
     .vxm_rmsnorm_en(vxm_rmsnorm_en),
     .vxm_rope_en(vxm_rope_en),
-    .vxm_residual_op(vxm_residual_op)
+    .vxm_residual_op(vxm_residual_op),
+
+    // External JTAG program load
+    .ext_write_en(ext_imem_write_en),
+    .ext_addr(ext_imem_addr),
+    .ext_data_in(ext_imem_data_in)
 );
 
 //mux logic for mem0 input
@@ -179,7 +204,14 @@ mem #(
     .stream_out(mem0_stream_out),
     .read_en(mem0_read_en),
     .write_en(mem0_write_en_eff),
-    .addr(mem0_addr)
+    .addr(mem0_addr),
+
+    // External JTAG read/write
+    .ext_write_en(ext_mem0_write_en),
+    .ext_read_en(ext_mem0_read_en),
+    .ext_addr(ext_mem0_addr),
+    .ext_data_in(ext_mem0_data_in),
+    .ext_data_out(ext_mem0_data_out)
 );
 
 //since mem1 is on the far left westbound cannot write into it, so only eastbound can 
@@ -202,7 +234,14 @@ mem #(
     .stream_out(mem1_stream_out),
     .read_en(mem1_read_en),
     .write_en(mem1_write_en_eff),
-    .addr(mem1_addr)
+    .addr(mem1_addr),
+
+    // External JTAG read/write
+    .ext_write_en(ext_mem1_write_en),
+    .ext_read_en(ext_mem1_read_en),
+    .ext_addr(ext_mem1_addr),
+    .ext_data_in(ext_mem1_data_in),
+    .ext_data_out(ext_mem1_data_out)
 );
 
 // memory read data is synchronous, so register valid alongside the read enable
