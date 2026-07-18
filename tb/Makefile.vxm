@@ -7,8 +7,13 @@ PATH := $(REPO_ROOT)/.venv_cocotb13/bin:$(PATH)
 COCOTB_CONFIG ?= $(if $(wildcard $(REPO_ROOT)/.venv_cocotb13/bin/cocotb-config),$(REPO_ROOT)/.venv_cocotb13/bin/cocotb-config,cocotb-config)
 
 VERILOG_SOURCES = $(REPO_ROOT)/src/cvfpu_fp8_to_fp32_cast.sv \
+                  $(REPO_ROOT)/src/cvfpu_fp32_addsub.sv \
+                  $(REPO_ROOT)/src/cvfpu_fp32_div.sv \
+                  $(REPO_ROOT)/src/cvfpu_fp32_cmp.sv \
                   $(REPO_ROOT)/src/cvfpu_fp32_fma.sv \
+                  $(REPO_ROOT)/src/cvfpu_fp32_sqrt.sv \
                   $(REPO_ROOT)/src/lut_rmsnorm.sv \
+                  $(REPO_ROOT)/src/rmsnorm.sv \
                   $(REPO_ROOT)/src/vxm_rope.sv \
                   $(REPO_ROOT)/src/residual_add.sv \
                   $(REPO_ROOT)/src/vxm.sv \

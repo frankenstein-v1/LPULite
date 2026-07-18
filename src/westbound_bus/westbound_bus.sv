@@ -2,6 +2,7 @@
 `include "lpu_pkg.sv"
 
 module westbound_bus #(
+    // 8 FP8 lanes travel together on westbound by default.
     parameter int PAYLOAD_W = $bits(superlane_t)
 ) (
     // Producer select (encoded): choose exactly one source for this cycle.
