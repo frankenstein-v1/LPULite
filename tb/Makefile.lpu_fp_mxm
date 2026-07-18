@@ -25,6 +25,7 @@ VERILOG_SOURCES = \
 	$(ROOT)/src/lut_softmax_exp.sv \
 	$(ROOT)/src/lut_softmax_div.sv \
 	$(ROOT)/src/softmax.sv \
+	$(ROOT)/src/softmax_chunked.sv \
 	$(ROOT)/src/quant.sv \
 	$(ROOT)/src/lut_rmsnorm.sv \
 	$(ROOT)/src/vxm_rope.sv \

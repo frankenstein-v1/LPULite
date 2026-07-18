@@ -26,6 +26,7 @@ def test_lpu_mem_sxm_mxm():
         src_dir / "lut_softmax_exp.sv",
         src_dir / "lut_softmax_div.sv",
         src_dir / "softmax.sv",
+        src_dir / "softmax_chunked.sv",
         src_dir / "quant.sv",
         src_dir / "lut_rmsnorm.sv",
         src_dir / "vxm_rope.sv",

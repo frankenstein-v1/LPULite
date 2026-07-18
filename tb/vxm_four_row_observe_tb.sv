@@ -34,6 +34,8 @@ module vxm_four_row_observe_tb;
         .rope_cos_fp8(32'h3c3c_3c3c),
         .rope_sin_fp8(32'h0000_0000),
         .residual_op(3'd0),
+        .softmax_chunked_en(1'b0),
+        .scale_factor(32'h3f80_0000),
         .layernorm_bypass(1'b1),
         .layernorm_gamma({LANES{32'h00000001}}),
         .layernorm_beta({LANES{32'h00000000}}),
