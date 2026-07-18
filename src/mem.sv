@@ -34,6 +34,8 @@ module mem #(
             // On reset, we clear the outgoing stream.
             stream_out   <= '0;
             ext_data_out <= '0;
+            // External writes remain available while reset is asserted.
+            if (ext_write_en) sram_array[ext_addr] <= ext_data_in;
         end else begin
             
             // Synchronous Write: Open the SRAM vault and catch incoming data
