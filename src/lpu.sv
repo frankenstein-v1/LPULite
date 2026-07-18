@@ -241,7 +241,12 @@ mem #(
     .stream_out(mem0_stream_out),
     .read_en(mem0_read_en_eff),
     .write_en(mem0_write_en_eff),
-    .addr(mem0_addr_eff)
+    .addr(mem0_addr_eff),
+    .ext_write_en(1'b0),
+    .ext_read_en(1'b0),
+    .ext_addr('0),
+    .ext_data_in('0),
+    .ext_data_out()
 );
 
 //since mem1 is on the far left westbound cannot write into it, so only eastbound can 
@@ -267,7 +272,12 @@ mem #(
     .stream_out(mem1_stream_out),
     .read_en(mem1_read_en_eff),
     .write_en(mem1_write_en_eff),
-    .addr(mem1_addr_eff)
+    .addr(mem1_addr_eff),
+    .ext_write_en(1'b0),
+    .ext_read_en(1'b0),
+    .ext_addr('0),
+    .ext_data_in('0),
+    .ext_data_out()
 );
 
 always_comb begin

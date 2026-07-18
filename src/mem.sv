@@ -15,7 +15,14 @@ module mem #(
     // Control Signals
     input  logic read_en,
     input  logic write_en,
-    input  logic [ADDR_W-1:0] addr
+    input  logic [ADDR_W-1:0] addr,
+
+    // External Host/JTAG interface (Bypass ports)
+    input  logic              ext_write_en,
+    input  logic              ext_read_en,
+    input  logic [ADDR_W-1:0] ext_addr,
+    input  logic [DATA_W-1:0] ext_data_in,
+    output logic [DATA_W-1:0] ext_data_out
 );
 
     // The actual SRAM vault. Width is parameterized so LPU can use row-wide storage.
@@ -25,14 +32,17 @@ module mem #(
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             // On reset, we clear the outgoing stream.
-            // (We deliberately don't clear the whole SRAM array because 
-            // wiring a reset to thousands of SRAM cells wastes physical space).
-            stream_out <= '0;
+            stream_out   <= '0;
+            ext_data_out <= '0;
+            // External writes remain available while reset is asserted.
+            if (ext_write_en) sram_array[ext_addr] <= ext_data_in;
         end else begin
             
             // Synchronous Write: Open the SRAM vault and catch incoming data
             if (write_en) begin
                 sram_array[addr] <= stream_in;
+            end else if (ext_write_en) begin
+                sram_array[ext_addr] <= ext_data_in;
             end
 
             // Synchronous Read: Grab data from SRAM and push it onto the stream
@@ -42,8 +52,16 @@ module mem #(
                 // Push bubbles (all zeros) onto the stream if we aren't reading
                 stream_out <= '0; 
             end
+
+            // Synchronous External Read: Grab data for the JTAG host readout
+            if (ext_read_en) begin
+                ext_data_out <= sram_array[ext_addr];
+            end else begin
+                ext_data_out <= '0;
+            end
             
         end
     end
 
 endmodule
+
