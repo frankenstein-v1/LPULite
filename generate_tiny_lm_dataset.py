@@ -1,6 +1,13 @@
 import json
 import random
 from pathlib import Path
+import argparse
+
+parser = argparse.ArgumentParser(description="Tiny LPU LM Dataset Generator")
+parser.add_argument("--vocab-size", type=int, default=256, help="Target vocabulary size (default: 256)")
+args = parser.parse_args()
+
+TARGET_VOCAB_SIZE = args.vocab_size
 
 # ============================================================
 # Tiny LPU LM Dataset Generator
@@ -438,16 +445,16 @@ for token in sorted(used_tokens):
     if token not in vocab_tokens:
         vocab_tokens.append(token)
 
-# Fill unused slots until vocab has exactly 256 entries
+# Fill unused slots until vocab has exactly TARGET_VOCAB_SIZE entries
 unused_index = 0
 
-while len(vocab_tokens) < 256:
+while len(vocab_tokens) < TARGET_VOCAB_SIZE:
     filler_token = f"<unused_{unused_index:03d}>"
     vocab_tokens.append(filler_token)
     unused_index += 1
 
 # If this fails, we accidentally added too many real words
-assert len(vocab_tokens) == 256, f"Vocab size is {len(vocab_tokens)}, expected 256"
+assert len(vocab_tokens) == TARGET_VOCAB_SIZE, f"Vocab size is {len(vocab_tokens)}, expected {TARGET_VOCAB_SIZE}"
 
 vocab = {token: idx for idx, token in enumerate(vocab_tokens)}
 
