@@ -3,7 +3,11 @@ import json
 class Tokenizer:
     def __init__(self, vocab_path="output/vocab.json"):
         with open(vocab_path, "r", encoding="utf-8") as f:
-            self.vocab = json.load(f)  # token string -> {"id": id, "score": score}
+            raw_vocab = json.load(f)  # token string -> {"id": id, "score": score} or id
+        self.vocab = {
+            token: value if isinstance(value, dict) else {"id": value, "score": 0.0}
+            for token, value in raw_vocab.items()
+        }
         self.id_to_token = {v["id"]: k for k, v in self.vocab.items()}
         
         # Populate byte-to-id mapping for initialization
@@ -77,12 +81,15 @@ class Tokenizer:
 
     def decode(self, ids):
         tokens = []
+        word_tokens = []
+        saw_byte_token = False
         for token_id in ids:
             t = self.id_to_token.get(token_id, "")
             # Skip special tokens
-            if t in ["\n<s>\n", "\n</s>\n", "<s>", "</s>", "<unk>"]:
+            if t in ["\n<s>\n", "\n</s>\n", "<s>", "</s>", "<bos>", "<eos>", "<pad>", "<unk>"]:
                 continue
             if t.startswith("<0x") and t.endswith(">"):
+                saw_byte_token = True
                 # Byte fallback token
                 try:
                     b_val = int(t[3:-1], 16)
@@ -91,6 +98,19 @@ class Tokenizer:
                     pass
             else:
                 tokens.append(t.encode("utf-8"))
+                word_tokens.append(t)
+
+        if word_tokens and not saw_byte_token:
+            out = []
+            no_space_before = {".", ",", "!", "?", ":", ";", "'s"}
+            for token in word_tokens:
+                if token in no_space_before and out:
+                    out[-1] = out[-1] + token
+                elif token == '"':
+                    out.append(token)
+                else:
+                    out.append(token)
+            return " ".join(out).replace(' " ', ' "')
         
         # Join bytes and decode
         raw_decoded = b"".join(tokens).decode("utf-8", errors="replace")

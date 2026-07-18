@@ -6,7 +6,7 @@
 //   y_even = x_even*cos - x_odd*sin
 //   y_odd  = x_even*sin + x_odd*cos
 module vxm_rope #(
-    parameter int LANES  = 4,
+    parameter int LANES  = 8,
     parameter int LANE_W = 32
 ) (
     input  logic                    clk,

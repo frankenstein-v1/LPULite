@@ -3,7 +3,9 @@
 module vxm #(
     parameter int LANES   = 8,
     parameter int LANE_W  = 32, // Upgraded to 32 bits
-    parameter int ALU_W   = 32 // Upgraded ALU width to 32 bits per user request
+    parameter int ALU_W   = 32, // Upgraded ALU width to 32 bits per user request
+    parameter int RMSNORM_CHUNKS = 8,
+    parameter int SOFTMAX_CHUNKS = 64
 ) (
     input  logic clk,
     input  logic rst_n,
@@ -115,6 +117,11 @@ module vxm #(
     logic                     softmax_active_valid;
     logic [ROW_W-1:0]         softmax_active_data;
     logic                     softmax_active_is_fp;
+    logic                     softmax_result_valid;
+    logic [ROW_W-1:0]         softmax_result_reg;
+    logic                     softmax_result_mode_fp_reg;
+    logic                     softmax_result_accept;
+    logic                     softmax_result_can_take;
     logic [LANES*LANE_W-1:0]  mux_out;
     logic                     mux_valid;
     logic                     quant_mode_softmax;
@@ -254,9 +261,9 @@ module vxm #(
     
     assign chunked_softmax_in_valid = s4_valid && s4_bypass_sel_reg && !stall_pipeline;
 
-    assign softmax_active_valid = chunked_softmax_out_valid;
-    assign softmax_active_data  = chunked_softmax_out;
-    assign softmax_active_is_fp = chunked_softmax_out_mode_fp;
+    assign softmax_active_valid = softmax_result_valid;
+    assign softmax_active_data  = softmax_result_reg;
+    assign softmax_active_is_fp = softmax_result_mode_fp_reg;
 
     assign mux_out   = softmax_active_valid ? softmax_active_data : s4_handoff_reg;
     assign mux_valid = softmax_active_valid || (s4_valid && !s4_bypass_sel_reg);
@@ -285,7 +292,9 @@ module vxm #(
     assign fp_bias_stall = fp_bias_wait && !fp_bias_done_all;
     assign fp_scale_stall = fp_scale_wait && !fp_scale_done_all;
 
-    assign chunked_softmax_out_ready = residual_start && chunked_softmax_out_valid;
+    assign softmax_result_accept = residual_start && softmax_result_valid;
+    assign softmax_result_can_take = !softmax_result_valid || softmax_result_accept;
+    assign chunked_softmax_out_ready = softmax_result_can_take;
     assign softmax_stall = s4_valid && s4_bypass_sel_reg && !chunked_softmax_in_ready;
     assign rope_stall = rope_en && (rope_inflight || (mux_valid && !rope_result_valid));
     assign rmsnorm_stall = !rmsnorm_bypass &&
@@ -329,6 +338,9 @@ module vxm #(
             rope_inflight       <= 1'b0;
             rope_result_valid   <= 1'b0;
             rope_result_reg     <= '0;
+            softmax_result_valid <= 1'b0;
+            softmax_result_reg  <= '0;
+            softmax_result_mode_fp_reg <= 1'b0;
             residual_result_valid <= 1'b0;
             residual_result_reg <= '0;
             residual_active_mode_softmax <= 1'b0;
@@ -364,6 +376,14 @@ module vxm #(
                 rope_result_valid <= 1'b1;
             end else if ((rmsnorm_start || residual_start) && rope_result_valid) begin
                 rope_result_valid <= 1'b0;
+            end
+
+            if (chunked_softmax_out_valid && chunked_softmax_out_ready) begin
+                softmax_result_reg <= chunked_softmax_out;
+                softmax_result_mode_fp_reg <= chunked_softmax_out_mode_fp;
+                softmax_result_valid <= 1'b1;
+            end else if (softmax_result_accept) begin
+                softmax_result_valid <= 1'b0;
             end
 
             if (residual_start) begin
@@ -432,7 +452,7 @@ module vxm #(
     softmax #(
         .LANES(LANES),
         .LANE_W(LANE_W),
-        .MAX_CHUNKS(64)
+        .MAX_CHUNKS(SOFTMAX_CHUNKS)
     ) softmax_inst (
         .clk(clk),
         .rst_n(rst_n),
@@ -465,7 +485,8 @@ module vxm #(
 
     rmsnorm #(
         .LANES(LANES),
-        .LANE_W(LANE_W)
+        .LANE_W(LANE_W),
+        .CHUNKS(RMSNORM_CHUNKS)
     ) rmsnorm_inst (
         .clk(clk),
         .rst_n(rst_n),

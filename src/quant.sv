@@ -1,7 +1,7 @@
 `timescale 1ns/1ns
 
 module quant #(
-    parameter int LANES  = 4,
+    parameter int LANES  = 8,
     parameter int LANE_W = 32
 ) (
     input  logic                            clk,

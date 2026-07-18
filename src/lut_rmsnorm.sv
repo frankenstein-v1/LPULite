@@ -11,7 +11,7 @@
 // name because VXM now instantiates lut_rmsnorm, and the behavior is
 // floating-point RMSNorm.
 module lut_rmsnorm #(
-    parameter int LANES      = 4,
+    parameter int LANES      = 8,
     parameter int LANE_W     = 32,
     parameter int LUT_FRAC_W = 16
 ) (
@@ -57,7 +57,7 @@ module lut_rmsnorm #(
                 sum_sq = sum_sq + (x_lane[i] * x_lane[i]);
             end
 
-            // d value is LANES (hardcoded 4)
+            // d value is the configured lane count.
             rms_sq = sum_sq / LANES;
 
             inv_rms = lookup_inv_sqrt(rms_sq);

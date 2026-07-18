@@ -1,7 +1,7 @@
 `timescale 1ns/1ps
 
 module mxm#(
-    parameter int mxm_size = 4
+    parameter int mxm_size = 8
 )(
     input logic clk, 
     input logic rst, 

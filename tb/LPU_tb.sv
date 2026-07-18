@@ -1,7 +1,10 @@
 `timescale 1ns/1ps
 `include "lpu_pkg.sv"
 
-module lpu_cocotb_top (
+module lpu_cocotb_top #(
+    parameter int RMSNORM_CHUNKS = 8,
+    parameter int SOFTMAX_CHUNKS = 64
+) (
     input  logic        clk,
     input  logic        rst_n,
 
@@ -46,8 +49,8 @@ module lpu_cocotb_top (
     output logic        vxm_scale_valid_dbg,
     output mxm_row_t    vxm_softmax_in_row_dbg,
     output logic        vxm_softmax_in_valid_dbg,
-    output logic [3:0]  vxm_softmax_launch_dbg,
-    output logic [3:0]  vxm_softmax_done_dbg,
+    output logic [7:0]  vxm_softmax_launch_dbg,
+    output logic [7:0]  vxm_softmax_done_dbg,
     output mxm_row_t    vxm_quant_in_row_dbg,
     output logic        vxm_quant_in_valid_dbg,
     output logic [63:0] vxm_stream_out_live_dbg,
@@ -90,9 +93,22 @@ module lpu_cocotb_top (
     output logic [255:0] ln8_y_dbg
 );
 
-    lpu u_lpu (
+    lpu #(
+        .RMSNORM_CHUNKS(RMSNORM_CHUNKS),
+        .SOFTMAX_CHUNKS(SOFTMAX_CHUNKS)
+    ) u_lpu (
         .clk(clk),
-        .rst_n(rst_n)
+        .rst_n(rst_n),
+        .run_en(1'b1),
+        .pc_load_en(1'b0),
+        .pc_load_value(32'd0),
+        .ext_en(1'b0),
+        .ext_write(1'b0),
+        .ext_target(2'd0),
+        .ext_addr(32'd0),
+        .ext_wdata(96'd0),
+        .ext_rdata(),
+        .cycle_counter()
     );
 
     assign pc_dbg                    = u_lpu.u_icu.pc;
@@ -136,8 +152,8 @@ module lpu_cocotb_top (
     assign vxm_scale_valid_dbg       = u_lpu.u_vxm.s3_valid;
     assign vxm_softmax_in_row_dbg    = u_lpu.u_vxm.s4_handoff_reg;
     assign vxm_softmax_in_valid_dbg  = u_lpu.u_vxm.s4_valid;
-    assign vxm_softmax_launch_dbg    = {3'b000, u_lpu.u_vxm.chunked_softmax_in_valid};
-    assign vxm_softmax_done_dbg      = {3'b000, u_lpu.u_vxm.chunked_softmax_out_valid};
+    assign vxm_softmax_launch_dbg    = {7'b0000000, u_lpu.u_vxm.chunked_softmax_in_valid};
+    assign vxm_softmax_done_dbg      = {7'b0000000, u_lpu.u_vxm.chunked_softmax_out_valid};
     assign vxm_quant_in_row_dbg      = u_lpu.u_vxm.mux_out;
     assign vxm_quant_in_valid_dbg    = u_lpu.u_vxm.quant_issue;
     assign vxm_stream_out_live_dbg   = u_lpu.vxm_stream_out_live;

@@ -118,6 +118,18 @@ typedef enum logic [2:0] {
 localparam int MEM_DEPTH  = 32768;
 localparam int MEM_ADDR_W = $clog2(MEM_DEPTH);
 
+// Current TinyLPU GQA decode cache map.
+// K cache lives in MEM0 and V cache lives in MEM1 at the same per-layer offset:
+//   addr = layer * KV_CACHE_LAYER_ROWS + token_pos * KV_CACHE_ROWS_PER_TOKEN + kv_head
+// With dim=64, heads=8, kv_heads=4, head_dim=8, each token stores four 8-lane rows.
+localparam int MODEL_MAX_SEQ_LEN        = 512;
+localparam int MODEL_LAYERS             = 5;
+localparam int MODEL_KV_HEADS           = 4;
+localparam int MODEL_HEAD_DIM           = 8;
+localparam int KV_CACHE_ROWS_PER_TOKEN  = MODEL_KV_HEADS;
+localparam int KV_CACHE_LAYER_ROWS      = MODEL_MAX_SEQ_LEN * KV_CACHE_ROWS_PER_TOKEN;
+localparam int KV_CACHE_TOTAL_ROWS      = MODEL_LAYERS * KV_CACHE_LAYER_ROWS;
+
 `ifndef SYNTHESIS
 function automatic real fp32_to_real(input logic [31:0] fp32);
     logic [63:0] r_bits;
