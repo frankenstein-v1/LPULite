@@ -1,0 +1,26 @@
+Info: Starting: Create HDL design files for synthesis
+Info: qsys-generate C:\Users\micha\Documents(Local)\Projects\tinyLPU\platform_designer_system.qsys --synthesis=VERILOG --output-directory=C:\Users\micha\Documents(Local)\Projects\tinyLPU\platform_designer_system\synthesis --family="Cyclone V" --part=5CSEMA5F31C6
+Progress: Loading tinyLPU/platform_designer_system.qsys
+Progress: Reading input file
+Progress: Adding clk_0 [clock_source 25.1]
+Progress: Parameterizing module clk_0
+Progress: Adding jtag_master [altera_jtag_avalon_master 25.1]
+Progress: Parameterizing module jtag_master
+Progress: Building connections
+Progress: Parameterizing connections
+Progress: Validating
+Progress: Done reading input file
+Info: platform_designer_system: Generating "platform_designer_system" for QUARTUS_SYNTH
+Info: jtag_master: "platform_designer_system" instantiated altera_jtag_avalon_master "jtag_master"
+Info: jtag_phy_embedded_in_jtag_master: "jtag_master" instantiated altera_jtag_dc_streaming "jtag_phy_embedded_in_jtag_master"
+Info: timing_adt: "jtag_master" instantiated timing_adapter "timing_adt"
+Info: fifo: "jtag_master" instantiated altera_avalon_sc_fifo "fifo"
+Info: b2p: "jtag_master" instantiated altera_avalon_st_bytes_to_packets "b2p"
+Info: p2b: "jtag_master" instantiated altera_avalon_st_packets_to_bytes "p2b"
+Info: transacto: "jtag_master" instantiated altera_avalon_packets_to_master "transacto"
+Info: b2p_adapter: "jtag_master" instantiated channel_adapter "b2p_adapter"
+Info: p2b_adapter: "jtag_master" instantiated channel_adapter "p2b_adapter"
+Info: rst_controller: "jtag_master" instantiated altera_reset_controller "rst_controller"
+Info: platform_designer_system: Done "platform_designer_system" with 11 modules, 23 files
+Info: qsys-generate succeeded.
+Info: Finished: Create HDL design files for synthesis

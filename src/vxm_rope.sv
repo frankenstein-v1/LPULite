@@ -70,7 +70,8 @@ module vxm_rope #(
     assign fma_done_all  = (&fma_even_done) && (&fma_odd_done);
 
     generate
-        for (genvar pair = 0; pair < PAIRS; pair++) begin : g_rope_pairs
+        genvar pair;
+        for (pair = 0; pair < PAIRS; pair++) begin : g_rope_pairs
             localparam int EVEN_LANE = pair * 2;
             localparam int ODD_LANE  = pair * 2 + 1;
 

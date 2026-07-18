@@ -442,7 +442,8 @@ sxm #(
 );
 
 generate
-    for (genvar i = 0; i < MXM_SIZE; i++) begin : g_mxm_feed
+    genvar i;
+    for (i = 0; i < MXM_SIZE; i++) begin : g_mxm_feed
         assign mxm_input_in[i] = sxm_stream_out_to_mxm_left[i*8 +: 8];
         assign wght_val[i]     = sxm_stream_out_to_mxm_top[i*8 +: 8];
         assign wght_load[i]    = 1'b0;

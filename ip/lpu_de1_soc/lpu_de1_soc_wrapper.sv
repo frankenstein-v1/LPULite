@@ -1,5 +1,4 @@
 `timescale 1ns/1ps
-`include "lpu_pkg.sv"
 
 module lpu_de1_soc_wrapper (
     input  logic        clk,

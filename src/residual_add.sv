@@ -53,7 +53,8 @@ module residual_add #(
     assign add_done_all = &add_done_vec;
 
     generate
-        for (genvar lane = 0; lane < LANES; lane++) begin : g_residual_lanes
+        genvar lane;
+        for (lane = 0; lane < LANES; lane++) begin : g_residual_lanes
             logic [31:0] acc_lane;
             logic [31:0] add_lane;
             logic [31:0] add_result_lane;

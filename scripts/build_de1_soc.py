@@ -21,7 +21,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
 PROJECT = "tiny_lpu_de1_soc"
-DEVICE = "5CSEMA5F31C6N"
+# Quartus/Qsys use the orderable device name without the trailing temperature
+# suffix; the DE1-SoC package is commonly labelled 5CSEMA5F31C6N.
+DEVICE = "5CSEMA5F31C6"
 PROJECT_DIR = ROOT / "build" / PROJECT
 
 
@@ -90,15 +92,67 @@ def patch_rtl() -> None:
                 rf"\1,\n    .ext_write_en(ext_mem{name}_write_en),\n    .ext_read_en(ext_mem{name}_read_en),\n    .ext_addr(ext_mem{name}_addr),\n    .ext_data_in(ext_mem{name}_data_in),\n    .ext_data_out(ext_mem{name}_data_out)\2", f"MEM{name} hookup")
         write(lpu, text)
 
+    # Quartus 25.1 Lite accepts SystemVerilog generate loops, but not an
+    # inline ``for (genvar i = ...)`` declaration.  Keep the baseline RTL
+    # portable by declaring each genvar before its generate loop.
+    generate_fixes = {
+        "lpu.sv": [("for (genvar i = 0; i < MXM_SIZE; i++) begin : g_mxm_feed", "genvar i;\n    for (i = 0; i < MXM_SIZE; i++) begin : g_mxm_feed")],
+        "residual_add.sv": [("for (genvar lane = 0; lane < LANES; lane++) begin : g_residual_lanes", "genvar lane;\n        for (lane = 0; lane < LANES; lane++) begin : g_residual_lanes")],
+        "rmsnorm.sv": [
+            ("for (genvar i = 0; i < LANES; i++) begin : g_rms_lanes", "genvar i;\n        genvar j;\n        genvar m;\n        for (i = 0; i < LANES; i++) begin : g_rms_lanes"),
+            ("for (genvar j = 0; j < 4; j++) begin : g_sum1", "for (j = 0; j < 4; j++) begin : g_sum1"),
+            ("for (genvar m = 0; m < 2; m++) begin : g_sum2", "for (m = 0; m < 2; m++) begin : g_sum2"),
+        ],
+        "softmax.sv": [("for (genvar lane = 0; lane < LANES; lane++) begin : gen_exp", "genvar lane;\n        for (lane = 0; lane < LANES; lane++) begin : gen_exp")],
+        "vxm.sv": [("for (genvar i = 0; i < LANES; i++) begin : g_vxm_lanes", "genvar i;\n        for (i = 0; i < LANES; i++) begin : g_vxm_lanes")],
+        "vxm_rope.sv": [("for (genvar pair = 0; pair < PAIRS; pair++) begin : g_rope_pairs", "genvar pair;\n        for (pair = 0; pair < PAIRS; pair++) begin : g_rope_pairs")],
+        "eastbound_bus/mxm_eastbound_adapter.sv": [
+            ("for (genvar row = 0; row < MXM_SIZE; row++) begin : g_row\n            for (genvar col = 0; col < MXM_SIZE; col++) begin : g_col", "genvar row;\n        genvar col;\n        for (row = 0; row < MXM_SIZE; row++) begin : g_row\n            for (col = 0; col < MXM_SIZE; col++) begin : g_col"),
+        ],
+    }
+    for relative_path, fixes in generate_fixes.items():
+        path = SRC / relative_path
+        text = path.read_text(encoding="utf-8")
+        changed = False
+        for old, new in fixes:
+            if old in text:
+                text = text.replace(old, new)
+                changed = True
+        if changed:
+            write(path, text)
+
 
 TOP = """module de1_soc_top (
     input  logic        CLOCK_50,  // PIN_AF14 (50MHz clock input)
     input  logic [0:0]  KEY,       // PIN_AJ4 (Active-low pushbutton as Reset)
     output logic [0:0]  LEDR       // PIN_V16 (Diagnostic LED)
 );
+    logic [31:0] jtag_address, jtag_writedata, jtag_readdata;
+    logic [3:0]  jtag_byteenable;
+    logic        jtag_read, jtag_write, jtag_waitrequest, jtag_readdatavalid;
+
     platform_designer_system u_qsys (
         .clk_clk       (CLOCK_50),
-        .reset_reset_n (KEY[0])
+        .reset_reset_n (KEY[0]),
+        .lpu_avalon_address       (jtag_address),
+        .lpu_avalon_read          (jtag_read),
+        .lpu_avalon_write         (jtag_write),
+        .lpu_avalon_writedata     (jtag_writedata),
+        .lpu_avalon_byteenable    (jtag_byteenable),
+        .lpu_avalon_readdata      (jtag_readdata),
+        .lpu_avalon_waitrequest   (jtag_waitrequest),
+        .lpu_avalon_readdatavalid (jtag_readdatavalid)
+    );
+    lpu_de1_soc_wrapper u_lpu_avalon (
+        .clk             (CLOCK_50),
+        .rst_n           (KEY[0]),
+        .avs_address     (jtag_address[15:0]),
+        .avs_read        (jtag_read),
+        .avs_write       (jtag_write),
+        .avs_writedata   (jtag_writedata),
+        .avs_readdata      (jtag_readdata),
+        .avs_waitrequest   (jtag_waitrequest),
+        .avs_readdatavalid (jtag_readdatavalid)
     );
     assign LEDR[0] = KEY[0];
 endmodule
@@ -106,13 +160,13 @@ endmodule
 
 
 WRAPPER = r'''`timescale 1ns/1ps
-`include "lpu_pkg.sv"
 
 module lpu_de1_soc_wrapper (
     input logic clk, input logic rst_n,
     input logic [15:0] avs_address, input logic avs_read, input logic avs_write,
     input logic [31:0] avs_writedata,
-    output logic [31:0] avs_readdata, output logic avs_waitrequest
+    output logic [31:0] avs_readdata, output logic avs_waitrequest,
+    output logic avs_readdatavalid
 );
     logic run_enable;
     logic [95:0] imem_assembly;
@@ -134,6 +188,7 @@ module lpu_de1_soc_wrapper (
     integer lane_index;
 
     assign avs_waitrequest = 1'b0;
+    assign avs_readdatavalid = avs_read;
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             run_enable <= 1'b0; imem_assembly <= '0; mem0_assembly <= '0; mem1_assembly <= '0;
@@ -199,17 +254,12 @@ endmodule
 '''
 
 
-HW_TCL = r'''package require -exact qsys @QSYS_API_VERSION@
-set_module_property NAME lpu_de1_soc
+HW_TCL = r'''set_module_property NAME lpu_de1_soc
 set_module_property VERSION 1.0
 set_module_property GROUP "TinyLPU"
 set_module_property DISPLAY_NAME "TinyLPU DE1-SoC Avalon wrapper"
-set_module_property TOP_LEVEL_HDL_FILE lpu_de1_soc_wrapper.sv
 set_module_property TOP_LEVEL_HDL_MODULE lpu_de1_soc_wrapper
 set_module_property INSTANTIATE_IN_SYSTEM_MODULE true
-add_fileset QUARTUS_SYNTH QUARTUS_SYNTH ""
-set_fileset_property QUARTUS_SYNTH TOP_LEVEL lpu_de1_soc_wrapper
-add_fileset_file lpu_de1_soc_wrapper.sv SYSTEM_VERILOG PATH lpu_de1_soc_wrapper.sv TOP_LEVEL_FILE
 add_interface clk clock end
 add_interface_port clk clk clk Input 1
 add_interface rst_n reset end
@@ -222,7 +272,7 @@ set_interface_property avs associatedClock clk
 set_interface_property avs associatedReset rst_n
 set_interface_property avs readWaitTime 0
 set_interface_property avs writeWaitTime 0
-set_interface_property avs maximumPendingReadTransactions 1
+set_interface_property avs maximumPendingReadTransactions 0
 add_interface_port avs avs_address address Input 16
 add_interface_port avs avs_read read Input 1
 add_interface_port avs avs_write write Input 1
@@ -235,25 +285,18 @@ add_interface_port avs avs_waitrequest waitrequest Output 1
 SYSTEM_TCL = r'''package require -exact qsys @QSYS_API_VERSION@
 create_system platform_designer_system
 set_project_property DEVICE_FAMILY "Cyclone V"
-set_project_property DEVICE 5CSEMA5F31C6N
+set_project_property DEVICE 5CSEMA5F31C6
 add_instance clk_0 clock_source
 set_instance_parameter_value clk_0 clockFrequency {50000000.0}
-add_instance reset_bridge_0 altera_reset_bridge
-set_instance_parameter_value reset_bridge_0 ACTIVE_LOW_RESET {1}
-set_instance_parameter_value reset_bridge_0 SYNCHRONOUS_EDGES {none}
 add_instance jtag_master altera_jtag_avalon_master
-add_instance lpu_de1_soc_0 lpu_de1_soc
-add_connection clk_0.clk reset_bridge_0.clk
 add_connection clk_0.clk jtag_master.clk
-add_connection clk_0.clk lpu_de1_soc_0.clk
-add_connection reset_bridge_0.out_reset jtag_master.reset
-add_connection reset_bridge_0.out_reset lpu_de1_soc_0.rst_n
-add_connection jtag_master.master lpu_de1_soc_0.avs
-set_connection_parameter_value jtag_master.master/lpu_de1_soc_0.avs baseAddress {0x00000000}
+add_connection clk_0.clk_reset jtag_master.clk_reset
 add_interface clk clock sink
-set_interface_property clk EXPORT_OF clk_0.clk
+set_interface_property clk EXPORT_OF clk_0.clk_in
 add_interface reset reset sink
-set_interface_property reset EXPORT_OF reset_bridge_0.in_reset
+set_interface_property reset EXPORT_OF clk_0.clk_in_reset
+add_interface lpu_avalon avalon master
+set_interface_property lpu_avalon EXPORT_OF jtag_master.master
 save_system platform_designer_system.qsys
 '''
 
@@ -262,13 +305,16 @@ INIT_TCL = r'''set root [file normalize [file dirname [info script]]]
 set project_dir [file join $root build tiny_lpu_de1_soc]
 file mkdir $project_dir
 cd $project_dir
+# project_new -overwrite leaves an existing QSF in place.  This project file is
+# generated by this script, so remove it to prevent stale device assignments.
+file delete -force tiny_lpu_de1_soc.qsf
 project_new -overwrite tiny_lpu_de1_soc
 set_global_assignment -name FAMILY "Cyclone V"
-set_global_assignment -name DEVICE 5CSEMA5F31C6N
+set_global_assignment -name DEVICE 5CSEMA5F31C6
 set_global_assignment -name TOP_LEVEL_ENTITY de1_soc_top
 set_global_assignment -name SYSTEMVERILOG_FILE [file join $root src de1_soc_top.sv]
 foreach f [glob -nocomplain [file join $root src *.sv]] {
-    if {$f ne [file join $root src de1_soc_top.sv] && $f ne [file join $root src lpu_de1_soc_wrapper.sv]} { set_global_assignment -name SYSTEMVERILOG_FILE $f }
+    if {$f ne [file join $root src de1_soc_top.sv] && $f ne [file join $root src lpu_pkg.sv]} { set_global_assignment -name SYSTEMVERILOG_FILE $f }
 }
 set_global_assignment -name SEARCH_PATH [file join $root src]
 set_location_assignment PIN_AF14 -to CLOCK_50
@@ -308,11 +354,13 @@ def find_quartus() -> Path:
 
 def qsys_api_version(qsys_bin: Path) -> str:
     """Return the major.minor API version advertised by Platform Designer."""
-    version_file = qsys_bin.parent / "version.txt"
-    if version_file.is_file():
-        match = re.search(r"Version=(\d+\.\d+)", version_file.read_text(encoding="utf-8", errors="replace"))
-        if match:
-            return match.group(1)
+    # qsys_bin is <quartus>/sopc_builder/bin; the full numeric version is in
+    # <quartus>/version.txt, while the SOPC Builder file only has a label.
+    for version_file in (qsys_bin.parent.parent / "version.txt", qsys_bin.parent / "version.txt"):
+        if version_file.is_file():
+            match = re.search(r"Version=(\d+\.\d+)", version_file.read_text(encoding="utf-8", errors="replace"))
+            if match:
+                return match.group(1)
     # Both the requested Quartus 18.1 and current 25.1 use these APIs.
     return "18.1"
 
@@ -338,7 +386,9 @@ def main() -> int:
     quartus = find_quartus()
     PROJECT_DIR.mkdir(parents=True, exist_ok=True)
     qsys_bin = quartus.parent / "sopc_builder" / "bin"
-    if not (qsys_bin / "qsys-script.exe").is_file() or not (qsys_bin / "qsys-generate.exe").is_file():
+    if (not (qsys_bin / "qsys-script.exe").is_file() or
+            not (qsys_bin / "qsys-generate.exe").is_file() or
+            not (qsys_bin / "ip-make-ipx.exe").is_file()):
         raise RuntimeError(f"Platform Designer tools were not found in {qsys_bin}.")
     api_version = qsys_api_version(qsys_bin)
     write(ip / "lpu_de1_soc_hw.tcl", HW_TCL.replace("@QSYS_API_VERSION@", api_version))
@@ -347,13 +397,25 @@ def main() -> int:
     # Initialize the Quartus project first, then let Platform Designer add the
     # generated QIP referenced by that project.
     run([str(quartus / "quartus_sh.exe"), "-t", str(init)], PROJECT_DIR)
+    # Quartus 25.x discovers custom Qsys components through this generated
+    # index; a raw *_hw.tcl file alone is not catalogued.
+    run([
+        str(qsys_bin / "ip-make-ipx.exe"),
+        f"--source-directory={ip.parent}",
+        f"--output={ip.parent / 'components.ipx'}",
+        "--thorough-descent",
+    ])
     # Qsys finds the packaged component through this repository-local IP path.
     env = os.environ.copy()
     env["QSYS_COMPONENT_DIR"] = str(ROOT / "ip")
-    qsys_script_command = [str(qsys_bin / "qsys-script.exe"), "--search-path", str(ip), "--script", str(qsys)]
+    qsys_script_command = [
+        str(qsys_bin / "qsys-script.exe"),
+        f"--search-path={ip.parent},$",
+        f"--script={qsys}",
+    ]
     print("+", subprocess.list2cmdline(qsys_script_command))
     subprocess.run(qsys_script_command, cwd=ROOT, env=env, check=True)
-    run([str(qsys_bin / "qsys-generate.exe"), "platform_designer_system.qsys", "--search-path", str(ip), "--synthesis=VERILOG"])
+    run([str(qsys_bin / "qsys-generate.exe"), "platform_designer_system.qsys", f"--search-path={ip.parent},$", "--synthesis=VERILOG"])
     run([str(quartus / "quartus_sh.exe"), "-t", str(add_qip)], PROJECT_DIR)
     if not args.generate_only:
         project_file = PROJECT_DIR / PROJECT
