@@ -76,7 +76,8 @@ module mem_row_dequant (
     endfunction
 
     generate
-        for (genvar lane = 0; lane < MXM_SIZE; lane++) begin : g_dequant_lane
+        genvar lane;
+        for (lane = 0; lane < MXM_SIZE; lane++) begin : g_dequant_lane
             logic [31:0] lane_fp32;
 
             always_comb begin
