@@ -51,7 +51,7 @@ def patch_rtl() -> None:
     """
     mem = SRC / "mem.sv"
     text = mem.read_text(encoding="utf-8")
-    if "ext_write_en" not in text:
+    if "ext_write_en" not in text and "ext_imem_en" not in text:
         text = replace_once(text,
             r"(input\s+logic\s+\[ADDR_W-1:0\]\s+addr\s*)(,?\s*\n\s*\);)",
             r"\1,\n\n    // External Host/JTAG interface (bypass ports)\n    input  logic              ext_write_en,\n    input  logic              ext_read_en,\n    input  logic [ADDR_W-1:0] ext_addr,\n    input  logic [DATA_W-1:0] ext_data_in,\n    output logic [DATA_W-1:0] ext_data_out\2", "mem ports")
@@ -73,7 +73,7 @@ def patch_rtl() -> None:
 
     icu = SRC / "icu.sv"
     text = icu.read_text(encoding="utf-8")
-    if "ext_write_en" not in text:
+    if "ext_write_en" not in text and "ext_imem_en" not in text:
         text = replace_once(text, r"(output\s+logic\s+\[2:0\]\s+vxm_residual_op)(\s*\n\s*\);)",
             r"\1,\n\n    // External JTAG write interface for programming\n    input  logic                      ext_write_en,\n    input  logic [$clog2(INSTRUCTION_COUNT)-1:0] ext_addr,\n    input  logic [95:0]               ext_data_in\2", "ICU ports")
         text = replace_once(text, r"(logic\s+\[95:0\]\s+imem_array\s+\[0:INSTRUCTION_COUNT-1\];)",
@@ -82,7 +82,7 @@ def patch_rtl() -> None:
 
     lpu = SRC / "lpu.sv"
     text = lpu.read_text(encoding="utf-8")
-    if "ext_imem_write_en" not in text:
+    if "ext_imem_write_en" not in text and "ext_en" not in text:
         text = replace_once(text, r"(input\s+logic\s+rst_n)(\s*\n\s*\);)",
             r"\1,\n\n    input logic ext_imem_write_en,\n    input logic [9:0] ext_imem_addr,\n    input logic [95:0] ext_imem_data_in,\n    input logic ext_mem0_write_en, ext_mem0_read_en,\n    input logic [MEM_ADDR_W-1:0] ext_mem0_addr,\n    input logic [71:0] ext_mem0_data_in,\n    output logic [71:0] ext_mem0_data_out,\n    input logic ext_mem1_write_en, ext_mem1_read_en,\n    input logic [MEM_ADDR_W-1:0] ext_mem1_addr,\n    input logic [71:0] ext_mem1_data_in,\n    output logic [71:0] ext_mem1_data_out\2", "LPU ports")
         text = replace_once(text, r"(\.vxm_residual_op\(vxm_residual_op\))(\s*\n\s*\);)",
@@ -90,6 +90,30 @@ def patch_rtl() -> None:
         for name in ("0", "1"):
             text = replace_once(text, rf"(\.addr\(mem{name}_addr\))(\s*\n\s*\);)",
                 rf"\1,\n    .ext_write_en(ext_mem{name}_write_en),\n    .ext_read_en(ext_mem{name}_read_en),\n    .ext_addr(ext_mem{name}_addr),\n    .ext_data_in(ext_mem{name}_data_in),\n    .ext_data_out(ext_mem{name}_data_out)\2", f"MEM{name} hookup")
+        write(lpu, text)
+
+    # Quartus enforces enum typing at module ports. The ICU exposes its bus
+    # selects as packed logic vectors, so make typed views and cast at the
+    # boundary before passing them to the bus/decode modules.
+    text = lpu.read_text(encoding="utf-8")
+    old_bus_views = """// Encoded bus select views. Keep these as plain vectors for Icarus compatibility.
+logic [2:0] westbound_consumer_sel_t;
+logic [2:0] eastbound_consumer_sel_t;
+
+logic [2:0] westbound_sel_t;
+logic [2:0] eastbound_sel_t;"""
+    new_bus_views = """// Enum-typed views required at the strongly typed bus module boundaries.
+westbound_consumer_e westbound_consumer_sel_t;
+eastbound_consumer_e eastbound_consumer_sel_t;
+
+westbound_producer_e westbound_sel_t;
+eastbound_producer_e eastbound_sel_t;"""
+    if old_bus_views in text:
+        text = text.replace(old_bus_views, new_bus_views)
+        text = text.replace("assign westbound_consumer_sel_t = westbound_consumer_sel;", "assign westbound_consumer_sel_t = westbound_consumer_e'(westbound_consumer_sel);")
+        text = text.replace("assign eastbound_consumer_sel_t = eastbound_consumer_sel;", "assign eastbound_consumer_sel_t = eastbound_consumer_e'(eastbound_consumer_sel);")
+        text = text.replace("assign westbound_sel_t = westbound_sel;", "assign westbound_sel_t = westbound_producer_e'(westbound_sel);")
+        text = text.replace("assign eastbound_sel_t = eastbound_sel;", "assign eastbound_sel_t = eastbound_producer_e'(eastbound_sel);")
         write(lpu, text)
 
     # Quartus 25.1 Lite accepts SystemVerilog generate loops, but not an
@@ -106,6 +130,7 @@ def patch_rtl() -> None:
         "softmax.sv": [("for (genvar lane = 0; lane < LANES; lane++) begin : gen_exp", "genvar lane;\n        for (lane = 0; lane < LANES; lane++) begin : gen_exp")],
         "vxm.sv": [("for (genvar i = 0; i < LANES; i++) begin : g_vxm_lanes", "genvar i;\n        for (i = 0; i < LANES; i++) begin : g_vxm_lanes")],
         "vxm_rope.sv": [("for (genvar pair = 0; pair < PAIRS; pair++) begin : g_rope_pairs", "genvar pair;\n        for (pair = 0; pair < PAIRS; pair++) begin : g_rope_pairs")],
+        "mem_row_dequant.sv": [("for (genvar lane = 0; lane < MXM_SIZE; lane++) begin : g_dequant_lane", "genvar lane;\n        for (lane = 0; lane < MXM_SIZE; lane++) begin : g_dequant_lane")],
         "eastbound_bus/mxm_eastbound_adapter.sv": [
             ("for (genvar row = 0; row < MXM_SIZE; row++) begin : g_row\n            for (genvar col = 0; col < MXM_SIZE; col++) begin : g_col", "genvar row;\n        genvar col;\n        for (row = 0; row < MXM_SIZE; row++) begin : g_row\n            for (col = 0; col < MXM_SIZE; col++) begin : g_col"),
         ],
@@ -120,6 +145,42 @@ def patch_rtl() -> None:
                 changed = True
         if changed:
             write(path, text)
+
+    # An asynchronous-reset event control must test only that reset signal in
+    # its first branch. Quartus rejects ``if (rst || mxm_clear)`` under
+    # ``@(posedge clk or posedge rst)``; mxm_clear is synchronous.
+    mxm = SRC / "mxm.sv"
+    text = mxm.read_text(encoding="utf-8")
+    old_reset = """    //if reset or mxm_clear, we know the registers hjave nothing in them/ we reset them to 0
+    if (rst || mxm_clear) begin 
+        mxm_input_ingress_loaded <= 1'b0;
+        mxm_wght_ingress_loaded <= 1'b0;
+
+
+        //
+        for (int idx = 0; idx < mxm_size; idx++) begin 
+            mxm_input_ingress_reg[idx] <= '0;
+            mxm_wght_ingress_reg[idx] <= '0;
+        end 
+    end """
+    new_reset = """    // rst is asynchronous; mxm_clear is a synchronous command.
+    if (rst) begin 
+        mxm_input_ingress_loaded <= 1'b0;
+        mxm_wght_ingress_loaded <= 1'b0;
+        for (int idx = 0; idx < mxm_size; idx++) begin
+            mxm_input_ingress_reg[idx] <= '0;
+            mxm_wght_ingress_reg[idx] <= '0;
+        end
+    end else if (mxm_clear) begin
+        mxm_input_ingress_loaded <= 1'b0;
+        mxm_wght_ingress_loaded <= 1'b0;
+        for (int idx = 0; idx < mxm_size; idx++) begin
+            mxm_input_ingress_reg[idx] <= '0;
+            mxm_wght_ingress_reg[idx] <= '0;
+        end
+    end """
+    if old_reset in text:
+        write(mxm, text.replace(old_reset, new_reset))
 
 
 TOP = """module de1_soc_top (
@@ -160,7 +221,6 @@ endmodule
 
 
 WRAPPER = r'''`timescale 1ns/1ps
-
 module lpu_de1_soc_wrapper (
     input logic clk, input logic rst_n,
     input logic [15:0] avs_address, input logic avs_read, input logic avs_write,
@@ -168,88 +228,60 @@ module lpu_de1_soc_wrapper (
     output logic [31:0] avs_readdata, output logic avs_waitrequest,
     output logic avs_readdatavalid
 );
-    logic run_enable;
-    logic [95:0] imem_assembly;
-    logic [71:0] mem0_assembly, mem1_assembly;
-    logic ext_imem_write_en;
-    logic [9:0] ext_imem_addr;
-    logic [95:0] ext_imem_data_in;
-    logic ext_mem0_write_en, ext_mem0_read_en, ext_mem1_write_en, ext_mem1_read_en;
-    logic [14:0] ext_mem0_addr, ext_mem1_addr;
-    logic [71:0] ext_mem0_data_in, ext_mem1_data_in, ext_mem0_data_out, ext_mem1_data_out;
-    logic [71:0] mem0_read_latched, mem1_read_latched;
-
-    wire [13:0] imem_word = avs_address[13:2];
-    wire [13:0] mem0_word = (avs_address - 16'h4000) >> 2;
-    wire [13:0] mem1_word = (avs_address - 16'h8000) >> 2;
-    /* Avalon addresses are byte addresses.  Rows use consecutive 32-bit words:
-       row = word-address / 3, lane = word-address % 3. */
-    integer row_index;
-    integer lane_index;
+    localparam logic [1:0] MEM0 = 2'd0, MEM1 = 2'd1, IMEM = 2'd2;
+    logic run_enable, ext_en, ext_write;
+    logic [1:0] ext_target;
+    logic [31:0] ext_addr;
+    logic [95:0] ext_wdata, ext_rdata, assembly;
+    integer word_index, row_index, lane_index;
 
     assign avs_waitrequest = 1'b0;
     assign avs_readdatavalid = avs_read;
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            run_enable <= 1'b0; imem_assembly <= '0; mem0_assembly <= '0; mem1_assembly <= '0;
-            ext_imem_write_en <= 1'b0; ext_mem0_write_en <= 1'b0; ext_mem1_write_en <= 1'b0;
-            ext_mem0_read_en <= 1'b0; ext_mem1_read_en <= 1'b0; avs_readdata <= '0;
-            mem0_read_latched <= '0; mem1_read_latched <= '0;
+            run_enable <= 1'b0; ext_en <= 1'b0; ext_write <= 1'b0;
+            ext_target <= '0; ext_addr <= '0; ext_wdata <= '0; assembly <= '0;
+            avs_readdata <= '0;
         end else begin
-            ext_imem_write_en <= 1'b0; ext_mem0_write_en <= 1'b0; ext_mem1_write_en <= 1'b0;
-            ext_mem0_read_en <= 1'b0; ext_mem1_read_en <= 1'b0;
-            /* The SRAM read is synchronous.  Capture its result for the read
-               transaction launched on the preceding cycle. */
-            mem0_read_latched <= ext_mem0_data_out;
-            mem1_read_latched <= ext_mem1_data_out;
+            ext_en <= 1'b0;
             if (avs_write) begin
                 if (avs_address == 16'hc000) run_enable <= avs_writedata[0];
-                else if (avs_address < 16'h4000) begin
-                    row_index = imem_word / 3; lane_index = imem_word % 3;
+                else begin
+                    if (avs_address < 16'h4000) begin word_index = avs_address[13:2]; ext_target <= IMEM; end
+                    else if (avs_address < 16'h8000) begin word_index = (avs_address - 16'h4000) >> 2; ext_target <= MEM0; end
+                    else begin word_index = (avs_address - 16'h8000) >> 2; ext_target <= MEM1; end
+                    row_index = word_index / 3; lane_index = word_index % 3;
                     case (lane_index)
-                      0: imem_assembly[31:0] <= avs_writedata;
-                      1: imem_assembly[63:32] <= avs_writedata;
-                      2: begin ext_imem_write_en <= 1'b1; ext_imem_addr <= row_index[9:0];
-                               ext_imem_data_in <= {avs_writedata, imem_assembly[63:0]}; end
-                    endcase
-                end else if (avs_address < 16'h8000) begin
-                    row_index = mem0_word / 3; lane_index = mem0_word % 3;
-                    case (lane_index)
-                      0: mem0_assembly[31:0] <= avs_writedata;
-                      1: mem0_assembly[63:32] <= avs_writedata;
-                      2: begin ext_mem0_write_en <= 1'b1; ext_mem0_addr <= row_index[14:0];
-                               ext_mem0_data_in <= {avs_writedata[7:0], mem0_assembly[63:0]}; end
-                    endcase
-                end else if (avs_address < 16'hc000) begin
-                    row_index = mem1_word / 3; lane_index = mem1_word % 3;
-                    case (lane_index)
-                      0: mem1_assembly[31:0] <= avs_writedata;
-                      1: mem1_assembly[63:32] <= avs_writedata;
-                      2: begin ext_mem1_write_en <= 1'b1; ext_mem1_addr <= row_index[14:0];
-                               ext_mem1_data_in <= {avs_writedata[7:0], mem1_assembly[63:0]}; end
+                        0: assembly[31:0] <= avs_writedata;
+                        1: assembly[63:32] <= avs_writedata;
+                        2: begin
+                            ext_en <= 1'b1; ext_write <= 1'b1; ext_addr <= row_index;
+                            ext_wdata <= {avs_writedata, assembly[63:0]};
+                        end
                     endcase
                 end
             end
             if (avs_read) begin
                 if (avs_address == 16'hc000) avs_readdata <= {31'b0, run_enable};
-                else if (avs_address >= 16'h4000 && avs_address < 16'h8000) begin
-                    row_index = mem0_word / 3; lane_index = mem0_word % 3;
-                    ext_mem0_read_en <= 1'b1; ext_mem0_addr <= row_index[14:0];
-                    case (lane_index) 0: avs_readdata <= mem0_read_latched[31:0];
-                      1: avs_readdata <= mem0_read_latched[63:32]; default: avs_readdata <= {24'b0,mem0_read_latched[71:64]}; endcase
-                end else if (avs_address >= 16'h8000 && avs_address < 16'hc000) begin
-                    row_index = mem1_word / 3; lane_index = mem1_word % 3;
-                    ext_mem1_read_en <= 1'b1; ext_mem1_addr <= row_index[14:0];
-                    case (lane_index) 0: avs_readdata <= mem1_read_latched[31:0];
-                      1: avs_readdata <= mem1_read_latched[63:32]; default: avs_readdata <= {24'b0,mem1_read_latched[71:64]}; endcase
-                end else avs_readdata <= '0; // IMEM has no external read port.
+                else begin
+                    if (avs_address < 16'h4000) begin word_index = avs_address[13:2]; ext_target <= IMEM; end
+                    else if (avs_address < 16'h8000) begin word_index = (avs_address - 16'h4000) >> 2; ext_target <= MEM0; end
+                    else begin word_index = (avs_address - 16'h8000) >> 2; ext_target <= MEM1; end
+                    row_index = word_index / 3; lane_index = word_index % 3;
+                    ext_en <= 1'b1; ext_write <= 1'b0; ext_addr <= row_index;
+                    case (lane_index) 0: avs_readdata <= ext_rdata[31:0];
+                      1: avs_readdata <= ext_rdata[63:32];
+                      default: avs_readdata <= ext_rdata[95:64]; endcase
+                end
             end
         end
     end
-    lpu u_lpu (.clk(clk), .rst_n(rst_n & run_enable),
-        .ext_imem_write_en(ext_imem_write_en), .ext_imem_addr(ext_imem_addr), .ext_imem_data_in(ext_imem_data_in),
-        .ext_mem0_write_en(ext_mem0_write_en), .ext_mem0_read_en(ext_mem0_read_en), .ext_mem0_addr(ext_mem0_addr), .ext_mem0_data_in(ext_mem0_data_in), .ext_mem0_data_out(ext_mem0_data_out),
-        .ext_mem1_write_en(ext_mem1_write_en), .ext_mem1_read_en(ext_mem1_read_en), .ext_mem1_addr(ext_mem1_addr), .ext_mem1_data_in(ext_mem1_data_in), .ext_mem1_data_out(ext_mem1_data_out));
+    lpu u_lpu (
+        .clk(clk), .rst_n(rst_n), .run_en(run_enable),
+        .pc_load_en(1'b0), .pc_load_value(32'd0),
+        .ext_en(ext_en), .ext_write(ext_write), .ext_target(ext_target),
+        .ext_addr(ext_addr), .ext_wdata(ext_wdata), .ext_rdata(ext_rdata), .cycle_counter()
+    );
 endmodule
 '''
 
@@ -312,11 +344,90 @@ project_new -overwrite tiny_lpu_de1_soc
 set_global_assignment -name FAMILY "Cyclone V"
 set_global_assignment -name DEVICE 5CSEMA5F31C6
 set_global_assignment -name TOP_LEVEL_ENTITY de1_soc_top
+# Exclude simulation-only real-number conversion helpers guarded with
+# `ifndef SYNTHESIS in the model RTL. Quartus does not define this macro by
+# default, and real data types are not synthesizable.
+set_global_assignment -name VERILOG_MACRO SYNTHESIS
 set_global_assignment -name SYSTEMVERILOG_FILE [file join $root src de1_soc_top.sv]
-foreach f [glob -nocomplain [file join $root src *.sv]] {
-    if {$f ne [file join $root src de1_soc_top.sv] && $f ne [file join $root src lpu_pkg.sv]} { set_global_assignment -name SYSTEMVERILOG_FILE $f }
+set source_dirs [concat [list [file join $root src]] [glob -nocomplain -types d [file join $root src *]]]
+foreach dir $source_dirs {
+    # One level is sufficient for TinyLPU's bus modules; archive is deliberately
+    # excluded because it contains alternative implementations.
+    if {[file tail $dir] ne "archive"} {
+        foreach f [glob -nocomplain [file join $dir *.sv]] {
+            if {$f ne [file join $root src de1_soc_top.sv] && $f ne [file join $root src lpu_pkg.sv]} {
+                set_global_assignment -name SYSTEMVERILOG_FILE $f
+            }
+        }
+    }
 }
 set_global_assignment -name SEARCH_PATH [file join $root src]
+if {0} {
+# CVFPU is kept here as a reference source list, but is intentionally disabled:
+# the pinned upstream sources use SystemVerilog constructs Quartus Lite 25.1
+# does not support. A Quartus-compatible FPU implementation is required before
+# this list can be enabled.
+set cvfpu [file join $root third_party cvfpu]
+set_global_assignment -name SEARCH_PATH [file join $cvfpu src common_cells include]
+# The model's FP32 wrappers bind to the repository-pinned CVFPU implementation
+# when HAVE_CVFPU is defined. Keep this curated list in the same order as the
+# existing simulation makefiles; do not glob the CVFPU tree because it contains
+# mutually exclusive test and vendor implementations.
+foreach rel {
+    src/common_cells/src/cf_math_pkg.sv
+    src/common_cells/src/lzc.sv
+    src/common_cells/src/rr_arb_tree.sv
+    src/fpu_div_sqrt_mvp/hdl/defs_div_sqrt_mvp.sv
+    src/fpu_div_sqrt_mvp/hdl/iteration_div_sqrt_mvp.sv
+    src/fpu_div_sqrt_mvp/hdl/control_mvp.sv
+    src/fpu_div_sqrt_mvp/hdl/norm_div_sqrt_mvp.sv
+    src/fpu_div_sqrt_mvp/hdl/preprocess_mvp.sv
+    src/fpu_div_sqrt_mvp/hdl/nrbd_nrsc_mvp.sv
+    src/fpu_div_sqrt_mvp/hdl/div_sqrt_top_mvp.sv
+    src/fpu_div_sqrt_mvp/hdl/div_sqrt_mvp_wrapper.sv
+    vendor/opene906/E906_RTL_FACTORY/gen_rtl/clk/rtl/gated_clk_cell.v
+    vendor/opene906/E906_RTL_FACTORY/gen_rtl/fdsu/rtl/pa_fdsu_ctrl.v
+    vendor/opene906/E906_RTL_FACTORY/gen_rtl/fdsu/rtl/pa_fdsu_ff1.v
+    vendor/opene906/E906_RTL_FACTORY/gen_rtl/fdsu/rtl/pa_fdsu_pack_single.v
+    vendor/opene906/E906_RTL_FACTORY/gen_rtl/fdsu/rtl/pa_fdsu_prepare.v
+    vendor/opene906/E906_RTL_FACTORY/gen_rtl/fdsu/rtl/pa_fdsu_round_single.v
+    vendor/opene906/E906_RTL_FACTORY/gen_rtl/fdsu/rtl/pa_fdsu_special.v
+    vendor/opene906/E906_RTL_FACTORY/gen_rtl/fdsu/rtl/pa_fdsu_srt_single.v
+    vendor/opene906/E906_RTL_FACTORY/gen_rtl/fdsu/rtl/pa_fdsu_top.v
+    vendor/opene906/E906_RTL_FACTORY/gen_rtl/fpu/rtl/pa_fpu_dp.v
+    vendor/opene906/E906_RTL_FACTORY/gen_rtl/fpu/rtl/pa_fpu_frbus.v
+    vendor/opene906/E906_RTL_FACTORY/gen_rtl/fpu/rtl/pa_fpu_src_type.v
+    vendor/openc910/C910_RTL_FACTORY/gen_rtl/vfdsu/rtl/ct_vfdsu_ctrl.v
+    vendor/openc910/C910_RTL_FACTORY/gen_rtl/vfdsu/rtl/ct_vfdsu_double.v
+    vendor/openc910/C910_RTL_FACTORY/gen_rtl/vfdsu/rtl/ct_vfdsu_ff1.v
+    vendor/openc910/C910_RTL_FACTORY/gen_rtl/vfdsu/rtl/ct_vfdsu_pack.v
+    vendor/openc910/C910_RTL_FACTORY/gen_rtl/vfdsu/rtl/ct_vfdsu_prepare.v
+    vendor/openc910/C910_RTL_FACTORY/gen_rtl/vfdsu/rtl/ct_vfdsu_round.v
+    vendor/openc910/C910_RTL_FACTORY/gen_rtl/vfdsu/rtl/ct_vfdsu_scalar_dp.v
+    vendor/openc910/C910_RTL_FACTORY/gen_rtl/vfdsu/rtl/ct_vfdsu_srt_radix16_bound_table.v
+    vendor/openc910/C910_RTL_FACTORY/gen_rtl/vfdsu/rtl/ct_vfdsu_srt_radix16_with_sqrt.v
+    vendor/openc910/C910_RTL_FACTORY/gen_rtl/vfdsu/rtl/ct_vfdsu_srt.v
+    vendor/openc910/C910_RTL_FACTORY/gen_rtl/vfdsu/rtl/ct_vfdsu_top.v
+    vendor/cvw/fma/fmalza.sv
+    src/fpnew_pkg.sv
+    src/fpnew_cast_multi.sv
+    src/fpnew_classifier.sv
+    src/fpnew_divsqrt_th_32.sv
+    src/fpnew_divsqrt_th_64_multi.sv
+    src/fpnew_divsqrt_multi.sv
+    src/fpnew_fma.sv
+    src/fpnew_fma_multi.sv
+    src/fpnew_noncomp.sv
+    src/fpnew_opgroup_block.sv
+    src/fpnew_opgroup_fmt_slice.sv
+    src/fpnew_rounding.sv
+    src/fpnew_top.sv
+} {
+    set f [file join $cvfpu $rel]
+    if {![file exists $f]} { error "Required CVFPU source is missing: $f. Run: git submodule update --init --recursive" }
+    if {[file extension $f] eq ".v"} { set_global_assignment -name VERILOG_FILE $f } else { set_global_assignment -name SYSTEMVERILOG_FILE $f }
+}
+}
 set_location_assignment PIN_AF14 -to CLOCK_50
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to CLOCK_50
 set_location_assignment PIN_AJ4 -to KEY[0]
@@ -377,8 +488,6 @@ def main() -> int:
     patch_rtl()
     write(SRC / "de1_soc_top.sv", TOP)
     write(SRC / "lpu_de1_soc_wrapper.sv", WRAPPER)
-    ip = ROOT / "ip" / "lpu_de1_soc"
-    write(ip / "lpu_de1_soc_wrapper.sv", WRAPPER)
     init = ROOT / "quartus_init_de1_soc.tcl"
     write(init, INIT_TCL)
     add_qip = ROOT / "quartus_add_qip_de1_soc.tcl"
@@ -387,35 +496,24 @@ def main() -> int:
     PROJECT_DIR.mkdir(parents=True, exist_ok=True)
     qsys_bin = quartus.parent / "sopc_builder" / "bin"
     if (not (qsys_bin / "qsys-script.exe").is_file() or
-            not (qsys_bin / "qsys-generate.exe").is_file() or
-            not (qsys_bin / "ip-make-ipx.exe").is_file()):
+            not (qsys_bin / "qsys-generate.exe").is_file()):
         raise RuntimeError(f"Platform Designer tools were not found in {qsys_bin}.")
     api_version = qsys_api_version(qsys_bin)
-    write(ip / "lpu_de1_soc_hw.tcl", HW_TCL.replace("@QSYS_API_VERSION@", api_version))
     qsys = ROOT / "platform_designer_system.qsys.tcl"
     write(qsys, SYSTEM_TCL.replace("@QSYS_API_VERSION@", api_version))
     # Initialize the Quartus project first, then let Platform Designer add the
     # generated QIP referenced by that project.
     run([str(quartus / "quartus_sh.exe"), "-t", str(init)], PROJECT_DIR)
-    # Quartus 25.x discovers custom Qsys components through this generated
-    # index; a raw *_hw.tcl file alone is not catalogued.
-    run([
-        str(qsys_bin / "ip-make-ipx.exe"),
-        f"--source-directory={ip.parent}",
-        f"--output={ip.parent / 'components.ipx'}",
-        "--thorough-descent",
-    ])
-    # Qsys finds the packaged component through this repository-local IP path.
-    env = os.environ.copy()
-    env["QSYS_COMPONENT_DIR"] = str(ROOT / "ip")
+    # The JTAG master is exported from Platform Designer and connected to the
+    # repository HDL wrapper at the Quartus top level.  This avoids fragile
+    # version-specific custom-IP cataloguing entirely.
     qsys_script_command = [
         str(qsys_bin / "qsys-script.exe"),
-        f"--search-path={ip.parent},$",
         f"--script={qsys}",
     ]
     print("+", subprocess.list2cmdline(qsys_script_command))
-    subprocess.run(qsys_script_command, cwd=ROOT, env=env, check=True)
-    run([str(qsys_bin / "qsys-generate.exe"), "platform_designer_system.qsys", f"--search-path={ip.parent},$", "--synthesis=VERILOG"])
+    subprocess.run(qsys_script_command, cwd=ROOT, check=True)
+    run([str(qsys_bin / "qsys-generate.exe"), "platform_designer_system.qsys", "--synthesis=VERILOG"])
     run([str(quartus / "quartus_sh.exe"), "-t", str(add_qip)], PROJECT_DIR)
     if not args.generate_only:
         project_file = PROJECT_DIR / PROJECT

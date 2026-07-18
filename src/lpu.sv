@@ -74,12 +74,12 @@ localparam logic [2:0] VXM_OPERAND_ROPE_SIN = 3'd5;
 localparam logic [2:0] VXM_OPERAND_SCALE    = 3'd6;
 localparam logic [2:0] VXM_RES_EMIT         = 3'd4;
 
-// Encoded bus select views. Keep these as plain vectors for Icarus compatibility.
-logic [2:0] westbound_consumer_sel_t;
-logic [2:0] eastbound_consumer_sel_t;
+// Enum-typed views required at the strongly typed bus module boundaries.
+westbound_consumer_e westbound_consumer_sel_t;
+eastbound_consumer_e eastbound_consumer_sel_t;
 
-logic [2:0] westbound_sel_t;
-logic [2:0] eastbound_sel_t;
+westbound_producer_e westbound_sel_t;
+eastbound_producer_e eastbound_sel_t;
 
 localparam logic [1:0] EXT_TARGET_MEM0 = 2'd0;
 localparam logic [1:0] EXT_TARGET_MEM1 = 2'd1;
@@ -203,8 +203,8 @@ icu u_icu(
 
 //mux logic for mem0 input
 
-assign westbound_consumer_sel_t = westbound_consumer_sel;
-assign eastbound_consumer_sel_t = eastbound_consumer_sel;
+assign westbound_consumer_sel_t = westbound_consumer_e'(westbound_consumer_sel);
+assign eastbound_consumer_sel_t = eastbound_consumer_e'(eastbound_consumer_sel);
 
 assign mem0_write_from_west =
     mem0_write_en && (westbound_consumer_sel_t == WC_MEM0) && westbound_valid;
@@ -244,8 +244,8 @@ mem #(
     .addr(mem0_addr_eff),
     .ext_write_en(1'b0),
     .ext_read_en(1'b0),
-    .ext_addr('0),
-    .ext_data_in('0),
+    .ext_addr({MEM_ADDR_W{1'b0}}),
+    .ext_data_in({$bits(mem_row_t){1'b0}}),
     .ext_data_out()
 );
 
@@ -259,9 +259,9 @@ assign mem1_write_en_eff = ext_mem1_write ||
 assign mem1_read_en_eff = ext_mem1_read || mem1_read_en;
 assign mem1_addr_eff = ext_mem1_en ? ext_addr[MEM_ADDR_W-1:0] : mem1_addr;
 
-assign westbound_sel_t = westbound_sel;
+assign westbound_sel_t = westbound_producer_e'(westbound_sel);
 
-assign eastbound_sel_t = eastbound_sel;
+assign eastbound_sel_t = eastbound_producer_e'(eastbound_sel);
 
 mem #(
     .DATA_W($bits(mem_row_t))
@@ -275,8 +275,8 @@ mem #(
     .addr(mem1_addr_eff),
     .ext_write_en(1'b0),
     .ext_read_en(1'b0),
-    .ext_addr('0),
-    .ext_data_in('0),
+    .ext_addr({MEM_ADDR_W{1'b0}}),
+    .ext_data_in({$bits(mem_row_t){1'b0}}),
     .ext_data_out()
 );
 
