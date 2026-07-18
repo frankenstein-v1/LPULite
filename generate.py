@@ -86,7 +86,7 @@ if __name__ == "__main__":
     else:
         # Interactive shell
         print("\n=== TinyLM Interactive Generator ===")
-        print("Type a prompt (e.g. 'messi is', 'cat wears', 'sky is') or type 'exit' to quit.\n")
+        print("Type a prompt (e.g. 'he is', 'he is very', 'it is') or type 'exit' to quit.\n")
         while True:
             try:
                 prompt = input("Prompt > ")

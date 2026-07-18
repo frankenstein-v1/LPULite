@@ -7,7 +7,7 @@
 // consume. VXM can feed row_o into its existing quant stage when storage is
 // required.
 module residual_add #(
-    parameter int LANES  = 4,
+    parameter int LANES  = 8,
     parameter int LANE_W = 32
 ) (
     input  logic                    clk,

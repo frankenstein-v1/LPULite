@@ -8,7 +8,7 @@
 // name because VXM already instantiates lut_layernorm, but the behavior is now
 // floating-point rather than fixed-point LUT math.
 module lut_layernorm #(
-    parameter int LANES      = 4,
+    parameter int LANES      = 8,
     parameter int LANE_W     = 32,
     parameter int LUT_FRAC_W = 16
 ) (

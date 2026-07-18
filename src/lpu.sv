@@ -1,18 +1,37 @@
 `timescale 1ns/1ps
 `include "lpu_pkg.sv"
 
-module lpu (
-    input logic clk,
-    input logic rst_n
+module lpu #(
+    parameter int RMSNORM_CHUNKS = 8,
+    parameter int SOFTMAX_CHUNKS = 64
+) (
+    input  logic        clk,
+    input  logic        rst_n,
+
+    input  logic        run_en,
+    input  logic        pc_load_en,
+    input  logic [31:0] pc_load_value,
+
+    input  logic        ext_en,
+    input  logic        ext_write,
+    input  logic [1:0]  ext_target,
+    input  logic [31:0] ext_addr,
+    input  logic [95:0] ext_wdata,
+    output logic [95:0] ext_rdata,
+    output logic [31:0] cycle_counter
 );
 
 //icu mem outputs
 logic mem0_read_en;
 logic mem0_write_en;
 logic [MEM_ADDR_W-1:0] mem0_addr;
+logic mem0_read_en_eff;
+logic [MEM_ADDR_W-1:0] mem0_addr_eff;
 logic mem1_read_en;
 logic mem1_write_en;
 logic [MEM_ADDR_W-1:0] mem1_addr;
+logic mem1_read_en_eff;
+logic [MEM_ADDR_W-1:0] mem1_addr_eff;
 
 //icu sxm outputs
 logic [11:0] sxm_opcode_input;
@@ -61,6 +80,36 @@ logic [2:0] eastbound_consumer_sel_t;
 
 logic [2:0] westbound_sel_t;
 logic [2:0] eastbound_sel_t;
+
+localparam logic [1:0] EXT_TARGET_MEM0 = 2'd0;
+localparam logic [1:0] EXT_TARGET_MEM1 = 2'd1;
+localparam logic [1:0] EXT_TARGET_IMEM = 2'd2;
+localparam logic [1:0] EXT_TARGET_CTRL = 2'd3;
+
+logic ext_mem0_en;
+logic ext_mem1_en;
+logic ext_imem_en;
+logic ext_mem0_write;
+logic ext_mem1_write;
+logic ext_mem0_read;
+logic ext_mem1_read;
+logic [95:0] ext_imem_rdata;
+
+assign ext_mem0_en    = ext_en && (ext_target == EXT_TARGET_MEM0);
+assign ext_mem1_en    = ext_en && (ext_target == EXT_TARGET_MEM1);
+assign ext_imem_en    = ext_en && (ext_target == EXT_TARGET_IMEM);
+assign ext_mem0_write = ext_mem0_en && ext_write;
+assign ext_mem1_write = ext_mem1_en && ext_write;
+assign ext_mem0_read  = ext_mem0_en && !ext_write;
+assign ext_mem1_read  = ext_mem1_en && !ext_write;
+
+always_ff @(posedge clk or negedge rst_n) begin
+    if (!rst_n) begin
+        cycle_counter <= 32'd0;
+    end else if (run_en) begin
+        cycle_counter <= cycle_counter + 32'd1;
+    end
+end
 
 // shared bus signals (to be driven by bus fabric later)
 superlane_t westbound_payload;
@@ -112,6 +161,14 @@ logic signed [MXM_SIZE-1:0][MXM_SIZE-1:0][31:0] mxm_out;
 icu u_icu(
     .clk(clk),
     .rst_n(rst_n),
+    .run_en(run_en),
+    .pc_load_en(pc_load_en),
+    .pc_load_value(pc_load_value),
+    .ext_imem_en(ext_imem_en),
+    .ext_imem_write(ext_write),
+    .ext_imem_addr(ext_addr[9:0]),
+    .ext_imem_wdata(ext_wdata),
+    .ext_imem_rdata(ext_imem_rdata),
     .mem0_read_en(mem0_read_en),
     .mem0_write_en(mem0_write_en),
     .mem0_addr(mem0_addr),
@@ -155,12 +212,17 @@ assign mem0_write_from_west =
 assign mem0_write_from_east =
     mem0_write_en && (eastbound_consumer_sel_t == EC_MEM0) && eastbound_valid;
 
-assign mem0_write_en_eff = mem0_write_from_west || mem0_write_from_east;
+assign mem0_write_en_eff = ext_mem0_write || mem0_write_from_west || mem0_write_from_east;
+assign mem0_read_en_eff = ext_mem0_read || mem0_read_en;
+assign mem0_addr_eff = ext_mem0_en ? ext_addr[MEM_ADDR_W-1:0] : mem0_addr;
 
 always_comb begin
     mem0_stream_in = '0;
 
-    if (mem0_write_from_west) begin
+    if (ext_mem0_write) begin
+        mem0_stream_in = ext_wdata[$bits(mem_row_t)-1:0];
+    end
+    else if (mem0_write_from_west) begin
         if (westbound_sel_t == WB_VXM)
             mem0_stream_in = mem_row_t'(make_fp8_row_mem(westbound_payload, vxm_stream_out_scale_buf));
         else
@@ -177,9 +239,9 @@ mem #(
     .rst_n(rst_n),
     .stream_in(mem0_stream_in),
     .stream_out(mem0_stream_out),
-    .read_en(mem0_read_en),
+    .read_en(mem0_read_en_eff),
     .write_en(mem0_write_en_eff),
-    .addr(mem0_addr)
+    .addr(mem0_addr_eff)
 );
 
 //since mem1 is on the far left westbound cannot write into it, so only eastbound can 
@@ -187,7 +249,10 @@ mem_row_t mem1_stream_out;
 
 logic mem1_write_en_eff;
 
-assign mem1_write_en_eff = mem1_write_en && (eastbound_consumer_sel_t == EC_MEM1) && eastbound_valid;
+assign mem1_write_en_eff = ext_mem1_write ||
+                            (mem1_write_en && (eastbound_consumer_sel_t == EC_MEM1) && eastbound_valid);
+assign mem1_read_en_eff = ext_mem1_read || mem1_read_en;
+assign mem1_addr_eff = ext_mem1_en ? ext_addr[MEM_ADDR_W-1:0] : mem1_addr;
 
 assign westbound_sel_t = westbound_sel;
 
@@ -198,12 +263,35 @@ mem #(
 ) u_mem1(
     .clk(clk),
     .rst_n(rst_n),
-    .stream_in(eastbound_to_mem_row(eastbound_payload)),
+    .stream_in(ext_mem1_write ? ext_wdata[$bits(mem_row_t)-1:0] : eastbound_to_mem_row(eastbound_payload)),
     .stream_out(mem1_stream_out),
-    .read_en(mem1_read_en),
+    .read_en(mem1_read_en_eff),
     .write_en(mem1_write_en_eff),
-    .addr(mem1_addr)
+    .addr(mem1_addr_eff)
 );
+
+always_comb begin
+    ext_rdata = '0;
+    unique case (ext_target)
+        EXT_TARGET_MEM0: begin
+            ext_rdata[$bits(mem_row_t)-1:0] = mem0_stream_out;
+        end
+        EXT_TARGET_MEM1: begin
+            ext_rdata[$bits(mem_row_t)-1:0] = mem1_stream_out;
+        end
+        EXT_TARGET_IMEM: begin
+            ext_rdata = ext_imem_rdata;
+        end
+        EXT_TARGET_CTRL: begin
+            ext_rdata[0]     = run_en;
+            ext_rdata[1]     = rst_n;
+            ext_rdata[63:32] = cycle_counter;
+        end
+        default: begin
+            ext_rdata = '0;
+        end
+    endcase
+end
 
 // memory read data is synchronous, so register valid alongside the read enable
 always_ff @(posedge clk or negedge rst_n) begin
@@ -211,8 +299,8 @@ always_ff @(posedge clk or negedge rst_n) begin
         mem0_valid <= 1'b0;
         mem1_valid <= 1'b0;
     end else begin
-        mem0_valid <= mem0_read_en;
-        mem1_valid <= mem1_read_en;
+        mem0_valid <= mem0_read_en && !ext_mem0_read;
+        mem1_valid <= mem1_read_en && !ext_mem1_read;
     end
 end
 
@@ -250,6 +338,7 @@ logic mxm_valid_e;
 mxm_row_t vxm_payload_e_bus;
 mxm_row_t sxm_payload_e_bus;
 mxm_row_t mem0_payload_e_bus;
+mxm_row_t mem0_dequant_payload_e_bus;
 
 assign eastbound_payload_lane0 = eastbound_payload[$bits(superlane_t)-1:0];
 
@@ -262,6 +351,11 @@ always_comb begin
     sxm_payload_e_bus[$bits(superlane_t)-1:0] = sxm_stream_out_to_mxm_left;
     mem0_payload_e_bus = mem_row_to_eastbound(mem0_stream_out);
 end
+
+mem_row_dequant u_mem0_dequant (
+    .mem_row_i(mem0_stream_out),
+    .fp32_row_o(mem0_dequant_payload_e_bus)
+);
 
 mxm_eastbound_adapter #(
     .MXM_SIZE(MXM_SIZE),
@@ -396,10 +490,25 @@ assign vxm_load_operand = vxm_load_operand_east || vxm_load_operand_west;
 
 always_comb begin
     vxm_operand_payload = '0;
-    if (vxm_load_operand_east)
-        vxm_operand_payload = eastbound_payload;
-    else if (vxm_load_operand_west)
+    if (vxm_load_operand_east) begin
+        if (eastbound_sel_t == EB_MEM0) begin
+            unique case (vxm_operand_sel)
+                VXM_OPERAND_DATA,
+                VXM_OPERAND_BIAS,
+                VXM_OPERAND_GAMMA,
+                VXM_OPERAND_BETA: begin
+                    vxm_operand_payload = mem0_dequant_payload_e_bus;
+                end
+                default: begin
+                    vxm_operand_payload = eastbound_payload;
+                end
+            endcase
+        end else begin
+            vxm_operand_payload = eastbound_payload;
+        end
+    end else if (vxm_load_operand_west) begin
         vxm_operand_payload[$bits(superlane_t)-1:0] = westbound_payload;
+    end
 end
 
 // For now VXM consumes full-width rows from the eastbound bus only.
@@ -429,7 +538,7 @@ row_fifo #(
     .rst_n(rst_n),
     .wr_en(vxm_fifo_wr_en),
     .rd_en(vxm_fifo_rd_en),
-    .data_in(eastbound_payload),
+    .data_in(vxm_operand_payload),
     .data_out(vxm_fifo_data_out),
     .full(vxm_fifo_full),
     .empty(vxm_fifo_empty)
@@ -508,7 +617,9 @@ row_fifo #(
 vxm #(
     .LANES(MXM_SIZE),
     .LANE_W(32),
-    .ALU_W(32)
+    .ALU_W(32),
+    .RMSNORM_CHUNKS(RMSNORM_CHUNKS),
+    .SOFTMAX_CHUNKS(SOFTMAX_CHUNKS)
 ) u_vxm(
     .clk(clk),
     .rst_n(rst_n),

@@ -4,6 +4,15 @@ module icu #(
 )(
     input  logic clk,
     input  logic rst_n,
+    input  logic run_en,
+    input  logic pc_load_en,
+    input  logic [31:0] pc_load_value,
+
+    input  logic        ext_imem_en,
+    input  logic        ext_imem_write,
+    input  logic [9:0]  ext_imem_addr,
+    input  logic [95:0] ext_imem_wdata,
+    output logic [95:0] ext_imem_rdata,
 
     // mem0 Control
     output logic      mem0_read_en,
@@ -58,12 +67,23 @@ module icu #(
     // A simple register that tracks what line of code we are on.
     logic [31:0] pc;
 
+    always_ff @(posedge clk) begin
+        if (ext_imem_en && ext_imem_write) begin
+            imem_array[ext_imem_addr] <= ext_imem_wdata;
+        end
+    end
+
+    assign ext_imem_rdata = imem_array[ext_imem_addr];
+
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             pc <= 32'd0; // Reset back to line 0
+        end else if (pc_load_en) begin
+            pc <= pc_load_value;
+        end else if (run_en) begin
+            pc <= pc + 1;
         end else begin
-            // In a stateless LPU, we never stall or branch. We just relentlessly march forward.
-            pc <= pc + 1; 
+            pc <= pc;
         end
     end
 
