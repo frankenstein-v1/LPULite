@@ -1,57 +1,70 @@
-// ==============================================================================
-// Mathematical Core & Architecture Inspiration Credit: SuryaHead
-// Repository: https://github.com/SurjaHead/softmax-in-hardware
-// Completely structurally rewritten to support parallel LANES and AXI4-Stream
-// for the tinyLPU architecture.
-// ==============================================================================
-`default_nettype none
 `timescale 1ns/1ns
 
 module softmax #(
-    parameter int LANES   = 4,
-    parameter int LANE_W  = 32
+    parameter int LANES      = 8,
+    parameter int LANE_W     = 32,
+    parameter int MAX_CHUNKS = 64
 ) (
-    input  logic                     clk,
-    input  logic                     rst_n,
+    input  logic                    clk,
+    input  logic                    rst_n,
 
-    input  logic                     in_valid,
-    input  logic                     input_mode_fp,
-    input  logic [LANES*LANE_W-1:0]  x_in,
+    input  logic                    in_valid,
+    input  logic [LANES*LANE_W-1:0] x_in,
+    output logic                    in_ready,
 
-    output logic                     in_ready,
-    output logic                     out_valid,
-    output logic                     out_mode_fp,
-    output logic [LANES*LANE_W-1:0]  y_out
+    output logic                    out_valid,
+    output logic                    out_mode_fp,
+    output logic [LANES*LANE_W-1:0] y_out,
+    input  logic                    out_ready,
+
+    output logic                    busy_o
 );
 
-    localparam int MAX_BITS = 30;
-    localparam int OUT_BITS = 8;
-    localparam logic [LANE_W-1:0] RECIP_DIVIDEND = 32'd1 << MAX_BITS;
-    localparam int SHIFT = MAX_BITS - OUT_BITS;
+    localparam int ROW_W = LANES * LANE_W;
+    localparam int IDX_W = (MAX_CHUNKS <= 1) ? 1 : $clog2(MAX_CHUNKS);
 
-    typedef enum logic [4:0] {
-        ST_IDLE,
-        ST_INT_DIVIDE,
-        ST_INT_DONE,
-        ST_FP_MAX_L1_START,
-        ST_FP_MAX_L1_WAIT,
-        ST_FP_MAX_L2_START,
-        ST_FP_MAX_L2_WAIT,
-        ST_FP_MAX_L3_START,
-        ST_FP_MAX_L3_WAIT,
-        ST_FP_DELTA_START,
-        ST_FP_DELTA_WAIT,
-        ST_FP_EXP_CAPTURE,
-        ST_FP_SUM_L1_START,
-        ST_FP_SUM_L1_WAIT,
-        ST_FP_SUM_L2_START,
-        ST_FP_SUM_L2_WAIT,
-        ST_FP_SUM_L3_START,
-        ST_FP_SUM_L3_WAIT,
-        ST_FP_NORM_START,
-        ST_FP_NORM_WAIT,
-        ST_FP_DONE
-    } state_t;
+    typedef enum logic [1:0] {
+        ST_CAPTURE,
+        ST_SUM,
+        ST_NORM
+    } state_e;
+
+    state_e state_q;
+
+    logic [ROW_W-1:0] score_buf [0:MAX_CHUNKS-1];
+    logic [IDX_W-1:0] write_idx;
+    logic [IDX_W-1:0] read_idx;
+    logic [31:0]      global_max;
+    logic [31:0]      global_sum;
+    logic             active_q;
+
+    logic [ROW_W-1:0] active_row;
+    logic [31:0]      row_max;
+    logic [31:0]      exp_row [0:LANES-1];
+    logic signed [LANE_W-1:0] exp_delta_q [0:LANES-1];
+    logic [31:0]      chunk_sum;
+    logic [31:0]      prob_fixed [0:LANES-1];
+
+    function automatic logic fp32_gt(
+        input logic [31:0] a,
+        input logic [31:0] b
+    );
+        logic sign_a;
+        logic sign_b;
+        begin
+            sign_a = a[31];
+            sign_b = b[31];
+
+            if (a[30:0] == 31'd0 && b[30:0] == 31'd0)
+                fp32_gt = 1'b0;
+            else if (sign_a != sign_b)
+                fp32_gt = sign_b;
+            else if (!sign_a)
+                fp32_gt = a[30:0] > b[30:0];
+            else
+                fp32_gt = a[30:0] < b[30:0];
+        end
+    endfunction
 
     function automatic logic signed [LANE_W-1:0] fp32_to_q8_8(
         input logic [31:0] fp_bits
@@ -134,574 +147,118 @@ module softmax #(
         end
     endfunction
 
-    // ---------------------------------------------------------
-    // Integer softmax datapath
-    // ---------------------------------------------------------
-    logic signed [LANE_W-1:0] int_lane_data [0:LANES-1];
-    logic signed [LANE_W-1:0] int_lane_sub  [0:LANES-1];
-    logic signed [LANE_W-1:0] int_lane_exp  [0:LANES-1];
-    logic signed [LANE_W-1:0] int_lane_exp_reg [0:LANES-1];
-    logic signed [LANE_W-1:0] int_lane_out [0:LANES-1];
-    logic signed [LANE_W-1:0] int_lane_max;
-    logic signed [LANE_W-1:0] sum_exp;
-    logic signed [LANE_W-1:0] sum_exp_reg;
-    logic [LANE_W-1:0] quotient, remainder;
-    logic divider_start;
-    logic divider_done;
-
-    always_comb begin
-        for (int i = 0; i < LANES; i++) begin
-            int_lane_data[i] = x_in[i*LANE_W +: LANE_W];
-        end
-    end
-
-    always_comb begin
-        int_lane_max = int_lane_data[0];
-        for (int i = 1; i < LANES; i++) begin
-            if (int_lane_data[i] > int_lane_max)
-                int_lane_max = int_lane_data[i];
-        end
-    end
-
-    always_comb begin
-        for (int i = 0; i < LANES; i++) begin
-            int_lane_sub[i] = int_lane_data[i] - int_lane_max;
-        end
-    end
-
-    generate
-        for (genvar i = 0; i < LANES; i++) begin : gen_int_exp
-            lut_softmax_exp #(.DW(LANE_W)) exp_inst (
-                .clk(clk),
-                .rst(~rst_n),
-                .q(int_lane_sub[i]),
-                .q_out(int_lane_exp[i])
-            );
-        end
-    endgenerate
-
-    always_comb begin
-        sum_exp = '0;
-        for (int i = 0; i < LANES; i++) begin
-            sum_exp = sum_exp + int_lane_exp[i];
-        end
-    end
-
-    lut_softmax_div #(.DW(LANE_W)) u_lut_softmax_div (
-        .clk(clk),
-        .rst(~rst_n),
-        .start(divider_start),
-        .dividend(RECIP_DIVIDEND),
-        .divisor(sum_exp_reg),
-        .quotient(quotient),
-        .remainder(remainder),
-        .done(divider_done)
+    function automatic logic [31:0] softmax_prob_q8_8(
+        input logic [31:0] exp_value,
+        input logic [31:0] sum_value
     );
-
-    always_comb begin
-        for (int k = 0; k < LANES; k++) begin
-            int_lane_out[k] = (quotient * int_lane_exp_reg[k]) >> SHIFT;
+        longint unsigned numerator;
+        longint unsigned quotient;
+        begin
+            if (sum_value == 32'd0) begin
+                softmax_prob_q8_8 = 32'd0;
+            end else begin
+                numerator = ({32'd0, exp_value} << 8) + {33'd0, sum_value[31:1]};
+                quotient = numerator / {32'd0, sum_value};
+                softmax_prob_q8_8 = (quotient > 64'd256) ? 32'd256 : quotient[31:0];
+            end
         end
-    end
-
-    // ---------------------------------------------------------
-    // Floating-point softmax datapath registers & signals
-    // ---------------------------------------------------------
-    logic [31:0] fp_input_reg [0:LANES-1];
-
-    logic [31:0] fp_max_pair0_reg;
-    logic [31:0] fp_max_pair1_reg;
-    logic [31:0] fp_max_pair2_reg;
-    logic [31:0] fp_max_pair3_reg;
-    logic [31:0] fp_max_quad0_reg;
-    logic [31:0] fp_max_quad1_reg;
-    logic [31:0] fp_max_reg;
-
-    logic [31:0] fp_delta_reg [0:LANES-1];
-    logic [31:0] fp_exp_reg   [0:LANES-1];
-    logic [31:0] fp_prob_reg  [0:LANES-1];
-
-    logic [31:0] fp_sum_pair0_reg;
-    logic [31:0] fp_sum_pair1_reg;
-    logic [31:0] fp_sum_pair2_reg;
-    logic [31:0] fp_sum_pair3_reg;
-    logic [31:0] fp_sum_quad0_reg;
-    logic [31:0] fp_sum_quad1_reg;
-    logic [31:0] fp_sum_reg;
-
-    logic signed [LANE_W-1:0] fp_delta_q8_8 [0:LANES-1];
-    logic signed [LANE_W-1:0] fp_scaled_exp [0:LANES-1];
-    logic [31:0]              fp_exp_wire   [0:LANES-1];
-
-    logic fp_cmp_l1_start;
-    logic fp_cmp_l2_start;
-    logic fp_cmp_l3_start;
-    logic fp_delta_start;
-    logic fp_sum_l1_start;
-    logic fp_sum_l2_start;
-    logic fp_sum_l3_start;
-    logic fp_norm_start;
-
-    logic fp_cmp01_done, fp_cmp23_done, fp_cmp45_done, fp_cmp67_done;
-    logic fp_cmp01_result, fp_cmp23_result, fp_cmp45_result, fp_cmp67_result;
-
-    logic fp_cmp_q0_done, fp_cmp_q1_done;
-    logic fp_cmp_q0_result, fp_cmp_q1_result;
-
-    logic fp_cmp_oct_done;
-    logic fp_cmp_oct_result;
-
-    logic [31:0] fp_delta_result [0:LANES-1];
-    logic [LANES-1:0] fp_delta_done;
-
-    logic [31:0] fp_sum_pair0_result, fp_sum_pair1_result, fp_sum_pair2_result, fp_sum_pair3_result;
-    logic        fp_sum_pair0_done, fp_sum_pair1_done, fp_sum_pair2_done, fp_sum_pair3_done;
-
-    logic [31:0] fp_sum_quad0_result, fp_sum_quad1_result;
-    logic        fp_sum_quad0_done, fp_sum_quad1_done;
-
-    logic [31:0] fp_sum_oct_result;
-    logic        fp_sum_oct_done;
-
-    logic [31:0] fp_norm_result [0:LANES-1];
-    logic [LANES-1:0] fp_norm_done;
-
-    logic [31:0] fp_max_pair0_next;
-    logic [31:0] fp_max_pair1_next;
-    logic [31:0] fp_max_pair2_next;
-    logic [31:0] fp_max_pair3_next;
-    logic [31:0] fp_max_quad0_next;
-    logic [31:0] fp_max_quad1_next;
-    logic [31:0] fp_max_oct_next;
-
-    assign fp_max_pair0_next = fp_cmp01_result ? fp_input_reg[1] : fp_input_reg[0];
-    assign fp_max_pair1_next = fp_cmp23_result ? fp_input_reg[3] : fp_input_reg[2];
-    assign fp_max_pair2_next = (LANES == 8) ? (fp_cmp45_result ? fp_input_reg[5] : fp_input_reg[4]) : 32'h0;
-    assign fp_max_pair3_next = (LANES == 8) ? (fp_cmp67_result ? fp_input_reg[7] : fp_input_reg[6]) : 32'h0;
-
-    assign fp_max_quad0_next = fp_cmp_q0_result ? fp_max_pair1_reg : fp_max_pair0_reg;
-    assign fp_max_quad1_next = (LANES == 8) ? (fp_cmp_q1_result ? fp_max_pair3_reg : fp_max_pair2_reg) : 32'h0;
-
-    assign fp_max_oct_next   = fp_cmp_oct_result ? fp_max_quad1_reg : fp_max_quad0_reg;
+    endfunction
 
     always_comb begin
-        for (int i = 0; i < LANES; i++) begin
-            fp_delta_q8_8[i] = fp32_to_q8_8(fp_delta_reg[i]);
-            fp_exp_wire[i]   = uq8_8_to_fp32(fp_scaled_exp[i]);
+        active_row = (state_q == ST_CAPTURE) ? x_in : score_buf[read_idx];
+
+        row_max = active_row[0 +: LANE_W];
+        for (int lane = 1; lane < LANES; lane++) begin
+            if (fp32_gt(active_row[lane*LANE_W +: LANE_W], row_max))
+                row_max = active_row[lane*LANE_W +: LANE_W];
+        end
+
+        chunk_sum = 32'd0;
+        for (int lane = 0; lane < LANES; lane++) begin
+            exp_delta_q[lane] = fp32_to_q8_8(active_row[lane*LANE_W +: LANE_W])
+                              - fp32_to_q8_8(global_max);
+            chunk_sum = chunk_sum + exp_row[lane];
+            prob_fixed[lane] = softmax_prob_q8_8(exp_row[lane], global_sum);
+            y_out[lane*LANE_W +: LANE_W] = uq8_8_to_fp32(prob_fixed[lane]);
         end
     end
 
     generate
-        for (genvar i = 0; i < LANES; i++) begin : gen_fp_exp
+        for (genvar lane = 0; lane < LANES; lane++) begin : gen_exp
             lut_softmax_exp #(.DW(LANE_W)) exp_inst (
                 .clk(clk),
                 .rst(~rst_n),
-                .q(fp_delta_q8_8[i]),
-                .q_out(fp_scaled_exp[i])
+                .q(exp_delta_q[lane]),
+                .q_out(exp_row[lane])
             );
         end
     endgenerate
-
-    // ---------------------------------------------------------
-    // Dual-Lane Logic Tree Allocations
-    // ---------------------------------------------------------
-    generate
-        if (LANES == 8) begin : gen_tree_8
-            // Level 1 Max Comparators
-            cvfpu_fp32_cmp u_fp_cmp01(.clk_i(clk), .rst_ni(rst_n), .start_i(fp_cmp_l1_start), .cmp_mode_i(2'b0), .invert_i(1'b0), .a_i(fp_input_reg[0]), .b_i(fp_input_reg[1]), .result_o(fp_cmp01_result), .done_o(fp_cmp01_done), .busy_o());
-            cvfpu_fp32_cmp u_fp_cmp23(.clk_i(clk), .rst_ni(rst_n), .start_i(fp_cmp_l1_start), .cmp_mode_i(2'b0), .invert_i(1'b0), .a_i(fp_input_reg[2]), .b_i(fp_input_reg[3]), .result_o(fp_cmp23_result), .done_o(fp_cmp23_done), .busy_o());
-            cvfpu_fp32_cmp u_fp_cmp45(.clk_i(clk), .rst_ni(rst_n), .start_i(fp_cmp_l1_start), .cmp_mode_i(2'b0), .invert_i(1'b0), .a_i(fp_input_reg[4]), .b_i(fp_input_reg[5]), .result_o(fp_cmp45_result), .done_o(fp_cmp45_done), .busy_o());
-            cvfpu_fp32_cmp u_fp_cmp67(.clk_i(clk), .rst_ni(rst_n), .start_i(fp_cmp_l1_start), .cmp_mode_i(2'b0), .invert_i(1'b0), .a_i(fp_input_reg[6]), .b_i(fp_input_reg[7]), .result_o(fp_cmp67_result), .done_o(fp_cmp67_done), .busy_o());
-
-            // Level 2 Max Comparators
-            cvfpu_fp32_cmp u_fp_cmp_q0(.clk_i(clk), .rst_ni(rst_n), .start_i(fp_cmp_l2_start), .cmp_mode_i(2'b0), .invert_i(1'b0), .a_i(fp_max_pair0_reg), .b_i(fp_max_pair1_reg), .result_o(fp_cmp_q0_result), .done_o(fp_cmp_q0_done), .busy_o());
-            cvfpu_fp32_cmp u_fp_cmp_q1(.clk_i(clk), .rst_ni(rst_n), .start_i(fp_cmp_l2_start), .cmp_mode_i(2'b0), .invert_i(1'b0), .a_i(fp_max_pair2_reg), .b_i(fp_max_pair3_reg), .result_o(fp_cmp_q1_result), .done_o(fp_cmp_q1_done), .busy_o());
-
-            // Level 3 Max Comparator
-            cvfpu_fp32_cmp u_fp_cmp_oct(.clk_i(clk), .rst_ni(rst_n), .start_i(fp_cmp_l3_start), .cmp_mode_i(2'b0), .invert_i(1'b0), .a_i(fp_max_quad0_reg), .b_i(fp_max_quad1_reg), .result_o(fp_cmp_oct_result), .done_o(fp_cmp_oct_done), .busy_o());
-
-            // Level 1 Exponent Sums
-            cvfpu_fp32_addsub u_fp_sum_pair0(.clk_i(clk), .rst_ni(rst_n), .start_i(fp_sum_l1_start), .sub_i(1'b0), .a_i(fp_exp_reg[0]), .b_i(fp_exp_reg[1]), .result_o(fp_sum_pair0_result), .done_o(fp_sum_pair0_done), .busy_o());
-            cvfpu_fp32_addsub u_fp_sum_pair1(.clk_i(clk), .rst_ni(rst_n), .start_i(fp_sum_l1_start), .sub_i(1'b0), .a_i(fp_exp_reg[2]), .b_i(fp_exp_reg[3]), .result_o(fp_sum_pair1_result), .done_o(fp_sum_pair1_done), .busy_o());
-            cvfpu_fp32_addsub u_fp_sum_pair2(.clk_i(clk), .rst_ni(rst_n), .start_i(fp_sum_l1_start), .sub_i(1'b0), .a_i(fp_exp_reg[4]), .b_i(fp_exp_reg[5]), .result_o(fp_sum_pair2_result), .done_o(fp_sum_pair2_done), .busy_o());
-            cvfpu_fp32_addsub u_fp_sum_pair3(.clk_i(clk), .rst_ni(rst_n), .start_i(fp_sum_l1_start), .sub_i(1'b0), .a_i(fp_exp_reg[6]), .b_i(fp_exp_reg[7]), .result_o(fp_sum_pair3_result), .done_o(fp_sum_pair3_done), .busy_o());
-
-            // Level 2 Exponent Sums
-            cvfpu_fp32_addsub u_fp_sum_quad0(.clk_i(clk), .rst_ni(rst_n), .start_i(fp_sum_l2_start), .sub_i(1'b0), .a_i(fp_sum_pair0_reg), .b_i(fp_sum_pair1_reg), .result_o(fp_sum_quad0_result), .done_o(fp_sum_quad0_done), .busy_o());
-            cvfpu_fp32_addsub u_fp_sum_quad1(.clk_i(clk), .rst_ni(rst_n), .start_i(fp_sum_l2_start), .sub_i(1'b0), .a_i(fp_sum_pair2_reg), .b_i(fp_sum_pair3_reg), .result_o(fp_sum_quad1_result), .done_o(fp_sum_quad1_done), .busy_o());
-
-            // Level 3 Exponent Sum
-            cvfpu_fp32_addsub u_fp_sum_oct(.clk_i(clk), .rst_ni(rst_n), .start_i(fp_sum_l3_start), .sub_i(1'b0), .a_i(fp_sum_quad0_reg), .b_i(fp_sum_quad1_reg), .result_o(fp_sum_oct_result), .done_o(fp_sum_oct_done), .busy_o());
-        end else begin : gen_tree_4
-            // Level 1 Max Comparators
-            cvfpu_fp32_cmp u_fp_cmp01(.clk_i(clk), .rst_ni(rst_n), .start_i(fp_cmp_l1_start), .cmp_mode_i(2'b0), .invert_i(1'b0), .a_i(fp_input_reg[0]), .b_i(fp_input_reg[1]), .result_o(fp_cmp01_result), .done_o(fp_cmp01_done), .busy_o());
-            cvfpu_fp32_cmp u_fp_cmp23(.clk_i(clk), .rst_ni(rst_n), .start_i(fp_cmp_l1_start), .cmp_mode_i(2'b0), .invert_i(1'b0), .a_i(fp_input_reg[2]), .b_i(fp_input_reg[3]), .result_o(fp_cmp23_result), .done_o(fp_cmp23_done), .busy_o());
-
-            // Level 2 Max Comparator
-            cvfpu_fp32_cmp u_fp_cmp_q0(.clk_i(clk), .rst_ni(rst_n), .start_i(fp_cmp_l2_start), .cmp_mode_i(2'b0), .invert_i(1'b0), .a_i(fp_max_pair0_reg), .b_i(fp_max_pair1_reg), .result_o(fp_cmp_q0_result), .done_o(fp_cmp_q0_done), .busy_o());
-
-            // Level 1 Exponent Sums
-            cvfpu_fp32_addsub u_fp_sum_pair0(.clk_i(clk), .rst_ni(rst_n), .start_i(fp_sum_l1_start), .sub_i(1'b0), .a_i(fp_exp_reg[0]), .b_i(fp_exp_reg[1]), .result_o(fp_sum_pair0_result), .done_o(fp_sum_pair0_done), .busy_o());
-            cvfpu_fp32_addsub u_fp_sum_pair1(.clk_i(clk), .rst_ni(rst_n), .start_i(fp_sum_l1_start), .sub_i(1'b0), .a_i(fp_exp_reg[2]), .b_i(fp_exp_reg[3]), .result_o(fp_sum_pair1_result), .done_o(fp_sum_pair1_done), .busy_o());
-
-            // Level 2 Exponent Sum
-            cvfpu_fp32_addsub u_fp_sum_quad0(.clk_i(clk), .rst_ni(rst_n), .start_i(fp_sum_l2_start), .sub_i(1'b0), .a_i(fp_sum_pair0_reg), .b_i(fp_sum_pair1_reg), .result_o(fp_sum_quad0_result), .done_o(fp_sum_quad0_done), .busy_o());
-
-            // Dummies for unused 8-lane signals/ports
-            assign fp_cmp45_done = 1'b1;
-            assign fp_cmp67_done = 1'b1;
-            assign fp_cmp45_result = 1'b0;
-            assign fp_cmp67_result = 1'b0;
-            assign fp_cmp_q1_done = 1'b1;
-            assign fp_cmp_q1_result = 1'b0;
-            assign fp_cmp_oct_done = 1'b1;
-            assign fp_cmp_oct_result = 1'b0;
-
-            assign fp_sum_pair2_result = 32'd0;
-            assign fp_sum_pair3_result = 32'd0;
-            assign fp_sum_pair2_done = 1'b1;
-            assign fp_sum_pair3_done = 1'b1;
-            assign fp_sum_quad1_result = 32'd0;
-            assign fp_sum_quad1_done = 1'b1;
-            assign fp_sum_oct_result = 32'd0;
-            assign fp_sum_oct_done = 1'b1;
-        end
-    endgenerate
-
-    // Unified FP Delat & Normalizer Generators
-    generate
-        for (genvar i = 0; i < LANES; i++) begin : gen_fp_delta_inst
-            cvfpu_fp32_addsub u_fp_delta (
-                .clk_i(clk),
-                .rst_ni(rst_n),
-                .start_i(fp_delta_start),
-                .sub_i(1'b1),
-                .a_i(fp_input_reg[i]),
-                .b_i(fp_max_reg),
-                .result_o(fp_delta_result[i]),
-                .done_o(fp_delta_done[i]),
-                .busy_o()
-            );
-        end
-
-        for (genvar i = 0; i < LANES; i++) begin : gen_fp_norm_inst
-            cvfpu_fp32_div u_fp_norm (
-                .clk_i(clk),
-                .rst_ni(rst_n),
-                .start_i(fp_norm_start),
-                .dividend_i(fp_exp_reg[i]),
-                .divisor_i(fp_sum_reg),
-                .result_o(fp_norm_result[i]),
-                .done_o(fp_norm_done[i]),
-                .busy_o()
-            );
-        end
-    endgenerate
-
-
-    // ---------------------------------------------------------
-    // Control
-    // ---------------------------------------------------------
-    state_t state, next_state;
-    logic input_mode_fp_reg;
-
-    assign in_ready = (state == ST_IDLE);
-    assign out_mode_fp = input_mode_fp_reg;
-
-    always_comb begin
-        next_state      = state;
-        out_valid       = 1'b0;
-        divider_start   = 1'b0;
-        fp_cmp_l1_start = 1'b0;
-        fp_cmp_l2_start = 1'b0;
-        fp_cmp_l3_start = 1'b0;
-        fp_delta_start  = 1'b0;
-        fp_sum_l1_start = 1'b0;
-        fp_sum_l2_start = 1'b0;
-        fp_sum_l3_start = 1'b0;
-        fp_norm_start   = 1'b0;
-
-        unique case (state)
-            ST_IDLE: begin
-                if (in_valid) begin
-                    if (input_mode_fp)
-                        next_state = ST_FP_MAX_L1_START;
-                    else begin
-                        divider_start = 1'b1;
-                        next_state = ST_INT_DIVIDE;
-                    end
-                end
-            end
-
-            ST_INT_DIVIDE: begin
-                if (divider_done)
-                    next_state = ST_INT_DONE;
-            end
-
-            ST_INT_DONE: begin
-                out_valid = 1'b1;
-                next_state = ST_IDLE;
-            end
-
-            ST_FP_MAX_L1_START: begin
-                fp_cmp_l1_start = 1'b1;
-                next_state = ST_FP_MAX_L1_WAIT;
-            end
-
-            ST_FP_MAX_L1_WAIT: begin
-                if (LANES == 8) begin
-                    if (fp_cmp01_done && fp_cmp23_done && fp_cmp45_done && fp_cmp67_done)
-                        next_state = ST_FP_MAX_L2_START;
-                end else begin
-                    if (fp_cmp01_done && fp_cmp23_done)
-                        next_state = ST_FP_MAX_L2_START;
-                end
-            end
-
-            ST_FP_MAX_L2_START: begin
-                fp_cmp_l2_start = 1'b1;
-                next_state = ST_FP_MAX_L2_WAIT;
-            end
-
-            ST_FP_MAX_L2_WAIT: begin
-                if (LANES == 8) begin
-                    if (fp_cmp_q0_done && fp_cmp_q1_done)
-                        next_state = ST_FP_MAX_L3_START;
-                end else begin
-                    if (fp_cmp_q0_done)
-                        next_state = ST_FP_DELTA_START;
-                end
-            end
-
-            ST_FP_MAX_L3_START: begin
-                fp_cmp_l3_start = 1'b1;
-                next_state = ST_FP_MAX_L3_WAIT;
-            end
-
-            ST_FP_MAX_L3_WAIT: begin
-                if (fp_cmp_oct_done)
-                    next_state = ST_FP_DELTA_START;
-            end
-
-            ST_FP_DELTA_START: begin
-                fp_delta_start = 1'b1;
-                next_state = ST_FP_DELTA_WAIT;
-            end
-
-            ST_FP_DELTA_WAIT: begin
-                if (&fp_delta_done)
-                    next_state = ST_FP_EXP_CAPTURE;
-            end
-
-            ST_FP_EXP_CAPTURE: begin
-                next_state = ST_FP_SUM_L1_START;
-            end
-
-            ST_FP_SUM_L1_START: begin
-                fp_sum_l1_start = 1'b1;
-                next_state = ST_FP_SUM_L1_WAIT;
-            end
-
-            ST_FP_SUM_L1_WAIT: begin
-                if (LANES == 8) begin
-                    if (fp_sum_pair0_done && fp_sum_pair1_done && fp_sum_pair2_done && fp_sum_pair3_done)
-                        next_state = ST_FP_SUM_L2_START;
-                end else begin
-                    if (fp_sum_pair0_done && fp_sum_pair1_done)
-                        next_state = ST_FP_SUM_L2_START;
-                end
-            end
-
-            ST_FP_SUM_L2_START: begin
-                fp_sum_l2_start = 1'b1;
-                next_state = ST_FP_SUM_L2_WAIT;
-            end
-
-            ST_FP_SUM_L2_WAIT: begin
-                if (LANES == 8) begin
-                    if (fp_sum_quad0_done && fp_sum_quad1_done)
-                        next_state = ST_FP_SUM_L3_START;
-                end else begin
-                    if (fp_sum_quad0_done)
-                        next_state = ST_FP_NORM_START;
-                end
-            end
-
-            ST_FP_SUM_L3_START: begin
-                fp_sum_l3_start = 1'b1;
-                next_state = ST_FP_SUM_L3_WAIT;
-            end
-
-            ST_FP_SUM_L3_WAIT: begin
-                if (fp_sum_oct_done)
-                    next_state = ST_FP_NORM_START;
-            end
-
-            ST_FP_NORM_START: begin
-                fp_norm_start = 1'b1;
-                next_state = ST_FP_NORM_WAIT;
-            end
-
-            ST_FP_NORM_WAIT: begin
-                if (&fp_norm_done)
-                    next_state = ST_FP_DONE;
-            end
-
-            ST_FP_DONE: begin
-                out_valid = 1'b1;
-                next_state = ST_IDLE;
-            end
-
-            default: next_state = ST_IDLE;
-        endcase
-    end
 
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            state <= ST_IDLE;
-            input_mode_fp_reg <= 1'b0;
-            sum_exp_reg <= '0;
-            fp_max_pair0_reg <= 32'h0000_0000;
-            fp_max_pair1_reg <= 32'h0000_0000;
-            fp_max_pair2_reg <= 32'h0000_0000;
-            fp_max_pair3_reg <= 32'h0000_0000;
-            fp_max_quad0_reg <= 32'h0000_0000;
-            fp_max_quad1_reg <= 32'h0000_0000;
-            fp_max_reg <= 32'h0000_0000;
-            fp_sum_pair0_reg <= 32'h0000_0000;
-            fp_sum_pair1_reg <= 32'h0000_0000;
-            fp_sum_pair2_reg <= 32'h0000_0000;
-            fp_sum_pair3_reg <= 32'h0000_0000;
-            fp_sum_quad0_reg <= 32'h0000_0000;
-            fp_sum_quad1_reg <= 32'h0000_0000;
-            fp_sum_reg <= 32'h0000_0000;
-            for (int i = 0; i < LANES; i++) begin
-                int_lane_exp_reg[i] <= '0;
-                fp_input_reg[i] <= 32'h0000_0000;
-                fp_delta_reg[i] <= 32'h0000_0000;
-                fp_exp_reg[i] <= 32'h0000_0000;
-                fp_prob_reg[i] <= 32'h0000_0000;
-            end
+            state_q    <= ST_CAPTURE;
+            write_idx  <= '0;
+            read_idx   <= '0;
+            global_max <= 32'hff80_0000;
+            global_sum <= 32'd0;
+            active_q   <= 1'b0;
         end else begin
-            state <= next_state;
+            unique case (state_q)
+                ST_CAPTURE: begin
+                    if (in_valid && in_ready) begin
+                        score_buf[write_idx] <= x_in;
 
-            if (state == ST_IDLE && in_valid) begin
-                input_mode_fp_reg <= input_mode_fp;
-                if (input_mode_fp) begin
-                    for (int i = 0; i < LANES; i++) begin
-                        fp_input_reg[i] <= x_in[i*LANE_W +: LANE_W];
-                    end
-                end else begin
-                    sum_exp_reg <= sum_exp;
-                    for (int i = 0; i < LANES; i++) begin
-                        int_lane_exp_reg[i] <= int_lane_exp[i];
-                    end
-                end
-            end
+                        if (!active_q || fp32_gt(row_max, global_max))
+                            global_max <= row_max;
 
-            // Max reduction L1 capture
-            if (state == ST_FP_MAX_L1_WAIT) begin
-                if (LANES == 8) begin
-                    if (fp_cmp01_done && fp_cmp23_done && fp_cmp45_done && fp_cmp67_done) begin
-                        fp_max_pair0_reg <= fp_max_pair0_next;
-                        fp_max_pair1_reg <= fp_max_pair1_next;
-                        fp_max_pair2_reg <= fp_max_pair2_next;
-                        fp_max_pair3_reg <= fp_max_pair3_next;
-                    end
-                end else begin
-                    if (fp_cmp01_done && fp_cmp23_done) begin
-                        fp_max_pair0_reg <= fp_max_pair0_next;
-                        fp_max_pair1_reg <= fp_max_pair1_next;
+                        active_q <= 1'b1;
+
+                        if (write_idx == IDX_W'(MAX_CHUNKS-1)) begin
+                            write_idx  <= '0;
+                            read_idx   <= '0;
+                            global_sum <= 32'd0;
+                            state_q    <= ST_SUM;
+                        end else begin
+                            write_idx <= write_idx + 1'b1;
+                        end
                     end
                 end
-            end
 
-            // Max reduction L2 capture
-            if (state == ST_FP_MAX_L2_WAIT) begin
-                if (LANES == 8) begin
-                    if (fp_cmp_q0_done && fp_cmp_q1_done) begin
-                        fp_max_quad0_reg <= fp_max_quad0_next;
-                        fp_max_quad1_reg <= fp_max_quad1_next;
-                    end
-                end else begin
-                    if (fp_cmp_q0_done) begin
-                        fp_max_reg <= fp_max_quad0_next;
+                ST_SUM: begin
+                    global_sum <= global_sum + chunk_sum;
+                    if (read_idx == IDX_W'(MAX_CHUNKS-1)) begin
+                        read_idx <= '0;
+                        state_q  <= ST_NORM;
+                    end else begin
+                        read_idx <= read_idx + 1'b1;
                     end
                 end
-            end
 
-            // Max reduction L3 capture
-            if (state == ST_FP_MAX_L3_WAIT && fp_cmp_oct_done) begin
-                fp_max_reg <= fp_max_oct_next;
-            end
-
-            if (state == ST_FP_DELTA_WAIT && (&fp_delta_done)) begin
-                for (int i = 0; i < LANES; i++) begin
-                    fp_delta_reg[i] <= fp_delta_result[i];
-                end
-            end
-
-            if (state == ST_FP_EXP_CAPTURE) begin
-                for (int i = 0; i < LANES; i++) begin
-                    fp_exp_reg[i] <= fp_exp_wire[i];
-                end
-            end
-
-            // Exponent sum L1 capture
-            if (state == ST_FP_SUM_L1_WAIT) begin
-                if (LANES == 8) begin
-                    if (fp_sum_pair0_done && fp_sum_pair1_done && fp_sum_pair2_done && fp_sum_pair3_done) begin
-                        fp_sum_pair0_reg <= fp_sum_pair0_result;
-                        fp_sum_pair1_reg <= fp_sum_pair1_result;
-                        fp_sum_pair2_reg <= fp_sum_pair2_result;
-                        fp_sum_pair3_reg <= fp_sum_pair3_result;
-                    end
-                end else begin
-                    if (fp_sum_pair0_done && fp_sum_pair1_done) begin
-                        fp_sum_pair0_reg <= fp_sum_pair0_result;
-                        fp_sum_pair1_reg <= fp_sum_pair1_result;
+                ST_NORM: begin
+                    if (out_ready) begin
+                        if (read_idx == IDX_W'(MAX_CHUNKS-1)) begin
+                            read_idx   <= '0;
+                            write_idx  <= '0;
+                            global_max <= 32'hff80_0000;
+                            global_sum <= 32'd0;
+                            active_q   <= 1'b0;
+                            state_q    <= ST_CAPTURE;
+                        end else begin
+                            read_idx <= read_idx + 1'b1;
+                        end
                     end
                 end
-            end
 
-            // Exponent sum L2 capture
-            if (state == ST_FP_SUM_L2_WAIT) begin
-                if (LANES == 8) begin
-                    if (fp_sum_quad0_done && fp_sum_quad1_done) begin
-                        fp_sum_quad0_reg <= fp_sum_quad0_result;
-                        fp_sum_quad1_reg <= fp_sum_quad1_result;
-                    end
-                end else begin
-                    if (fp_sum_quad0_done) begin
-                        fp_sum_reg <= fp_sum_quad0_result;
-                    end
+                default: begin
+                    state_q <= ST_CAPTURE;
                 end
-            end
-
-            // Exponent sum L3 capture
-            if (state == ST_FP_SUM_L3_WAIT && fp_sum_oct_done) begin
-                fp_sum_reg <= fp_sum_oct_result;
-            end
-
-            if (state == ST_FP_NORM_WAIT && (&fp_norm_done)) begin
-                for (int i = 0; i < LANES; i++) begin
-                    fp_prob_reg[i] <= fp_norm_result[i];
-                end
-            end
+            endcase
         end
     end
 
-    always_comb begin
-        y_out = '0;
-        if (state == ST_INT_DONE) begin
-            for (int i = 0; i < LANES; i++) begin
-                y_out[i*LANE_W +: LANE_W] = int_lane_out[i];
-            end
-        end else if (state == ST_FP_DONE) begin
-            for (int i = 0; i < LANES; i++) begin
-                y_out[i*LANE_W +: LANE_W] = fp_prob_reg[i];
-            end
-        end
-    end
+    assign in_ready = (state_q == ST_CAPTURE);
+    assign out_valid = (state_q == ST_NORM);
+    assign out_mode_fp = 1'b1;
+    assign busy_o = active_q || (state_q != ST_CAPTURE);
 
 endmodule

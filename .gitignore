@@ -1,5 +1,14 @@
 build/
+sim_build/
+tb/sim_build*/
+tb/__pycache__/
+__pycache__/
 *.out
 *.vcd
+*.fst
+*.vvp
+*.pyc
+results.xml
 *.json
 .DS_Store
+.pytest_cache/

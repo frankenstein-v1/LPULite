@@ -118,6 +118,7 @@ typedef enum logic [2:0] {
 localparam int MEM_DEPTH  = 32768;
 localparam int MEM_ADDR_W = $clog2(MEM_DEPTH);
 
+`ifndef SYNTHESIS
 function automatic real fp32_to_real(input logic [31:0] fp32);
     logic [63:0] r_bits;
     logic        sign;
@@ -188,5 +189,6 @@ function automatic logic [31:0] real_to_fp32(input real r);
         real_to_fp32 = {sign, exp, frac};
     end
 endfunction
+`endif
 
 `endif

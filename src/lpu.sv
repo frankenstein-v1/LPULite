@@ -45,7 +45,6 @@ logic [1:0] mem_store_fmt;
 logic vxm_rmsnorm_en;
 logic vxm_rope_en;
 logic [2:0] vxm_residual_op;
-logic vxm_softmax_chunked_en;
 
 localparam logic [2:0] VXM_OPERAND_DATA     = 3'd0;
 localparam logic [2:0] VXM_OPERAND_BIAS     = 3'd1;
@@ -142,8 +141,7 @@ icu u_icu(
     .mem_store_fmt(mem_store_fmt),
     .vxm_rmsnorm_en(vxm_rmsnorm_en),
     .vxm_rope_en(vxm_rope_en),
-    .vxm_residual_op(vxm_residual_op),
-    .vxm_softmax_chunked_en(vxm_softmax_chunked_en)
+    .vxm_residual_op(vxm_residual_op)
 );
 
 //mux logic for mem0 input
@@ -523,7 +521,6 @@ vxm #(
     .rope_cos_fp8(vxm_rope_cos_fp8_reg),
     .rope_sin_fp8(vxm_rope_sin_fp8_reg),
     .residual_op(vxm_residual_op),
-    .softmax_chunked_en(vxm_softmax_chunked_en),
     .scale_factor(vxm_scale_factor_reg),
     .rmsnorm_bypass(~vxm_rmsnorm_en),
     .rmsnorm_gamma(vxm_rmsnorm_gamma_reg),

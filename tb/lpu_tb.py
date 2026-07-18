@@ -318,7 +318,6 @@ def build_instruction(
     vxm_layernorm_en=0,
     vxm_rope_en=0,
     vxm_residual_op=VXM_RES_PASS,
-    vxm_softmax_chunked_en=0,
     vxm_operand_sel=VXM_OPERAND_DATA,
 ):
     word = 0
@@ -369,7 +368,6 @@ def build_instruction(
     word = _set_field(word, vxm_layernorm_en, 74, 1)
     word = _set_field(word, vxm_rope_en, 75, 1)
     word = _set_field(word, vxm_residual_op, 76, 3)
-    word = _set_field(word, vxm_softmax_chunked_en, 79, 1)
 
     return word
 

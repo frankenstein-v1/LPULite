@@ -16,7 +16,11 @@ VERILOG_SOURCES = \
 	$(ROOT)/src/mac.sv \
 	$(ROOT)/src/int_mac.sv \
 	$(ROOT)/src/cvfpu_fp8_to_fp32_cast.sv \
+	$(ROOT)/src/cvfpu_fp32_addsub.sv \
+	$(ROOT)/src/cvfpu_fp32_div.sv \
+	$(ROOT)/src/cvfpu_fp32_cmp.sv \
 	$(ROOT)/src/cvfpu_fp32_fma.sv \
+	$(ROOT)/src/cvfpu_fp32_sqrt.sv \
 	$(ROOT)/src/acc.sv \
 	$(ROOT)/src/mem.sv \
 	$(ROOT)/src/mxm.sv \
@@ -25,9 +29,9 @@ VERILOG_SOURCES = \
 	$(ROOT)/src/lut_softmax_exp.sv \
 	$(ROOT)/src/lut_softmax_div.sv \
 	$(ROOT)/src/softmax.sv \
-	$(ROOT)/src/softmax_chunked.sv \
 	$(ROOT)/src/quant.sv \
 	$(ROOT)/src/lut_rmsnorm.sv \
+	$(ROOT)/src/rmsnorm.sv \
 	$(ROOT)/src/vxm_rope.sv \
 	$(ROOT)/src/residual_add.sv \
 	$(ROOT)/src/vxm.sv \

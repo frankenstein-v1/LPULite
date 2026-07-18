@@ -46,8 +46,7 @@ module icu #(
     output logic [1:0] mem_store_fmt,
     output logic      vxm_rmsnorm_en,
     output logic      vxm_rope_en,
-    output logic [2:0] vxm_residual_op,
-    output logic      vxm_softmax_chunked_en
+    output logic [2:0] vxm_residual_op
 );
 
     // 1. THE INSTRUCTION MEMORY (IMEM)
@@ -86,8 +85,7 @@ module icu #(
     //   [62:46] MXM + quant/store controls
     //   [65:63] SXM transpose controls
     //   [78:66] VXM controls
-    //   [79]    VXM chunked softmax enable
-    //   [95:80] reserved
+    //   [95:79] reserved
 
     // mem0 control
     assign mem0_read_en  = current_instruction[12];
@@ -126,6 +124,5 @@ module icu #(
     assign vxm_rmsnorm_en  = current_instruction[74];
     assign vxm_rope_en     = current_instruction[75];
     assign vxm_residual_op = current_instruction[78:76];
-    assign vxm_softmax_chunked_en = current_instruction[79];
 
 endmodule

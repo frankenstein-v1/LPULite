@@ -136,8 +136,8 @@ module lpu_cocotb_top (
     assign vxm_scale_valid_dbg       = u_lpu.u_vxm.s3_valid;
     assign vxm_softmax_in_row_dbg    = u_lpu.u_vxm.s4_handoff_reg;
     assign vxm_softmax_in_valid_dbg  = u_lpu.u_vxm.s4_valid;
-    assign vxm_softmax_launch_dbg    = u_lpu.u_vxm.softmax_launch_vec;
-    assign vxm_softmax_done_dbg      = u_lpu.u_vxm.softmax_valid_vec;
+    assign vxm_softmax_launch_dbg    = {3'b000, u_lpu.u_vxm.chunked_softmax_in_valid};
+    assign vxm_softmax_done_dbg      = {3'b000, u_lpu.u_vxm.chunked_softmax_out_valid};
     assign vxm_quant_in_row_dbg      = u_lpu.u_vxm.mux_out;
     assign vxm_quant_in_valid_dbg    = u_lpu.u_vxm.quant_issue;
     assign vxm_stream_out_live_dbg   = u_lpu.vxm_stream_out_live;

@@ -65,7 +65,6 @@ def build_instruction(
     mem_store_fmt=0,
     vxm_layernorm_en=0,
     vxm_operand_sel=0,
-    vxm_softmax_chunked_en=0,
 ):
     word = 0
     if sxm_opcode_input == OP_TRANSPOSE_LOAD:
@@ -101,7 +100,6 @@ def build_instruction(
     word = _set_field(word, vxm_data_sel, 70, 1)
     word = _set_field(word, vxm_operand_sel, 71, 3)
     word = _set_field(word, vxm_layernorm_en, 74, 1)
-    word = _set_field(word, vxm_softmax_chunked_en, 79, 1)
     return word
 
 async def tick(dut, n=1):

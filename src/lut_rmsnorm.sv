@@ -1,5 +1,6 @@
 `timescale 1ns/1ns
 
+`ifndef SYNTHESIS
 `include "cvfpu_compat.svh"
 
 // // FP32 row layernorm for VXM.
@@ -77,3 +78,4 @@ module lut_rmsnorm #(
     end
 
 endmodule
+`endif

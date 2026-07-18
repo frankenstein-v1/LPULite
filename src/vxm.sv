@@ -31,7 +31,6 @@ module vxm #(
 
     // Residual accumulator control
     input  logic [2:0]              residual_op,
-    input  logic                    softmax_chunked_en,
     input  logic [31:0]             scale_factor,
 
     // RMSNorm control and parameters
@@ -103,11 +102,6 @@ module vxm #(
     logic [LANES*8-1:0]       quantize_out;
     logic [31:0]              quantize_scale_out;
     logic                     quantize_valid;
-    logic [3:0][ROW_W-1:0]    softmax_out_vec;
-    logic [3:0]               softmax_valid_vec;
-    logic [3:0]               softmax_in_ready_vec;
-    logic [3:0]               softmax_out_mode_fp_vec;
-    logic [3:0]               softmax_launch_vec;
     logic                     chunked_softmax_in_valid;
     logic                     chunked_softmax_in_ready;
     logic                     chunked_softmax_out_valid;
@@ -117,25 +111,7 @@ module vxm #(
     logic                     chunked_softmax_busy;
     logic                     softmax_stall;
     logic                     stall_pipeline;
-    logic [1:0]               launch_idx;
-    logic [1:0]               collect_idx;
-    logic [ROW_W-1:0]         softmax_result_reg [0:3];
-    logic                     softmax_result_valid [0:3];
-    logic [3:0]               softmax_result_is_fp;
 
-    initial begin
-        launch_idx = 2'd0;
-        collect_idx = 2'd0;
-        softmax_result_reg[0] = '0;
-        softmax_result_reg[1] = '0;
-        softmax_result_reg[2] = '0;
-        softmax_result_reg[3] = '0;
-        softmax_result_valid[0] = 1'b0;
-        softmax_result_valid[1] = 1'b0;
-        softmax_result_valid[2] = 1'b0;
-        softmax_result_valid[3] = 1'b0;
-        softmax_result_is_fp = 4'b0000;
-    end
     logic                     softmax_active_valid;
     logic [ROW_W-1:0]         softmax_active_data;
     logic                     softmax_active_is_fp;
@@ -157,6 +133,16 @@ module vxm #(
     logic [ROW_W-1:0]         rope_out;
     logic [ROW_W-1:0]         rope_result_reg;
     logic [ROW_W-1:0]         pre_layernorm_in;
+    logic [ROW_W-1:0]         rmsnorm_out;
+    logic [ROW_W-1:0]         rmsnorm_result_reg;
+    logic                     rmsnorm_start;
+    logic                     rmsnorm_done;
+    logic                     rmsnorm_busy;
+    logic                     rmsnorm_inflight;
+    logic                     rmsnorm_result_valid;
+    logic                     rmsnorm_input_valid;
+    logic                     rmsnorm_output_valid;
+    logic                     rmsnorm_stall;
     logic [ROW_W-1:0]         residual_row_in;
     logic [ROW_W-1:0]         residual_row_out;
     logic [ROW_W-1:0]         residual_acc_out;
@@ -267,36 +253,11 @@ module vxm #(
         end
     endgenerate
     
-    // logic to route the launch signal to the correct engine
-    assign softmax_launch_vec[0] = (s4_valid && s4_bypass_sel_reg && !softmax_chunked_en && !stall_pipeline && launch_idx == 2'd0);
-    assign softmax_launch_vec[1] = (s4_valid && s4_bypass_sel_reg && !softmax_chunked_en && !stall_pipeline && launch_idx == 2'd1);
-    assign softmax_launch_vec[2] = (s4_valid && s4_bypass_sel_reg && !softmax_chunked_en && !stall_pipeline && launch_idx == 2'd2);
-    assign softmax_launch_vec[3] = (s4_valid && s4_bypass_sel_reg && !softmax_chunked_en && !stall_pipeline && launch_idx == 2'd3);
-    assign chunked_softmax_in_valid = s4_valid && s4_bypass_sel_reg && softmax_chunked_en && !stall_pipeline;
+    assign chunked_softmax_in_valid = s4_valid && s4_bypass_sel_reg && !stall_pipeline;
 
-    // logic to determine the current active softmax result (either from register or direct output)
-    logic             active_result_valid;
-    logic [ROW_W-1:0] active_result_data;
-    logic             active_result_is_fp;
-
-    assign active_result_valid = (collect_idx == 2'd0) ? (softmax_result_valid[0] || softmax_valid_vec[0]) :
-                                 (collect_idx == 2'd1) ? (softmax_result_valid[1] || softmax_valid_vec[1]) :
-                                 (collect_idx == 2'd2) ? (softmax_result_valid[2] || softmax_valid_vec[2]) :
-                                 (softmax_result_valid[3] || softmax_valid_vec[3]);
-
-    assign active_result_data  = (collect_idx == 2'd0) ? (softmax_result_valid[0] ? softmax_result_reg[0] : softmax_out_vec[0]) :
-                                 (collect_idx == 2'd1) ? (softmax_result_valid[1] ? softmax_result_reg[1] : softmax_out_vec[1]) :
-                                 (collect_idx == 2'd2) ? (softmax_result_valid[2] ? softmax_result_reg[2] : softmax_out_vec[2]) :
-                                 (softmax_result_valid[3] ? softmax_result_reg[3] : softmax_out_vec[3]);
-
-    assign active_result_is_fp = (collect_idx == 2'd0) ? (softmax_result_valid[0] ? softmax_result_is_fp[0] : softmax_out_mode_fp_vec[0]) :
-                                 (collect_idx == 2'd1) ? (softmax_result_valid[1] ? softmax_result_is_fp[1] : softmax_out_mode_fp_vec[1]) :
-                                 (collect_idx == 2'd2) ? (softmax_result_valid[2] ? softmax_result_is_fp[2] : softmax_out_mode_fp_vec[2]) :
-                                 (softmax_result_valid[3] ? softmax_result_is_fp[3] : softmax_out_mode_fp_vec[3]);
-
-    assign softmax_active_valid = chunked_softmax_out_valid || active_result_valid;
-    assign softmax_active_data  = chunked_softmax_out_valid ? chunked_softmax_out : active_result_data;
-    assign softmax_active_is_fp = chunked_softmax_out_valid ? chunked_softmax_out_mode_fp : active_result_is_fp;
+    assign softmax_active_valid = chunked_softmax_out_valid;
+    assign softmax_active_data  = chunked_softmax_out;
+    assign softmax_active_is_fp = chunked_softmax_out_mode_fp;
 
     assign mux_out   = softmax_active_valid ? softmax_active_data : s4_handoff_reg;
     assign mux_valid = softmax_active_valid || (s4_valid && !s4_bypass_sel_reg);
@@ -306,8 +267,14 @@ module vxm #(
     assign quant_issue = residual_result_valid && quant_slot_available;
     assign rope_start = rope_en && mux_valid && !rope_inflight && !rope_result_valid;
     assign residual_emit_cmd = in_valid && (residual_op == RES_OP_EMIT);
+    assign rmsnorm_input_valid = rope_en ? rope_result_valid : mux_valid;
+    assign rmsnorm_start = !rmsnorm_bypass &&
+                           rmsnorm_input_valid &&
+                           !rmsnorm_inflight &&
+                           !rmsnorm_result_valid;
+    assign rmsnorm_output_valid = rmsnorm_bypass ? rmsnorm_input_valid : rmsnorm_result_valid;
     assign residual_input_valid = residual_emit_cmd ||
-                                  (rope_en ? rope_result_valid : mux_valid);
+                                  rmsnorm_output_valid;
     assign residual_start = residual_input_valid &&
                             residual_ready &&
                             !residual_result_valid;
@@ -320,21 +287,18 @@ module vxm #(
     assign fp_bias_stall = fp_bias_wait && !fp_bias_done_all;
     assign fp_scale_stall = fp_scale_wait && !fp_scale_done_all;
 
-    logic target_in_ready;
-    assign target_in_ready = (launch_idx == 2'd0) ? softmax_in_ready_vec[0] :
-                             (launch_idx == 2'd1) ? softmax_in_ready_vec[1] :
-                             (launch_idx == 2'd2) ? softmax_in_ready_vec[2] :
-                             softmax_in_ready_vec[3];
-
     assign chunked_softmax_out_ready = residual_start && chunked_softmax_out_valid;
-    assign softmax_stall = s4_valid && s4_bypass_sel_reg &&
-                            (softmax_chunked_en ? !chunked_softmax_in_ready : !target_in_ready);
+    assign softmax_stall = s4_valid && s4_bypass_sel_reg && !chunked_softmax_in_ready;
     assign rope_stall = rope_en && (rope_inflight || (mux_valid && !rope_result_valid));
+    assign rmsnorm_stall = !rmsnorm_bypass &&
+                            rmsnorm_input_valid &&
+                            (!rmsnorm_result_valid || !residual_start);
     assign residual_stall = residual_input_valid && !residual_start;
     assign stall_pipeline = fp_bias_stall ||
                             fp_scale_stall ||
                             softmax_stall ||
                             rope_stall ||
+                            rmsnorm_stall ||
                             residual_stall;
 
     always_ff @(posedge clk or negedge rst_n) begin
@@ -360,23 +324,15 @@ module vxm #(
             s4_bypass_sel_reg   <= 1'b0;
             s4_fp_softmax_reg   <= 1'b0;
             s4_valid            <= 1'b0;
-            launch_idx          <= 2'd0;
-            collect_idx         <= 2'd0;
-            softmax_result_reg[0]   <= '0;
-            softmax_result_reg[1]   <= '0;
-            softmax_result_reg[2]   <= '0;
-            softmax_result_reg[3]   <= '0;
-            softmax_result_valid[0] <= 1'b0;
-            softmax_result_valid[1] <= 1'b0;
-            softmax_result_valid[2] <= 1'b0;
-            softmax_result_valid[3] <= 1'b0;
-            softmax_result_is_fp    <= 4'b0000;
             fp_bias_inflight    <= 1'b0;
             fp_scale_inflight   <= 1'b0;
             quant_inflight      <= 1'b0;
             rope_inflight       <= 1'b0;
             rope_result_valid   <= 1'b0;
             rope_result_reg     <= '0;
+            rmsnorm_inflight    <= 1'b0;
+            rmsnorm_result_valid <= 1'b0;
+            rmsnorm_result_reg  <= '0;
             residual_result_valid <= 1'b0;
             residual_result_reg <= '0;
             residual_active_mode_softmax <= 1'b0;
@@ -397,60 +353,6 @@ module vxm #(
             else if (fp_scale_inflight && fp_scale_done_all)
                 fp_scale_inflight <= 1'b0;
 
-            // Launch idx update
-            if (s4_valid && s4_bypass_sel_reg && !softmax_chunked_en && !stall_pipeline) begin
-                launch_idx <= launch_idx + 2'd1;
-            end
-
-            // Capture newly completed softmax outputs into their registers (statically unrolled)
-            if (softmax_valid_vec[0]) begin
-                if (2'd0 == collect_idx && quant_issue && residual_result_mode_softmax && softmax_active_valid) begin
-                    // Do not store, it goes straight to quant!
-                end else begin
-                    softmax_result_reg[0]   <= softmax_out_vec[0];
-                    softmax_result_valid[0] <= 1'b1;
-                    softmax_result_is_fp[0] <= softmax_out_mode_fp_vec[0];
-                end
-            end
-            if (softmax_valid_vec[1]) begin
-                if (2'd1 == collect_idx && quant_issue && residual_result_mode_softmax && softmax_active_valid) begin
-                    // Do not store, it goes straight to quant!
-                end else begin
-                    softmax_result_reg[1]   <= softmax_out_vec[1];
-                    softmax_result_valid[1] <= 1'b1;
-                    softmax_result_is_fp[1] <= softmax_out_mode_fp_vec[1];
-                end
-            end
-            if (softmax_valid_vec[2]) begin
-                if (2'd2 == collect_idx && quant_issue && residual_result_mode_softmax && softmax_active_valid) begin
-                    // Do not store, it goes straight to quant!
-                end else begin
-                    softmax_result_reg[2]   <= softmax_out_vec[2];
-                    softmax_result_valid[2] <= 1'b1;
-                    softmax_result_is_fp[2] <= softmax_out_mode_fp_vec[2];
-                end
-            end
-            if (softmax_valid_vec[3]) begin
-                if (2'd3 == collect_idx && quant_issue && residual_result_mode_softmax && softmax_active_valid) begin
-                    // Do not store, it goes straight to quant!
-                end else begin
-                    softmax_result_reg[3]   <= softmax_out_vec[3];
-                    softmax_result_valid[3] <= 1'b1;
-                    softmax_result_is_fp[3] <= softmax_out_mode_fp_vec[3];
-                end
-            end
-
-            // Handle the issue/collection of the current collect_idx
-            if (quant_issue && residual_result_mode_softmax && active_result_valid && !chunked_softmax_out_valid) begin
-                collect_idx <= collect_idx + 2'd1;
-                case (collect_idx)
-                    2'd0: softmax_result_valid[0] <= 1'b0;
-                    2'd1: softmax_result_valid[1] <= 1'b0;
-                    2'd2: softmax_result_valid[2] <= 1'b0;
-                    2'd3: softmax_result_valid[3] <= 1'b0;
-                endcase
-            end
-
             if (quant_issue)
                 quant_inflight <= 1'b1;
             else if (quantize_valid)
@@ -466,6 +368,18 @@ module vxm #(
                 rope_result_valid <= 1'b1;
             end else if (residual_start && rope_result_valid) begin
                 rope_result_valid <= 1'b0;
+            end
+
+            if (rmsnorm_start)
+                rmsnorm_inflight <= 1'b1;
+            else if (rmsnorm_done)
+                rmsnorm_inflight <= 1'b0;
+
+            if (rmsnorm_done) begin
+                rmsnorm_result_reg <= rmsnorm_out;
+                rmsnorm_result_valid <= 1'b1;
+            end else if (residual_start && rmsnorm_result_valid) begin
+                rmsnorm_result_valid <= 1'b0;
             end
 
             if (residual_start) begin
@@ -531,31 +445,11 @@ module vxm #(
         end
     end
 
-    genvar k;
-    generate
-        for (k = 0; k < 4; k++) begin : gen_softmax
-            softmax #(
-                .LANES(LANES),
-                .LANE_W(LANE_W)
-            ) softmax_inst (
-                .clk(clk),
-                .rst_n(rst_n),
-                .in_valid(softmax_launch_vec[k]),
-                .input_mode_fp(s4_fp_softmax_reg),
-                .x_in(s4_handoff_reg),
-                .in_ready(softmax_in_ready_vec[k]),
-                .out_valid(softmax_valid_vec[k]),
-                .out_mode_fp(softmax_out_mode_fp_vec[k]),
-                .y_out(softmax_out_vec[k])
-            );
-        end
-    endgenerate
-
-    softmax_chunked #(
+    softmax #(
         .LANES(LANES),
         .LANE_W(LANE_W),
         .MAX_CHUNKS(64)
-    ) chunked_softmax_inst (
+    ) softmax_inst (
         .clk(clk),
         .rst_n(rst_n),
         .in_valid(chunked_softmax_in_valid),
@@ -585,22 +479,23 @@ module vxm #(
 
     assign pre_layernorm_in = rope_en ? rope_result_reg : mux_out;
 
-    logic [LANES*LANE_W-1:0] rmsnorm_out;
-    logic [LANES*LANE_W-1:0] rmsnorm_mux_out;
-
-    lut_rmsnorm #(
+    rmsnorm #(
         .LANES(LANES),
         .LANE_W(LANE_W)
     ) rmsnorm_inst (
+        .clk(clk),
+        .rst_n(rst_n),
+        .start_i(rmsnorm_start),
         .x_in(pre_layernorm_in),
         .gamma(rmsnorm_gamma),
         .beta(rmsnorm_beta),
-        .y_out(rmsnorm_out)
+        .y_out(rmsnorm_out),
+        .done_o(rmsnorm_done),
+        .busy_o(rmsnorm_busy)
     );
 
-    assign rmsnorm_mux_out = rmsnorm_bypass ? pre_layernorm_in : rmsnorm_out;
-
-    assign residual_row_in = residual_emit_cmd ? '0 : rmsnorm_mux_out;
+    assign residual_row_in = residual_emit_cmd ? '0 :
+                             (rmsnorm_bypass ? pre_layernorm_in : rmsnorm_result_reg);
 
     residual_add #(
         .LANES(LANES),
