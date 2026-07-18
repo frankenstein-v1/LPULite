@@ -134,12 +134,11 @@ module vxm #(
     logic [ROW_W-1:0]         rope_result_reg;
     logic [ROW_W-1:0]         pre_layernorm_in;
     logic [ROW_W-1:0]         rmsnorm_out;
-    logic [ROW_W-1:0]         rmsnorm_result_reg;
     logic                     rmsnorm_start;
+    logic                     rmsnorm_in_ready;
     logic                     rmsnorm_done;
+    logic                     rmsnorm_out_ready;
     logic                     rmsnorm_busy;
-    logic                     rmsnorm_inflight;
-    logic                     rmsnorm_result_valid;
     logic                     rmsnorm_input_valid;
     logic                     rmsnorm_output_valid;
     logic                     rmsnorm_stall;
@@ -270,9 +269,8 @@ module vxm #(
     assign rmsnorm_input_valid = rope_en ? rope_result_valid : mux_valid;
     assign rmsnorm_start = !rmsnorm_bypass &&
                            rmsnorm_input_valid &&
-                           !rmsnorm_inflight &&
-                           !rmsnorm_result_valid;
-    assign rmsnorm_output_valid = rmsnorm_bypass ? rmsnorm_input_valid : rmsnorm_result_valid;
+                           rmsnorm_in_ready;
+    assign rmsnorm_output_valid = rmsnorm_bypass ? rmsnorm_input_valid : rmsnorm_done;
     assign residual_input_valid = residual_emit_cmd ||
                                   rmsnorm_output_valid;
     assign residual_start = residual_input_valid &&
@@ -292,7 +290,8 @@ module vxm #(
     assign rope_stall = rope_en && (rope_inflight || (mux_valid && !rope_result_valid));
     assign rmsnorm_stall = !rmsnorm_bypass &&
                             rmsnorm_input_valid &&
-                            (!rmsnorm_result_valid || !residual_start);
+                            !rmsnorm_in_ready;
+    assign rmsnorm_out_ready = !rmsnorm_bypass && rmsnorm_done && residual_start;
     assign residual_stall = residual_input_valid && !residual_start;
     assign stall_pipeline = fp_bias_stall ||
                             fp_scale_stall ||
@@ -330,9 +329,6 @@ module vxm #(
             rope_inflight       <= 1'b0;
             rope_result_valid   <= 1'b0;
             rope_result_reg     <= '0;
-            rmsnorm_inflight    <= 1'b0;
-            rmsnorm_result_valid <= 1'b0;
-            rmsnorm_result_reg  <= '0;
             residual_result_valid <= 1'b0;
             residual_result_reg <= '0;
             residual_active_mode_softmax <= 1'b0;
@@ -366,20 +362,8 @@ module vxm #(
             if (rope_done) begin
                 rope_result_reg <= rope_out;
                 rope_result_valid <= 1'b1;
-            end else if (residual_start && rope_result_valid) begin
+            end else if ((rmsnorm_start || residual_start) && rope_result_valid) begin
                 rope_result_valid <= 1'b0;
-            end
-
-            if (rmsnorm_start)
-                rmsnorm_inflight <= 1'b1;
-            else if (rmsnorm_done)
-                rmsnorm_inflight <= 1'b0;
-
-            if (rmsnorm_done) begin
-                rmsnorm_result_reg <= rmsnorm_out;
-                rmsnorm_result_valid <= 1'b1;
-            end else if (residual_start && rmsnorm_result_valid) begin
-                rmsnorm_result_valid <= 1'b0;
             end
 
             if (residual_start) begin
@@ -489,13 +473,15 @@ module vxm #(
         .x_in(pre_layernorm_in),
         .gamma(rmsnorm_gamma),
         .beta(rmsnorm_beta),
+        .in_ready(rmsnorm_in_ready),
         .y_out(rmsnorm_out),
         .done_o(rmsnorm_done),
+        .out_ready(rmsnorm_out_ready),
         .busy_o(rmsnorm_busy)
     );
 
     assign residual_row_in = residual_emit_cmd ? '0 :
-                             (rmsnorm_bypass ? pre_layernorm_in : rmsnorm_result_reg);
+                             (rmsnorm_bypass ? pre_layernorm_in : rmsnorm_out);
 
     residual_add #(
         .LANES(LANES),

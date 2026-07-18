@@ -2,7 +2,8 @@
 
 module rmsnorm #(
     parameter int LANES  = 8,
-    parameter int LANE_W = 32
+    parameter int LANE_W = 32,
+    parameter int CHUNKS = 8
 ) (
     input  logic                    clk,
     input  logic                    rst_n,
@@ -10,31 +11,34 @@ module rmsnorm #(
     input  logic [LANES*LANE_W-1:0] x_in,
     input  logic [LANES*LANE_W-1:0] gamma,
     input  logic [LANES*LANE_W-1:0] beta,
+    output logic                    in_ready,
     output logic [LANES*LANE_W-1:0] y_out,
     output logic                    done_o,
+    input  logic                    out_ready,
     output logic                    busy_o
 );
 
     localparam int ROW_W = LANES * LANE_W;
+    localparam int IDX_W = (CHUNKS <= 1) ? 1 : $clog2(CHUNKS);
     localparam logic [31:0] FP32_ZERO = 32'h0000_0000;
     localparam logic [31:0] FP32_ONE  = 32'h3f80_0000;
     localparam logic [31:0] FP32_EPS  = 32'h3727_c5ac; // 1.0e-5
 
-    function automatic logic [31:0] lanes_as_fp32();
+    function automatic logic [31:0] element_count_as_fp32();
         begin
-            unique case (LANES)
-                1:       lanes_as_fp32 = 32'h3f80_0000;
-                2:       lanes_as_fp32 = 32'h4000_0000;
-                4:       lanes_as_fp32 = 32'h4080_0000;
-                8:       lanes_as_fp32 = 32'h4100_0000;
-                16:      lanes_as_fp32 = 32'h4180_0000;
-                default: lanes_as_fp32 = 32'h4100_0000;
+            unique case (LANES * CHUNKS)
+                8:       element_count_as_fp32 = 32'h4100_0000;
+                16:      element_count_as_fp32 = 32'h4180_0000;
+                32:      element_count_as_fp32 = 32'h4200_0000;
+                64:      element_count_as_fp32 = 32'h4280_0000;
+                128:     element_count_as_fp32 = 32'h4300_0000;
+                default: element_count_as_fp32 = 32'h4280_0000;
             endcase
         end
     endfunction
 
     typedef enum logic [4:0] {
-        ST_IDLE,
+        ST_CAPTURE,
         ST_SQUARE,
         ST_SQUARE_WAIT,
         ST_SUM1,
@@ -43,6 +47,8 @@ module rmsnorm #(
         ST_SUM2_WAIT,
         ST_SUM3,
         ST_SUM3_WAIT,
+        ST_ACCUM,
+        ST_ACCUM_WAIT,
         ST_DIV,
         ST_DIV_WAIT,
         ST_EPS,
@@ -51,15 +57,18 @@ module rmsnorm #(
         ST_SQRT_WAIT,
         ST_INV,
         ST_INV_WAIT,
+        ST_LOAD_EMIT,
         ST_MUL_INV,
         ST_MUL_INV_WAIT,
         ST_MUL_GAMMA,
         ST_MUL_GAMMA_WAIT,
-        ST_DONE
+        ST_EMIT
     } state_e;
 
     state_e state_q;
 
+    logic [ROW_W-1:0] x_buf [0:CHUNKS-1];
+    logic [ROW_W-1:0] gamma_buf [0:CHUNKS-1];
     logic [ROW_W-1:0] x_reg;
     logic [ROW_W-1:0] gamma_reg;
     logic [ROW_W-1:0] square_word;
@@ -69,6 +78,11 @@ module rmsnorm #(
     logic [LANES-1:0] mul_inv_done;
     logic [LANES-1:0] mul_gamma_done;
 
+    logic [IDX_W-1:0] write_idx;
+    logic [IDX_W-1:0] read_idx;
+    logic [31:0]      sum_sq_acc;
+    logic [31:0]      sum_sq_next;
+    logic             accum_done;
     logic [3:0][31:0] sum1_result;
     logic [3:0]       sum1_done;
     logic [1:0][31:0] sum2_result;
@@ -88,6 +102,7 @@ module rmsnorm #(
     logic launch_sum1;
     logic launch_sum2;
     logic launch_sum3;
+    logic launch_accum;
     logic launch_div;
     logic launch_eps;
     logic launch_sqrt;
@@ -99,6 +114,7 @@ module rmsnorm #(
     assign launch_sum1      = (state_q == ST_SUM1);
     assign launch_sum2      = (state_q == ST_SUM2);
     assign launch_sum3      = (state_q == ST_SUM3);
+    assign launch_accum     = (state_q == ST_ACCUM);
     assign launch_div       = (state_q == ST_DIV);
     assign launch_eps       = (state_q == ST_EPS);
     assign launch_sqrt      = (state_q == ST_SQRT);
@@ -198,12 +214,24 @@ module rmsnorm #(
         .busy_o   (/* unused */)
     );
 
+    cvfpu_fp32_addsub u_accum (
+        .clk_i    (clk),
+        .rst_ni   (rst_n),
+        .start_i  (launch_accum),
+        .sub_i    (1'b0),
+        .a_i      (sum_sq_acc),
+        .b_i      (sum3_result),
+        .result_o (sum_sq_next),
+        .done_o   (accum_done),
+        .busy_o   (/* unused */)
+    );
+
     cvfpu_fp32_div u_div_lanes (
         .clk_i      (clk),
         .rst_ni     (rst_n),
         .start_i    (launch_div),
-        .dividend_i (sum3_result),
-        .divisor_i  (lanes_as_fp32()),
+        .dividend_i (sum_sq_acc),
+        .divisor_i  (element_count_as_fp32()),
         .result_o   (mean_square),
         .done_o     (div_done),
         .busy_o     (/* unused */)
@@ -244,17 +272,22 @@ module rmsnorm #(
 
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            state_q <= ST_IDLE;
-            x_reg   <= '0;
-            gamma_reg <= '0;
-            y_out   <= '0;
+            state_q    <= ST_CAPTURE;
+            write_idx  <= '0;
+            read_idx   <= '0;
+            sum_sq_acc <= FP32_ZERO;
+            x_reg      <= '0;
+            gamma_reg  <= '0;
+            y_out      <= '0;
         end else begin
             unique case (state_q)
-                ST_IDLE: begin
+                ST_CAPTURE: begin
                     if (start_i) begin
-                        x_reg     <= x_in;
-                        gamma_reg <= gamma;
-                        state_q   <= ST_SQUARE;
+                        x_buf[write_idx]     <= x_in;
+                        gamma_buf[write_idx] <= gamma;
+                        x_reg                <= x_in;
+                        gamma_reg            <= gamma;
+                        state_q              <= ST_SQUARE;
                     end
                 end
                 ST_SQUARE:        state_q <= ST_SQUARE_WAIT;
@@ -264,7 +297,21 @@ module rmsnorm #(
                 ST_SUM2:          state_q <= ST_SUM2_WAIT;
                 ST_SUM2_WAIT:     if (&sum2_done) state_q <= ST_SUM3;
                 ST_SUM3:          state_q <= ST_SUM3_WAIT;
-                ST_SUM3_WAIT:     if (sum3_done) state_q <= ST_DIV;
+                ST_SUM3_WAIT:     if (sum3_done) state_q <= ST_ACCUM;
+                ST_ACCUM:         state_q <= ST_ACCUM_WAIT;
+                ST_ACCUM_WAIT: begin
+                    if (accum_done) begin
+                        sum_sq_acc <= sum_sq_next;
+                        if (write_idx == IDX_W'(CHUNKS-1)) begin
+                            write_idx <= '0;
+                            read_idx  <= '0;
+                            state_q   <= ST_DIV;
+                        end else begin
+                            write_idx <= write_idx + 1'b1;
+                            state_q   <= ST_CAPTURE;
+                        end
+                    end
+                end
                 ST_DIV:           state_q <= ST_DIV_WAIT;
                 ST_DIV_WAIT:      if (div_done) state_q <= ST_EPS;
                 ST_EPS:           state_q <= ST_EPS_WAIT;
@@ -272,24 +319,42 @@ module rmsnorm #(
                 ST_SQRT:          state_q <= ST_SQRT_WAIT;
                 ST_SQRT_WAIT:     if (sqrt_done) state_q <= ST_INV;
                 ST_INV:           state_q <= ST_INV_WAIT;
-                ST_INV_WAIT:      if (inv_done) state_q <= ST_MUL_INV;
+                ST_INV_WAIT:      if (inv_done) state_q <= ST_LOAD_EMIT;
+                ST_LOAD_EMIT: begin
+                    x_reg     <= x_buf[read_idx];
+                    gamma_reg <= gamma_buf[read_idx];
+                    state_q   <= ST_MUL_INV;
+                end
                 ST_MUL_INV:       state_q <= ST_MUL_INV_WAIT;
                 ST_MUL_INV_WAIT:  if (&mul_inv_done) state_q <= ST_MUL_GAMMA;
                 ST_MUL_GAMMA:     state_q <= ST_MUL_GAMMA_WAIT;
                 ST_MUL_GAMMA_WAIT: begin
                     if (&mul_gamma_done) begin
                         y_out   <= scaled_word;
-                        state_q <= ST_DONE;
+                        state_q <= ST_EMIT;
                     end
                 end
-                ST_DONE:          state_q <= ST_IDLE;
-                default:          state_q <= ST_IDLE;
+                ST_EMIT: begin
+                    if (out_ready) begin
+                        if (read_idx == IDX_W'(CHUNKS-1)) begin
+                            read_idx   <= '0;
+                            write_idx  <= '0;
+                            sum_sq_acc <= FP32_ZERO;
+                            state_q    <= ST_CAPTURE;
+                        end else begin
+                            read_idx <= read_idx + 1'b1;
+                            state_q  <= ST_LOAD_EMIT;
+                        end
+                    end
+                end
+                default: state_q <= ST_CAPTURE;
             endcase
         end
     end
 
-    assign done_o = (state_q == ST_DONE);
-    assign busy_o = (state_q != ST_IDLE);
+    assign in_ready = (state_q == ST_CAPTURE);
+    assign done_o   = (state_q == ST_EMIT);
+    assign busy_o   = (state_q != ST_CAPTURE);
 
     logic unused_beta;
     assign unused_beta = ^beta;
