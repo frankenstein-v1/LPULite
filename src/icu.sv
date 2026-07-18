@@ -46,13 +46,25 @@ module icu #(
     output logic [1:0] mem_store_fmt,
     output logic      vxm_rmsnorm_en,
     output logic      vxm_rope_en,
-    output logic [2:0] vxm_residual_op
+    output logic [2:0] vxm_residual_op,
+
+    // External JTAG write interface for programming
+    input  logic                      ext_write_en,
+    input  logic [$clog2(INSTRUCTION_COUNT)-1:0] ext_addr,
+    input  logic [95:0]               ext_data_in
 );
 
     // 1. THE INSTRUCTION MEMORY (IMEM)
     // This is the physical SRAM vault holding your compiled software.
     // It is 96 bits wide and has INSTRUCTION_COUNT rows.
     logic [95:0] imem_array [0:INSTRUCTION_COUNT-1];
+
+    // Write-port for external programming
+    always_ff @(posedge clk) begin
+        if (ext_write_en) begin
+            imem_array[ext_addr] <= ext_data_in;
+        end
+    end
 
     // 2. THE PROGRAM COUNTER (PC)
     // A simple register that tracks what line of code we are on.
