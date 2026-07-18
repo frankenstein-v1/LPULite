@@ -96,6 +96,112 @@ def get_batches(data, batch_size, shuffle=True):
         yield x.to(DEVICE), y.to(DEVICE)
 
 
+def quantize_to_fp8_e5m2(x):
+    # Quantize tensor x to FP8 E5M2
+    x_fp32 = x.float()
+    abs_x = torch.abs(x_fp32)
+    # Clamp to avoid log of 0
+    exp = torch.floor(torch.log2(torch.clamp(abs_x, min=1e-12)))
+    exp_clamped = torch.clamp(exp, min=-14, max=15)
+    # Scale to normalize the mantissa
+    scaled = x_fp32 * torch.pow(2.0, -exp_clamped)
+    # Round mantissa to 2 fractional bits
+    rounded = torch.round(scaled * 4.0) / 4.0
+    # Reconstruct
+    q_x = rounded * torch.pow(2.0, exp_clamped)
+    # Handle zero and underflow
+    q_x = torch.where(abs_x < 7.629e-6, torch.zeros_like(q_x), q_x)
+    # Clip to max representable value in FP8 E5M2 (57344.0)
+    q_x = torch.clamp(q_x, min=-57344.0, max=57344.0)
+    return q_x.type_as(x)
+
+
+def fake_quantize_fp8_e5m2_row(x):
+    # x shape: [..., D]
+    if x.numel() == 0:
+        return x
+    with torch.no_grad():
+        absmax = torch.max(torch.abs(x), dim=-1, keepdim=True).values
+        scale_exp = torch.where(absmax > 0, torch.floor(torch.log2(torch.clamp(absmax, min=1e-12))), torch.zeros_like(absmax))
+        scaled = x * torch.pow(2.0, -scale_exp)
+        q_scaled = quantize_to_fp8_e5m2(scaled)
+        dequant = q_scaled * torch.pow(2.0, scale_exp)
+    return x + (dequant - x).detach()
+
+
+class FakeQuantLinear(nn.Linear):
+    def forward(self, x):
+        # Fake-quantize input activations per row (along last dimension)
+        x_q = fake_quantize_fp8_e5m2_row(x)
+        # Fake-quantize weights per row
+        w_q = fake_quantize_fp8_e5m2_row(self.weight)
+        return F.linear(x_q, w_q, self.bias)
+
+
+class FakeQuantEmbedding(nn.Embedding):
+    def forward(self, x):
+        # Fake-quantize embedding weights per row
+        w_q = fake_quantize_fp8_e5m2_row(self.weight)
+        return F.embedding(x, w_q, self.padding_idx, self.max_norm,
+                           self.norm_type, self.scale_grad_by_freq, self.sparse)
+
+
+class RMSNorm(nn.Module):
+    def __init__(self, dim, eps=1e-6):
+        super().__init__()
+        self.eps = eps
+        self.weight = nn.Parameter(torch.ones(dim))
+
+    def forward(self, x):
+        x_fp32 = x.float()
+        variance = x_fp32.pow(2).mean(-1, keepdim=True)
+        x_norm = x_fp32 * torch.rsqrt(variance + self.eps)
+        return (x_norm * self.weight).type_as(x)
+
+
+class RotaryEmbedding(nn.Module):
+    def __init__(self, dim, max_seq_len=512):
+        super().__init__()
+        self.dim = dim
+        inv_freq = 1.0 / (10000.0 ** (torch.arange(0, dim, 2).float() / dim))
+        self.register_buffer("inv_freq", inv_freq)
+        t = torch.arange(max_seq_len, dtype=torch.float32)
+        freqs = torch.outer(t, self.inv_freq)
+        emb = torch.repeat_interleave(freqs, 2, dim=-1)
+        
+        # Pre-quantize the cos and sin caches to FP8 E5M2
+        cos_fp8 = quantize_to_fp8_e5m2(emb.cos())
+        sin_fp8 = quantize_to_fp8_e5m2(emb.sin())
+        
+        self.register_buffer("cos_cached", cos_fp8)
+        self.register_buffer("sin_cached", sin_fp8)
+
+    def forward(self, x):
+        t = x.shape[2]
+        return self.cos_cached[:t, :], self.sin_cached[:t, :]
+
+
+def apply_rope(x, cos, sin):
+    # x: [B, H, T, D]
+    # cos, sin: [T, D]
+    cos = cos.unsqueeze(0).unsqueeze(0)
+    sin = sin.unsqueeze(0).unsqueeze(0)
+    
+    x_even = x[..., 0::2]
+    x_odd = x[..., 1::2]
+    
+    cos_even = cos[..., 0::2]
+    sin_even = sin[..., 0::2]
+    
+    y_even = x_even * cos_even - x_odd * sin_even
+    y_odd = x_even * sin_even + x_odd * cos_even
+    
+    out = torch.empty_like(x)
+    out[..., 0::2] = y_even
+    out[..., 1::2] = y_odd
+    return out
+
+
 # ============================================================
 # Tiny causal Transformer model with GQA & ReLU
 # ============================================================
@@ -112,10 +218,12 @@ class TinyCausalSelfAttention(nn.Module):
         assert dim % heads == 0, f"dim {dim} must be divisible by heads {heads}"
         assert heads % self.kv_heads == 0, f"heads {heads} must be divisible by kv_heads {self.kv_heads}"
 
-        self.q_proj = nn.Linear(dim, dim, bias=True)
-        self.k_proj = nn.Linear(dim, self.kv_heads * self.head_dim, bias=True)
-        self.v_proj = nn.Linear(dim, self.kv_heads * self.head_dim, bias=True)
-        self.out_proj = nn.Linear(dim, dim, bias=True)
+        self.q_proj = FakeQuantLinear(dim, dim, bias=False)
+        self.k_proj = FakeQuantLinear(dim, self.kv_heads * self.head_dim, bias=False)
+        self.v_proj = FakeQuantLinear(dim, self.kv_heads * self.head_dim, bias=False)
+        self.out_proj = FakeQuantLinear(dim, dim, bias=False)
+
+        self.rope = RotaryEmbedding(self.head_dim, seq_len)
 
         mask = torch.tril(torch.ones(seq_len - 1, seq_len - 1))
         self.register_buffer("causal_mask", mask)
@@ -130,19 +238,34 @@ class TinyCausalSelfAttention(nn.Module):
         k = k.view(B, T, self.kv_heads, self.head_dim).transpose(1, 2)
         v = v.view(B, T, self.kv_heads, self.head_dim).transpose(1, 2)
 
+        # Apply RoPE to Q and K
+        cos, sin = self.rope(q)
+        q = apply_rope(q, cos, sin)
+        k = apply_rope(k, cos, sin)
+
         if self.kv_heads != self.heads:
             num_queries_per_kv = self.heads // self.kv_heads
             k = k.repeat_interleave(num_queries_per_kv, dim=1)
             v = v.repeat_interleave(num_queries_per_kv, dim=1)
 
-        scores = q @ k.transpose(-2, -1)
+        # Fake-quantize Q, K, V activations before matmul
+        q_q = fake_quantize_fp8_e5m2_row(q)
+        k_q = fake_quantize_fp8_e5m2_row(k)
+        v_q = fake_quantize_fp8_e5m2_row(v)
+
+        # Attention scores: QK^T / sqrt(head_dim)
+        scores = q_q @ k_q.transpose(-2, -1)
         scores = scores / math.sqrt(self.head_dim)
 
         mask = self.causal_mask[:T, :T]
         scores = scores.masked_fill(mask == 0, float("-inf"))
 
         attn = F.softmax(scores, dim=-1)
-        out = attn @ v
+        
+        # Fake-quantize attention probs before multiplying with V
+        attn_q = fake_quantize_fp8_e5m2_row(attn)
+
+        out = attn_q @ v_q
         out = out.transpose(1, 2).contiguous().view(B, T, C)
         out = self.out_proj(out)
         return out
@@ -151,18 +274,29 @@ class TinyCausalSelfAttention(nn.Module):
 class TinyTransformerBlock(nn.Module):
     def __init__(self, dim, heads, kv_heads, ffn_dim, seq_len):
         super().__init__()
-        self.ln1 = nn.LayerNorm(dim)
+        self.ln1 = RMSNorm(dim)
         self.attn = TinyCausalSelfAttention(dim, heads, kv_heads, seq_len)
-        self.ln2 = nn.LayerNorm(dim)
-        self.ffn = nn.Sequential(
-            nn.Linear(dim, ffn_dim),
-            nn.ReLU(),
-            nn.Linear(ffn_dim, dim),
-        )
+        self.ln2 = RMSNorm(dim)
+        self.ffn_gate = FakeQuantLinear(dim, ffn_dim, bias=False)
+        self.ffn_down = FakeQuantLinear(ffn_dim, dim, bias=False)
 
     def forward(self, x):
-        x = x + self.attn(self.ln1(x))
-        x = x + self.ffn(self.ln2(x))
+        # Attention block
+        norm1 = self.ln1(x)
+        x = x + self.attn(norm1)
+        
+        # FFN block
+        norm2 = self.ln2(x)
+        ffn1 = self.ffn_gate(norm2)
+        
+        # Activation function: ReLU
+        act = F.relu(ffn1)
+        
+        # Fake-quantize activations after ReLU before down projection
+        act_q = fake_quantize_fp8_e5m2_row(act)
+        
+        ffn2 = self.ffn_down(act_q)
+        x = x + ffn2
         return x
 
 
@@ -177,23 +311,19 @@ class TinyLM(nn.Module):
         self.kv_heads = kv_heads
         self.ffn_dim = ffn_dim
 
-        self.token_emb = nn.Embedding(self.vocab_size, self.dim)
-        self.pos_emb = nn.Embedding(self.seq_len - 1, self.dim)
+        self.token_emb = FakeQuantEmbedding(self.vocab_size, self.dim)
 
         self.blocks = nn.ModuleList([
             TinyTransformerBlock(self.dim, self.heads, self.kv_heads, self.ffn_dim, self.seq_len)
             for _ in range(self.layers)
         ])
 
-        self.ln_f = nn.LayerNorm(self.dim)
-        self.lm_head = nn.Linear(self.dim, self.vocab_size, bias=True)
+        self.ln_f = RMSNorm(self.dim)
+        self.lm_head = FakeQuantLinear(self.dim, self.vocab_size, bias=False)
 
     def forward(self, idx):
         B, T = idx.shape
-        token_embeddings = self.token_emb(idx)
-        positions = torch.arange(T, device=idx.device)
-        position_embeddings = self.pos_emb(positions)
-        x = token_embeddings + position_embeddings
+        x = self.token_emb(idx)
 
         for block in self.blocks:
             x = block(x)
@@ -304,7 +434,7 @@ if __name__ == "__main__":
     if args.preset == "stories260k":
         preset_config = {
             "dim": 64,
-            "ffn_dim": 172,
+            "ffn_dim": 176,
             "layers": 5,
             "heads": 8,
             "kv_heads": 4,
