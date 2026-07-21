@@ -21,7 +21,7 @@ module lpu_mem_sxm_mxm_cocotb_top (
 
     output logic [2:0]  westbound_sel_dbg,
     output logic [2:0]  westbound_consumer_sel_dbg,
-    output logic [63:0] westbound_payload_dbg,
+    output westbound_row_t westbound_payload_dbg,
     output logic        westbound_valid_dbg,
 
     output logic        sxm_west_en_dbg,
@@ -33,6 +33,7 @@ module lpu_mem_sxm_mxm_cocotb_top (
     output logic        mxm_start_dbg,
     output logic        mxm_clear_dbg,
     output logic        mxm_west_en_dbg,
+    output logic signed [7:0] mxm_out_scale_dbg,
 
     output logic        input_loaded_dbg,
     output logic signed [7:0] input_buf0,
@@ -106,6 +107,7 @@ module lpu_mem_sxm_mxm_cocotb_top (
     assign mxm_start_dbg             = u_lpu.mxm_start;
     assign mxm_clear_dbg             = u_lpu.mxm_clear;
     assign mxm_west_en_dbg           = u_lpu.mxm_west_en;
+    assign mxm_out_scale_dbg         = u_lpu.mxm_out_scale;
 
     assign input_loaded_dbg          = u_lpu.u_mxm.mxm_input_ingress_loaded;
     assign input_buf0                = u_lpu.u_mxm.mxm_input_ingress_reg[0];

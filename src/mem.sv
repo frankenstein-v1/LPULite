@@ -1,16 +1,17 @@
 `include "lpu_pkg.sv"
 
 module mem #(
-    parameter int DATA_W = $bits(superlane_t),
+    parameter int DATA_W = $bits(mem_row_t),
     parameter int DEPTH  = MEM_DEPTH,
     parameter int ADDR_W = $clog2(DEPTH)
 ) (
     input  logic clk,
     input  logic rst_n,       // Active-low reset signal
 
-    // The Conveyor Belt (Streams)
-    input  logic [DATA_W-1:0] stream_in,
-    output logic [DATA_W-1:0] stream_out,
+    // Memory rows use the westbound fixed8 format:
+    // [63:0] = 8 x int8 fixed-point lanes, [71:64] = shared row scale.
+    input  logic [DATA_W-1:0] row_in,
+    output logic [DATA_W-1:0] row_out,
 
     // Control Signals
     input  logic read_en,
@@ -25,7 +26,14 @@ module mem #(
     output logic [DATA_W-1:0] ext_data_out
 );
 
-    // The actual SRAM vault. Width is parameterized so LPU can use row-wide storage.
+    // Compatibility names for existing debug/testbench hierarchy references.
+    wire [DATA_W-1:0] stream_in;
+    logic [DATA_W-1:0] stream_out;
+
+    assign stream_in = row_in;
+    assign row_out = stream_out;
+
+    // The actual SRAM vault. Width defaults to one fixed8 memory row.
     logic [DATA_W-1:0] sram_array [0:DEPTH-1];
 
     // Sequential logic: Everything happens strictly on the clock edge
@@ -64,4 +72,3 @@ module mem #(
     end
 
 endmodule
-
