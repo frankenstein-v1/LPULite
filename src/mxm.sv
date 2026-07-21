@@ -17,21 +17,27 @@ module mxm#(
     input logic mxm_input_is_signed,
     input logic mxm_wght_is_signed,
     input logic signed [mxm_size-1 : 0][7:0] mxm_input_in,
+    input logic signed [7:0] mxm_input_scale_i,
     input logic [mxm_size-1 : 0] wght_load,
     input logic signed [mxm_size-1 : 0][7:0] wght_val,
+    input logic signed [7:0] mxm_wght_scale_i,
    
 
     //outputs
-    output logic signed [mxm_size-1 : 0][mxm_size-1 : 0][31:0] mxm_out
+    output logic signed [mxm_size-1 : 0][mxm_size-1 : 0][31:0] mxm_out,
+    output logic signed [7:0] mxm_out_scale_o
 );
 
-//wires that hold the product of each MAC units 
-logic signed [19:0] product_wire [mxm_size-1:0][mxm_size-1:0];
-logic signed [31:0] int_accum_wire [mxm_size-1:0][mxm_size-1:0];
-logic [31:0]        fp_accum_wire  [mxm_size-1:0][mxm_size-1:0];
-logic               fp_result_valid_wire [mxm_size-1:0][mxm_size-1:0];
-logic               fp_busy_wire         [mxm_size-1:0][mxm_size-1:0];
-logic               mxm_use_fp_active;
+localparam int MAC_OPERAND_W = 9;
+localparam int MAC_PRODUCT_W = 2 * MAC_OPERAND_W;
+localparam int MAC_ACC_W     = 32;
+localparam int MAC_SCALE_W   = 8;
+
+//wires that hold the product of each MAC units
+logic signed [MAC_PRODUCT_W-1:0] product_wire [mxm_size-1:0][mxm_size-1:0];
+logic signed [MAC_ACC_W-1:0]     mac_accum_wire [mxm_size-1:0][mxm_size-1:0];
+logic signed [MAC_SCALE_W-1:0]   mac_acc_scale_wire [mxm_size-1:0][mxm_size-1:0];
+logic               unused_mxm_use_fp;
 
 //wire that holds the input vector that came in from the wb bus
 logic signed [7:0] mxm_input_ingress_reg [mxm_size-1:0];
@@ -51,8 +57,19 @@ logic signed [7:0] mxm_input_feed [mxm_size-1:0];
 //same with wght feed
 logic signed [7:0] mxm_wght_feed [mxm_size-1:0];
 
+//registered weight values used by the MAC array
+logic signed [MAC_OPERAND_W-1:0] mxm_wght_reg [mxm_size-1:0];
+logic signed [MAC_SCALE_W-1:0]   mxm_wght_scale_reg;
+
+//sign/zero-extended operands driven into the MAC array
+logic signed [MAC_OPERAND_W-1:0] mxm_input_mac_feed [mxm_size-1:0];
+logic signed [MAC_OPERAND_W-1:0] mxm_wght_mac_feed [mxm_size-1:0];
+
 //load command for wght vectors, its seperate so we can load the weight vectors 
 logic [mxm_size-1:0] mxm_wght_load_feed;
+
+//old MXM timing had one registered product stage before accumulation
+logic [mxm_size-1:0] mxm_mac_en_feed;
 
 //mxm should capture the wb bus this cycle
 logic mxm_west_capture;
@@ -61,6 +78,17 @@ logic mxm_west_capture;
 logic mxm_ingress_is_input;
 
 logic mxm_ingress_is_wght;
+
+function automatic logic signed [MAC_OPERAND_W-1:0] extend_operand(
+    input logic [7:0] operand,
+    input logic       operand_is_signed
+);
+    begin
+        extend_operand = operand_is_signed
+            ? $signed({operand[7], operand})
+            : $signed({1'b0, operand});
+    end
+endfunction
 
 //if west enable and westbound data is valid, capture the data
 assign mxm_west_capture = mxm_west_en && westbound_valid;
@@ -116,16 +144,7 @@ always_ff @(posedge clk or posedge rst) begin
     end 
 end 
 
-always_ff @(posedge clk or posedge rst) begin
-    if (rst) begin
-        mxm_use_fp_active <= 1'b0;
-    end else if (mxm_clear || mxm_start) begin
-        // Hold the numeric mode that produced the currently visible matrix so
-        // downstream observation does not change when ICU advances to NOPs.
-        mxm_use_fp_active <= mxm_use_fp;
-    end
-end
-
+assign unused_mxm_use_fp = mxm_use_fp;
 
 always_comb begin 
     for (int idx = 0; idx < mxm_size; idx++) begin 
@@ -147,6 +166,15 @@ always_comb begin
     end 
 end 
 
+always_comb begin
+    for (int idx = 0; idx < mxm_size; idx++) begin
+        mxm_input_mac_feed[idx] = extend_operand(mxm_input_feed[idx], mxm_input_is_signed);
+        mxm_wght_mac_feed[idx] = mxm_wght_load_feed[idx]
+            ? extend_operand(mxm_wght_feed[idx], mxm_wght_is_signed)
+            : mxm_wght_reg[idx];
+    end
+end
+
 always_comb begin 
     mxm_wght_load_feed = '0;
 
@@ -161,59 +189,63 @@ always_comb begin
     end 
 end 
 
+always_ff @(posedge clk or posedge rst) begin
+    if (rst || mxm_clear) begin
+        for (int idx = 0; idx < mxm_size; idx++) begin
+            mxm_wght_reg[idx] <= '0;
+        end
+        mxm_wght_scale_reg <= '0;
+        mxm_mac_en_feed <= '0;
+    end else begin
+        for (int idx = 0; idx < mxm_size; idx++) begin
+            mxm_mac_en_feed[idx] <= mxm_start && !mxm_wght_load_feed[idx];
+        end
+
+        for (int idx = 0; idx < mxm_size; idx++) begin
+            if (mxm_wght_load_feed[idx]) begin
+                mxm_wght_reg[idx] <= extend_operand(mxm_wght_feed[idx], mxm_wght_is_signed);
+            end
+        end
+
+        if (|mxm_wght_load_feed) begin
+            mxm_wght_scale_reg <= mxm_wght_scale_i;
+        end
+    end
+end
+
 
 
 genvar r, c;
 generate
     for(r = 0; r < mxm_size; r++) begin: row
         for(c = 0; c<mxm_size; c++) begin : col
-            int_mac u_int_mac(
+            mac #(
+                .INPUT_W(MAC_OPERAND_W),
+                .WEIGHT_W(MAC_OPERAND_W),
+                .PRODUCT_W(MAC_PRODUCT_W),
+                .ACC_W(MAC_ACC_W),
+                .SCALE_W(MAC_SCALE_W)
+            ) u_mac (
                 .clk(clk),
                 .rst(rst),
-                .en(mxm_start),
-                .input_in(mxm_input_feed[r]),
-                .input_is_signed(mxm_input_is_signed),
-                .weight_load(mxm_wght_load_feed[c]),
-                .weight_value(mxm_wght_feed[c]),
-                .weight_is_signed(mxm_wght_is_signed),
-                .product(product_wire[r][c])
-            );
-
-            acc u_int_acc(
-                .clk(clk),
-                .rst(rst),
-                .en(mxm_start),
                 .clear(mxm_clear),
-                .product_in(product_wire[r][c]),
-                .sum_out(int_accum_wire[r][c])
+                .en(mxm_mac_en_feed[c]),
+                .input_i(mxm_input_mac_feed[r]),
+                .weight_i(mxm_wght_mac_feed[c]),
+                .input_scale_i(mxm_input_scale_i),
+                .weight_scale_i(mxm_wght_scale_reg),
+                .acc_o(mac_accum_wire[r][c]),
+                .acc_scale_o(mac_acc_scale_wire[r][c]),
+                .product_o(product_wire[r][c])
             );
 
-            mac u_fp_mac(
-                .clk(clk),
-                .rst(rst),
-                .en(mxm_start),
-                .clear(mxm_clear),
-                .input_in(mxm_input_feed[r]),
-                .input_is_signed(mxm_input_is_signed),
-                .weight_load(mxm_wght_load_feed[c]),
-                .weight_value(mxm_wght_feed[c]),
-                .weight_is_signed(mxm_wght_is_signed),
-                .accum_out(fp_accum_wire[r][c]),
-                .result_valid(fp_result_valid_wire[r][c]),
-                .busy(fp_busy_wire[r][c])
-            );
-
-            always_comb begin
-                if (mxm_use_fp_active)
-                    mxm_out[r][c] = fp_accum_wire[r][c];
-                else
-                    mxm_out[r][c] = int_accum_wire[r][c];
-            end
+            assign mxm_out[r][c] = mac_accum_wire[r][c];
         end 
     end 
 
 
 endgenerate
 
+assign mxm_out_scale_o = mac_acc_scale_wire[0][0];
    
 endmodule

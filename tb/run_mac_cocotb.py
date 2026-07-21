@@ -4,29 +4,29 @@ import os
 from cocotb_tools.runner import get_runner
 
 
-def test_softmax():
+def test_mac():
     src_dir = (Path(__file__).parent / "../src").resolve()
-    build_dir = (Path(__file__).parent / "sim_build_softmax_fp").resolve()
+    build_dir = (Path(__file__).parent / "sim_build_mac").resolve()
     sources = [
-        src_dir / "softmax.sv",
-        src_dir / "lut_softmax_exp.sv",
-        src_dir / "lut_softmax_div.sv",
+        src_dir / "mac.sv",
     ]
 
     runner = get_runner("icarus")
     runner.build(
         sources=sources,
-        hdl_toplevel="softmax",
+        hdl_toplevel="mac",
         always=True,
         build_dir=build_dir,
+        waves=True,
     )
     runner.test(
-        hdl_toplevel="softmax",
-        test_module="softmax_fp_tb",
+        hdl_toplevel="mac",
+        test_module="mac_tb",
         testcase=os.getenv("TESTCASE"),
         build_dir=build_dir,
+        waves=True,
     )
 
 
 if __name__ == "__main__":
-    test_softmax()
+    test_mac()
