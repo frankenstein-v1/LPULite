@@ -3,7 +3,8 @@
 
 
 module eastbound_bus #(
-    parameter int PAYLOAD_E = $bits(mxm_row_t)
+    // 8 signed int32 fixed-point lanes plus one shared row scale.
+    parameter int PAYLOAD_E = $bits(eastbound_row_t)
 )(
 
     input eastbound_producer_e producer_sel,
@@ -25,6 +26,7 @@ module eastbound_bus #(
     input logic [PAYLOAD_E-1:0] mem0_payload_e, 
     input logic                 mem0_valid_e, 
 
+    // Shared eastbound bus output: [255:0] = 8x int32 lanes, [263:256] = scale.
     output logic [PAYLOAD_E-1:0] eastbound_payload, 
     output logic                 eastbound_valid
 );

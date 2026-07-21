@@ -13,7 +13,28 @@ typedef logic [7:0] fp8_row_scale_t;
 localparam int MXM_SIZE = 8;
 localparam int MXM_ACC_W = 32;
 typedef logic [255:0] mxm_row_t;
-typedef logic [71:0] mem_row_t;
+
+// Fixed-point bus row formats:
+//   westbound: 8 x int8 lanes plus one shared row scale
+//   eastbound: 8 x int32 lanes plus one shared row scale
+typedef logic signed [7:0]  fixed8_lane_t;
+typedef logic signed [31:0] fixed32_lane_t;
+typedef logic signed [7:0]  fixed_row_scale_t;
+typedef logic [63:0]        fixed8_row_data_t;
+typedef logic [255:0]       fixed32_row_data_t;
+typedef logic [71:0]        westbound_row_t;
+typedef logic [263:0]       eastbound_row_t;
+typedef westbound_row_t     mem_row_t;
+
+typedef struct packed {
+    fixed_row_scale_t row_scale;
+    fixed8_row_data_t packed_row;
+} westbound_fixed_row_t;
+
+typedef struct packed {
+    fixed_row_scale_t  row_scale;
+    fixed32_row_data_t packed_row;
+} eastbound_fixed_row_t;
 
 // Memory format for one quantized FP8 row:
 //   [63:0]   packed 8-lane FP8 row
@@ -33,6 +54,60 @@ function automatic mem_row_t make_fp8_row_mem(
         encoded_row[63:0] = packed_row;
         encoded_row[71:64] = row_scale_word[7:0];
         make_fp8_row_mem = encoded_row;
+    end
+endfunction
+
+function automatic westbound_row_t make_westbound_row(
+    input fixed8_row_data_t packed_row,
+    input logic [31:0]      row_scale_word
+);
+    begin
+        make_westbound_row = '0;
+        make_westbound_row[63:0] = packed_row;
+        make_westbound_row[71:64] = row_scale_word[7:0];
+    end
+endfunction
+
+function automatic fixed8_row_data_t westbound_row_data(
+    input westbound_row_t raw_row
+);
+    begin
+        westbound_row_data = raw_row[63:0];
+    end
+endfunction
+
+function automatic fixed_row_scale_t westbound_row_scale(
+    input westbound_row_t raw_row
+);
+    begin
+        westbound_row_scale = raw_row[71:64];
+    end
+endfunction
+
+function automatic eastbound_row_t make_eastbound_row(
+    input fixed32_row_data_t packed_row,
+    input logic [31:0]       row_scale_word
+);
+    begin
+        make_eastbound_row = '0;
+        make_eastbound_row[255:0] = packed_row;
+        make_eastbound_row[263:256] = row_scale_word[7:0];
+    end
+endfunction
+
+function automatic fixed32_row_data_t eastbound_row_data(
+    input eastbound_row_t raw_row
+);
+    begin
+        eastbound_row_data = raw_row[255:0];
+    end
+endfunction
+
+function automatic fixed_row_scale_t eastbound_row_scale(
+    input eastbound_row_t raw_row
+);
+    begin
+        eastbound_row_scale = raw_row[263:256];
     end
 endfunction
 
@@ -60,21 +135,24 @@ function automatic fp8_row_scale_t fp8_row_mem_scale(
     end
 endfunction
 
-function automatic mem_row_t eastbound_to_mem_row(
-    input mxm_row_t eastbound_row
+function automatic mem_row_t truncate_eastbound_to_mem_row(
+    input eastbound_row_t eastbound_row
 );
     begin
-        eastbound_to_mem_row = eastbound_row[$bits(mem_row_t)-1:0];
+        // Temporary bridge only: real MXM result stores should go through an
+        // int32-to-int8 requantizer before reaching memory.
+        truncate_eastbound_to_mem_row = make_fp8_row_mem(eastbound_row[63:0], eastbound_row[263:256]);
     end
 endfunction
 
-function automatic mxm_row_t mem_row_to_eastbound(
+function automatic eastbound_row_t mem_row_to_eastbound(
     input mem_row_t raw_row
 );
-    mxm_row_t widened_row;
+    eastbound_row_t widened_row;
     begin
         widened_row = '0;
-        widened_row[$bits(mem_row_t)-1:0] = raw_row;
+        widened_row[63:0] = fp8_row_mem_packed8(raw_row);
+        widened_row[263:256] = fp8_row_mem_scale(raw_row);
         mem_row_to_eastbound = widened_row;
     end
 endfunction

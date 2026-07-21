@@ -41,6 +41,7 @@ logic               unused_mxm_use_fp;
 
 //wire that holds the input vector that came in from the wb bus
 logic signed [7:0] mxm_input_ingress_reg [mxm_size-1:0];
+logic signed [MAC_SCALE_W-1:0] mxm_input_scale_reg;
 
 //this input register contains valid data
 logic mxm_input_ingress_loaded;
@@ -109,6 +110,7 @@ always_ff @(posedge clk or posedge rst) begin
             mxm_input_ingress_reg[idx] <= '0;
             mxm_wght_ingress_reg[idx] <= '0;
         end
+        mxm_input_scale_reg <= '0;
     end else if (mxm_clear) begin
         mxm_input_ingress_loaded <= 1'b0;
         mxm_wght_ingress_loaded <= 1'b0;
@@ -119,6 +121,7 @@ always_ff @(posedge clk or posedge rst) begin
             mxm_input_ingress_reg[idx] <= '0;
             mxm_wght_ingress_reg[idx] <= '0;
         end 
+        mxm_input_scale_reg <= '0;
     end 
 
     //if the mxm_West_capture 
@@ -131,6 +134,7 @@ always_ff @(posedge clk or posedge rst) begin
             end 
             //once loaded the register loaded should be 1
             mxm_input_ingress_loaded <= 1'b1;
+            mxm_input_scale_reg <= mxm_input_scale_i;
         end 
 
         else if (mxm_ingress_is_wght) begin 
@@ -232,7 +236,7 @@ generate
                 .en(mxm_mac_en_feed[c]),
                 .input_i(mxm_input_mac_feed[r]),
                 .weight_i(mxm_wght_mac_feed[c]),
-                .input_scale_i(mxm_input_scale_i),
+                .input_scale_i(mxm_input_ingress_loaded ? mxm_input_scale_reg : mxm_input_scale_i),
                 .weight_scale_i(mxm_wght_scale_reg),
                 .acc_o(mac_accum_wire[r][c]),
                 .acc_scale_o(mac_acc_scale_wire[r][c]),

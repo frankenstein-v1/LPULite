@@ -2,8 +2,8 @@
 `include "lpu_pkg.sv"
 
 module westbound_bus #(
-    // 8 FP8 lanes travel together on westbound by default.
-    parameter int PAYLOAD_W = $bits(superlane_t)
+    // 8 signed int8 fixed-point lanes plus one shared row scale.
+    parameter int PAYLOAD_W = $bits(westbound_row_t)
 ) (
     // Producer select (encoded): choose exactly one source for this cycle.
     input  westbound_producer_e producer_sel,
@@ -24,7 +24,7 @@ module westbound_bus #(
     input  logic [PAYLOAD_W-1:0] mem1_payload,
     input  logic                 mem1_valid,
 
-    // Shared westbound bus output
+    // Shared westbound bus output: [63:0] = 8x int8 lanes, [71:64] = scale.
     output logic [PAYLOAD_W-1:0] westbound_payload,
     output logic                 westbound_valid
 );

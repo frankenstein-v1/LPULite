@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 from cocotb_tools.runner import get_runner
@@ -13,6 +14,7 @@ def test_lpu_mem_sxm_mxm():
         src_dir / "mac.sv",
         src_dir / "acc.sv",
         src_dir / "mem.sv",
+        src_dir / "mem_row_dequant.sv",
         src_dir / "mxm.sv",
         src_dir / "sxm.sv",
         src_dir / "row_fifo.sv",
@@ -50,6 +52,7 @@ def test_lpu_mem_sxm_mxm():
     runner.test(
         hdl_toplevel="lpu_mem_sxm_mxm_cocotb_top",
         test_module="lpu_mem_sxm_mxm_tb",
+        testcase=os.getenv("TESTCASE"),
         build_dir=build_dir,
         test_dir=build_dir,
         waves=True,

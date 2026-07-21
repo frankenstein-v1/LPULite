@@ -111,10 +111,10 @@ always_ff @(posedge clk or negedge rst_n) begin
     end
 end
 
-// shared bus signals (to be driven by bus fabric later)
-superlane_t westbound_payload;
+// shared bus signals
+westbound_row_t westbound_payload;
 logic       westbound_valid;
-mxm_row_t   eastbound_payload;
+eastbound_row_t eastbound_payload;
 logic       eastbound_valid;
 superlane_t eastbound_payload_lane0;
 
@@ -157,6 +157,9 @@ logic [MXM_SIZE-1:0]              wght_load;
 logic signed [MXM_SIZE-1:0][7:0]  wght_val;
 logic signed [MXM_SIZE-1:0][MXM_SIZE-1:0][31:0] mxm_out;
 logic signed [7:0] mxm_out_scale;
+logic signed [7:0] mxm_westbound_scale;
+
+assign mxm_westbound_scale = westbound_row_scale(westbound_payload);
 
 //icu instance
 icu u_icu(
@@ -225,12 +228,12 @@ always_comb begin
     end
     else if (mem0_write_from_west) begin
         if (westbound_sel_t == WB_VXM)
-            mem0_stream_in = mem_row_t'(make_fp8_row_mem(westbound_payload, vxm_stream_out_scale_buf));
+            mem0_stream_in = mem_row_t'(make_fp8_row_mem(westbound_row_data(westbound_payload), vxm_stream_out_scale_buf));
         else
-            mem0_stream_in = mem_row_t'(make_fp8_row_mem(westbound_payload, '0));
+            mem0_stream_in = mem_row_t'(westbound_payload);
     end
     else if (mem0_write_from_east)
-        mem0_stream_in = eastbound_to_mem_row(eastbound_payload);
+        mem0_stream_in = truncate_eastbound_to_mem_row(eastbound_payload);
 end
 
 mem #(
@@ -238,8 +241,8 @@ mem #(
 ) u_mem0(
     .clk(clk),
     .rst_n(rst_n),
-    .stream_in(mem0_stream_in),
-    .stream_out(mem0_stream_out),
+    .row_in(mem0_stream_in),
+    .row_out(mem0_stream_out),
     .read_en(mem0_read_en_eff),
     .write_en(mem0_write_en_eff),
     .addr(mem0_addr_eff),
@@ -269,8 +272,8 @@ mem #(
 ) u_mem1(
     .clk(clk),
     .rst_n(rst_n),
-    .stream_in(ext_mem1_write ? ext_wdata[$bits(mem_row_t)-1:0] : eastbound_to_mem_row(eastbound_payload)),
-    .stream_out(mem1_stream_out),
+    .row_in(ext_mem1_write ? ext_wdata[$bits(mem_row_t)-1:0] : truncate_eastbound_to_mem_row(eastbound_payload)),
+    .row_out(mem1_stream_out),
     .read_en(mem1_read_en_eff),
     .write_en(mem1_write_en_eff),
     .addr(mem1_addr_eff),
@@ -318,18 +321,16 @@ end
 logic        sxm_emit_valid;
 logic        sxm_load_from_west;
 
-westbound_bus #(
-    .PAYLOAD_W($bits(superlane_t))
-) u_westbound_bus(
+westbound_bus u_westbound_bus(
     .producer_sel(westbound_sel_t),
-    .mem0_payload(fp8_row_mem_packed(mem0_stream_out)),
-    .mem1_payload(fp8_row_mem_packed(mem1_stream_out)),
+    .mem0_payload(westbound_row_t'(mem0_stream_out)),
+    .mem1_payload(westbound_row_t'(mem1_stream_out)),
     .mem0_valid(mem0_valid),
     .mem1_valid(mem1_valid),
     // SXM emits transpose rows onto westbound for downstream scheduling.
-    .sxm_payload(sxm_stream_out_to_mxm_top),
+    .sxm_payload(make_westbound_row(sxm_stream_out_to_mxm_top, '0)),
     .sxm_valid(sxm_emit_valid),
-    .vxm_payload(vxm_stream_out_buf),
+    .vxm_payload(make_westbound_row(vxm_stream_out_buf, vxm_stream_out_scale_buf)),
     .vxm_valid(vxm_stream_out_buf_valid_w),
     .westbound_payload(westbound_payload),
     .westbound_valid(westbound_valid)
@@ -344,11 +345,11 @@ westbound_consumer_decode u_westbound_consumer_decode(
     .vxm_west_en(vxm_west_en)
 );
 
-mxm_row_t mxm_payload_e;
+eastbound_row_t mxm_payload_e;
 logic mxm_valid_e;
-mxm_row_t vxm_payload_e_bus;
-mxm_row_t sxm_payload_e_bus;
-mxm_row_t mem0_payload_e_bus;
+eastbound_row_t vxm_payload_e_bus;
+eastbound_row_t sxm_payload_e_bus;
+eastbound_row_t mem0_payload_e_bus;
 mxm_row_t mem0_dequant_payload_e_bus;
 
 assign eastbound_payload_lane0 = eastbound_payload[$bits(superlane_t)-1:0];
@@ -358,8 +359,8 @@ always_comb begin
     sxm_payload_e_bus = '0;
     mem0_payload_e_bus = '0;
 
-    vxm_payload_e_bus = mxm_row_t'(make_fp8_row_mem(vxm_stream_out_buf, vxm_stream_out_scale_buf));
-    sxm_payload_e_bus[$bits(superlane_t)-1:0] = sxm_stream_out_to_mxm_left;
+    vxm_payload_e_bus = make_eastbound_row({192'd0, vxm_stream_out_buf}, vxm_stream_out_scale_buf);
+    sxm_payload_e_bus = make_eastbound_row({192'd0, sxm_stream_out_to_mxm_left}, '0);
     mem0_payload_e_bus = mem_row_to_eastbound(mem0_stream_out);
 end
 
@@ -375,14 +376,13 @@ mxm_eastbound_adapter #(
     .mxm_out(mxm_out),
     .mxm_row_sel(mxm_e_row_sel),
     .mxm_col_sel(mxm_e_col_sel),
+    .mxm_scale(mxm_out_scale),
     .mxm_valid_in(mxm_e_valid_in),
     .mxm_payload(mxm_payload_e),
     .mxm_valid(mxm_valid_e)
 );
 
-eastbound_bus #(
-    .PAYLOAD_E($bits(mxm_row_t))
-) u_eastbound_bus(
+eastbound_bus u_eastbound_bus(
     .producer_sel(eastbound_sel_t),
     .mxm_payload_e(mxm_payload_e),
     .mxm_valid_e(mxm_valid_e),
@@ -421,7 +421,7 @@ always_ff @(posedge clk or negedge rst_n) begin
         if (sxm_east_en && eastbound_valid)
             sxm_e_payload_reg <= eastbound_payload_lane0;
         if (sxm_west_en && westbound_valid)
-            sxm_w_payload_reg <= westbound_payload;
+            sxm_w_payload_reg <= westbound_row_data(westbound_payload);
     end
 end
 
@@ -458,7 +458,7 @@ mxm #(
     .rst(~rst_n),
     .mxm_clear(mxm_clear),
     .mxm_start(mxm_start),
-    .westbound_payload(westbound_payload),
+    .westbound_payload(westbound_row_data(westbound_payload)),
     .westbound_valid(westbound_valid),
     .mxm_west_en(mxm_west_en),
     .mxm_ingress_mode(mxm_ingress_mode),
@@ -466,10 +466,10 @@ mxm #(
     .mxm_input_is_signed(mxm_input_is_signed),
     .mxm_wght_is_signed(mxm_wght_is_signed),
     .mxm_input_in(mxm_input_in),
-    .mxm_input_scale_i(8'sd0),
+    .mxm_input_scale_i(mxm_westbound_scale),
     .wght_load(wght_load),
     .wght_val(wght_val),
-    .mxm_wght_scale_i(8'sd0),
+    .mxm_wght_scale_i(mxm_westbound_scale),
     .mxm_out(mxm_out),
     .mxm_out_scale_o(mxm_out_scale)
 );
@@ -515,14 +515,14 @@ always_comb begin
                     vxm_operand_payload = mem0_dequant_payload_e_bus;
                 end
                 default: begin
-                    vxm_operand_payload = eastbound_payload;
+                    vxm_operand_payload = eastbound_row_data(eastbound_payload);
                 end
             endcase
         end else begin
-            vxm_operand_payload = eastbound_payload;
+            vxm_operand_payload = eastbound_row_data(eastbound_payload);
         end
     end else if (vxm_load_operand_west) begin
-        vxm_operand_payload[$bits(superlane_t)-1:0] = westbound_payload;
+        vxm_operand_payload[$bits(superlane_t)-1:0] = westbound_row_data(westbound_payload);
     end
 end
 
