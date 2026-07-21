@@ -100,8 +100,16 @@ assign mxm_ingress_is_input = (mxm_ingress_mode == 2'b01);
 assign mxm_ingress_is_wght = (mxm_ingress_mode == 2'b10);
 
 always_ff @(posedge clk or posedge rst) begin 
-    //if reset or mxm_clear, we know the registers hjave nothing in them/ we reset them to 0
-    if (rst || mxm_clear) begin 
+    // rst is asynchronous; mxm_clear is a synchronous command.
+    if (rst) begin 
+        mxm_input_ingress_loaded <= 1'b0;
+        mxm_wght_ingress_loaded <= 1'b0;
+
+        for (int idx = 0; idx < mxm_size; idx++) begin 
+            mxm_input_ingress_reg[idx] <= '0;
+            mxm_wght_ingress_reg[idx] <= '0;
+        end
+    end else if (mxm_clear) begin
         mxm_input_ingress_loaded <= 1'b0;
         mxm_wght_ingress_loaded <= 1'b0;
 

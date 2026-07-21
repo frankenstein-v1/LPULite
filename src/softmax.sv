@@ -184,7 +184,8 @@ module softmax #(
     end
 
     generate
-        for (genvar lane = 0; lane < LANES; lane++) begin : gen_exp
+        genvar lane;
+        for (lane = 0; lane < LANES; lane++) begin : gen_exp
             lut_softmax_exp #(.DW(LANE_W)) exp_inst (
                 .clk(clk),
                 .rst(~rst_n),

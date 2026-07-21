@@ -1,14 +1,9 @@
-package require qsys
 set_module_property NAME lpu_de1_soc
 set_module_property VERSION 1.0
 set_module_property GROUP "TinyLPU"
 set_module_property DISPLAY_NAME "TinyLPU DE1-SoC Avalon wrapper"
-set_module_property TOP_LEVEL_HDL_FILE lpu_de1_soc_wrapper.sv
 set_module_property TOP_LEVEL_HDL_MODULE lpu_de1_soc_wrapper
 set_module_property INSTANTIATE_IN_SYSTEM_MODULE true
-add_fileset QUARTUS_SYNTH QUARTUS_SYNTH ""
-set_fileset_property QUARTUS_SYNTH TOP_LEVEL lpu_de1_soc_wrapper
-add_fileset_file lpu_de1_soc_wrapper.sv SYSTEM_VERILOG PATH lpu_de1_soc_wrapper.sv TOP_LEVEL_FILE
 add_interface clk clock end
 add_interface_port clk clk clk Input 1
 add_interface rst_n reset end
@@ -21,7 +16,7 @@ set_interface_property avs associatedClock clk
 set_interface_property avs associatedReset rst_n
 set_interface_property avs readWaitTime 0
 set_interface_property avs writeWaitTime 0
-set_interface_property avs maximumPendingReadTransactions 1
+set_interface_property avs maximumPendingReadTransactions 0
 add_interface_port avs avs_address address Input 16
 add_interface_port avs avs_read read Input 1
 add_interface_port avs avs_write write Input 1
