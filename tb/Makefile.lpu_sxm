@@ -6,15 +6,7 @@ TOPLEVEL_LANG ?= verilog
 PWD=$(shell pwd)
 
 VERILOG_SOURCES = $(PWD)/../src/lpu_pkg.sv \
-    $(PWD)/../src/cvfpu_fp8_fp32_fma.sv \
     $(PWD)/../src/mac.sv \
-    $(PWD)/../src/int_mac.sv \
-    $(PWD)/../src/cvfpu_fp8_to_fp32_cast.sv \
-    $(PWD)/../src/cvfpu_fp32_addsub.sv \
-    $(PWD)/../src/cvfpu_fp32_div.sv \
-    $(PWD)/../src/cvfpu_fp32_cmp.sv \
-    $(PWD)/../src/cvfpu_fp32_fma.sv \
-    $(PWD)/../src/cvfpu_fp32_sqrt.sv \
     $(PWD)/../src/acc.sv \
     $(PWD)/../src/mem.sv \
     $(PWD)/../src/mxm.sv \

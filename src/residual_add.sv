@@ -1,11 +1,6 @@
 `timescale 1ns/1ps
 
-// FP32 residual/vector add accumulator.
-//
-// This block intentionally does not quantize. It keeps an FP32 row accumulator
-// local to the block and only emits FP32 rows for the surrounding datapath to
-// consume. VXM can feed row_o into its existing quant stage when storage is
-// required.
+// Signed 32-bit residual/vector add accumulator.
 module residual_add #(
     parameter int LANES  = 8,
     parameter int LANE_W = 32
@@ -26,8 +21,6 @@ module residual_add #(
 );
 
     localparam int ROW_W = LANES * LANE_W;
-    localparam logic [31:0] FP32_ONE = 32'h3f80_0000;
-
     localparam logic [2:0] OP_PASS  = 3'd0;
     localparam logic [2:0] OP_CLEAR = 3'd1;
     localparam logic [2:0] OP_LOAD  = 3'd2;
@@ -35,46 +28,24 @@ module residual_add #(
     localparam logic [2:0] OP_EMIT  = 3'd4;
 
     typedef enum logic [1:0] {
-        ST_IDLE,
-        ST_ADD_START,
-        ST_ADD_WAIT
+        ST_IDLE
     } state_e;
 
     state_e state_q;
 
     logic [ROW_W-1:0] acc_reg;
-    logic [ROW_W-1:0] add_row_reg;
     logic [ROW_W-1:0] add_result_word;
-    logic [LANES-1:0] add_done_vec;
-    logic             add_start;
-    logic             add_done_all;
-
-    assign add_start = (state_q == ST_ADD_START);
-    assign add_done_all = &add_done_vec;
 
     generate
         for (genvar lane = 0; lane < LANES; lane++) begin : g_residual_lanes
-            logic [31:0] acc_lane;
-            logic [31:0] add_lane;
-            logic [31:0] add_result_lane;
-            logic        add_done_lane;
+            logic signed [LANE_W-1:0] acc_lane;
+            logic signed [LANE_W-1:0] row_lane;
+            logic signed [LANE_W-1:0] add_result_lane;
 
             assign acc_lane = acc_reg[lane*LANE_W +: LANE_W];
-            assign add_lane = add_row_reg[lane*LANE_W +: LANE_W];
+            assign row_lane = row_i[lane*LANE_W +: LANE_W];
+            assign add_result_lane = acc_lane + row_lane;
             assign add_result_word[lane*LANE_W +: LANE_W] = add_result_lane;
-            assign add_done_vec[lane] = add_done_lane;
-
-            cvfpu_fp32_fma u_fp32_add (
-                .clk_i          (clk),
-                .rst_ni         (rst_n),
-                .start_i        (add_start),
-                .multiplicand_i (acc_lane),
-                .multiplier_i   (FP32_ONE),
-                .addend_i       (add_lane),
-                .result_o       (add_result_lane),
-                .done_o         (add_done_lane),
-                .busy_o         (/* unused */)
-            );
         end
     endgenerate
 
@@ -82,7 +53,6 @@ module residual_add #(
         if (!rst_n) begin
             state_q     <= ST_IDLE;
             acc_reg     <= '0;
-            add_row_reg <= '0;
             row_o       <= '0;
             done_o      <= 1'b0;
             row_valid_o <= 1'b0;
@@ -111,8 +81,8 @@ module residual_add #(
                             end
 
                             OP_ADD: begin
-                                add_row_reg <= row_i;
-                                state_q     <= ST_ADD_START;
+                                acc_reg <= add_result_word;
+                                done_o  <= 1'b1;
                             end
 
                             OP_EMIT: begin
@@ -125,18 +95,6 @@ module residual_add #(
                                 done_o <= 1'b1;
                             end
                         endcase
-                    end
-                end
-
-                ST_ADD_START: begin
-                    state_q <= ST_ADD_WAIT;
-                end
-
-                ST_ADD_WAIT: begin
-                    if (add_done_all) begin
-                        acc_reg <= add_result_word;
-                        done_o  <= 1'b1;
-                        state_q <= ST_IDLE;
                     end
                 end
 

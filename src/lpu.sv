@@ -156,6 +156,7 @@ logic signed [MXM_SIZE-1:0][7:0]  mxm_input_in;
 logic [MXM_SIZE-1:0]              wght_load;
 logic signed [MXM_SIZE-1:0][7:0]  wght_val;
 logic signed [MXM_SIZE-1:0][MXM_SIZE-1:0][31:0] mxm_out;
+logic signed [7:0] mxm_out_scale;
 
 //icu instance
 icu u_icu(
@@ -464,9 +465,12 @@ mxm #(
     .mxm_input_is_signed(mxm_input_is_signed),
     .mxm_wght_is_signed(mxm_wght_is_signed),
     .mxm_input_in(mxm_input_in),
+    .mxm_input_scale_i(8'sd0),
     .wght_load(wght_load),
     .wght_val(wght_val),
-    .mxm_out(mxm_out)
+    .mxm_wght_scale_i(8'sd0),
+    .mxm_out(mxm_out),
+    .mxm_out_scale_o(mxm_out_scale)
 );
 
 

@@ -11,15 +11,7 @@ def test_lpu():
     
     sources = [
         src_dir / "lpu_pkg.sv",
-        src_dir / "cvfpu_fp8_fp32_fma.sv",
         src_dir / "mac.sv",
-        src_dir / "int_mac.sv",
-        src_dir / "cvfpu_fp8_to_fp32_cast.sv",
-        src_dir / "cvfpu_fp32_addsub.sv",
-        src_dir / "cvfpu_fp32_div.sv",
-        src_dir / "cvfpu_fp32_cmp.sv",
-        src_dir / "cvfpu_fp32_fma.sv",
-        src_dir / "cvfpu_fp32_sqrt.sv",
         src_dir / "acc.sv",
         src_dir / "mem.sv",
         src_dir / "mem_row_dequant.sv",

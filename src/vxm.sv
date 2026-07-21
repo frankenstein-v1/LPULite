@@ -49,7 +49,6 @@ module vxm #(
 
     localparam int ROW_W = LANES * LANE_W;
     localparam logic [31:0] FP32_ZERO = 32'h0000_0000;
-    localparam logic [31:0] FP32_ONE  = 32'h3f80_0000;
     localparam logic [2:0] RES_OP_PASS = 3'd0;
     localparam logic [2:0] RES_OP_EMIT = 3'd4;
 
@@ -87,18 +86,6 @@ module vxm #(
     logic [ROW_W-1:0] s1_bias_next; // integer bias/bypass result
     logic [ROW_W-1:0] s2_relu_next; // ReLU/bypass result
     logic [ROW_W-1:0] s3_scale_next; // integer scale/bypass result
-    logic [ROW_W-1:0] fp_bias_result_word;
-    logic [ROW_W-1:0] fp_scale_result_word;
-    logic [LANES-1:0] fp_bias_done_vec;
-    logic [LANES-1:0] fp_scale_done_vec;
-    logic             fp_bias_inflight;
-    logic             fp_scale_inflight;
-    logic             fp_bias_launch;
-    logic             fp_scale_launch;
-    logic             fp_bias_wait;
-    logic             fp_scale_wait;
-    logic             fp_bias_done_all;
-    logic             fp_scale_done_all;
 
     //outputs for quantize & softmax & muxes
     logic [LANES*8-1:0]       quantize_out;
@@ -129,8 +116,6 @@ module vxm #(
     logic                     quant_issue;
     logic                     quant_inflight;
     logic                     quant_slot_available;
-    logic                     fp_bias_stall;
-    logic                     fp_scale_stall;
     logic                     rope_start;
     logic                     rope_done;
     logic                     rope_busy;
@@ -169,6 +154,9 @@ module vxm #(
     logic [LANES*8-1:0]       stream_out_reg;
     logic [31:0]              stream_out_scale_reg;
     logic                     stream_out_valid_reg;
+    logic                     unused_scale_factor;
+
+    assign unused_scale_factor = ^scale_factor;
 
     //extend from 1 lane to 4 lanes
 
@@ -198,28 +186,12 @@ module vxm #(
             logic signed [LANE_W-1:0] bias_lane_s0;
             logic signed [ALU_W-1:0]  bias_add_out;
             logic signed [ALU_W-1:0]  mux1_out;
-            logic [31:0]              fp_bias_result_lane;
-            logic                     fp_bias_done_lane;
 
             assign data_lane    = s0_data_reg[i*LANE_W +: LANE_W];
             assign bias_lane_s0 = s0_bias_reg[i*LANE_W +: LANE_W];
             assign bias_add_out = widen_lane(data_lane) + widen_lane(bias_lane_s0);
             assign mux1_out     = s0_ctrl_reg[0] ? bias_add_out : widen_lane(data_lane);
             assign s1_bias_next[i*LANE_W +: LANE_W] = mux1_out[LANE_W-1:0];
-            assign fp_bias_result_word[i*LANE_W +: LANE_W] = fp_bias_result_lane;
-            assign fp_bias_done_vec[i] = fp_bias_done_lane;
-
-            cvfpu_fp32_fma u_fp_bias_add (
-                .clk_i          (clk),
-                .rst_ni         (rst_n),
-                .start_i        (fp_bias_launch),
-                .multiplicand_i (data_lane),
-                .multiplier_i   (FP32_ONE),
-                .addend_i       (bias_lane_s0),
-                .result_o       (fp_bias_result_lane),
-                .done_o         (fp_bias_done_lane),
-                .busy_o         (/* unused */)
-            );
 
             // Stage 2: ReLU logic
             logic signed [LANE_W-1:0] bias_lane_s1;
@@ -236,26 +208,10 @@ module vxm #(
             // Stage 3: scale logic
             logic signed [LANE_W-1:0] relu_lane;
             logic signed [ALU_W-1:0]  scale_out_int;
-            logic [31:0]              fp_scale_result_lane;
-            logic                     fp_scale_done_lane;
 
             assign relu_lane    = s2_relu_reg[i*LANE_W +: LANE_W];
             assign scale_out_int = widen_lane(relu_lane) >>> 1;
             assign s3_scale_next[i*LANE_W +: LANE_W] = s2_ctrl_reg[0] ? scale_out_int[LANE_W-1:0] : relu_lane;
-            assign fp_scale_result_word[i*LANE_W +: LANE_W] = fp_scale_result_lane;
-            assign fp_scale_done_vec[i] = fp_scale_done_lane;
-
-            cvfpu_fp32_fma u_fp_scale_half (
-                .clk_i          (clk),
-                .rst_ni         (rst_n),
-                .start_i        (fp_scale_launch),
-                .multiplicand_i (relu_lane),
-                .multiplier_i   (scale_factor),
-                .addend_i       (FP32_ZERO),
-                .result_o       (fp_scale_result_lane),
-                .done_o         (fp_scale_done_lane),
-                .busy_o         (/* unused */)
-            );
         end
     endgenerate
     
@@ -283,15 +239,6 @@ module vxm #(
     assign residual_start = residual_input_valid &&
                             residual_ready &&
                             !residual_result_valid;
-    assign fp_bias_wait = s0_valid && s0_fp_softmax_reg && s0_ctrl_reg[0];
-    assign fp_scale_wait = s2_valid && s2_fp_softmax_reg && s2_ctrl_reg[0];
-    assign fp_bias_launch = fp_bias_wait && !fp_bias_inflight;
-    assign fp_scale_launch = fp_scale_wait && !fp_scale_inflight;
-    assign fp_bias_done_all = &fp_bias_done_vec;
-    assign fp_scale_done_all = &fp_scale_done_vec;
-    assign fp_bias_stall = fp_bias_wait && !fp_bias_done_all;
-    assign fp_scale_stall = fp_scale_wait && !fp_scale_done_all;
-
     assign softmax_result_accept = residual_start && softmax_result_valid;
     assign softmax_result_can_take = !softmax_result_valid || softmax_result_accept;
     assign chunked_softmax_out_ready = softmax_result_can_take;
@@ -302,9 +249,7 @@ module vxm #(
                             !rmsnorm_in_ready;
     assign rmsnorm_out_ready = !rmsnorm_bypass && rmsnorm_done && residual_start;
     assign residual_stall = residual_input_valid && !residual_start;
-    assign stall_pipeline = fp_bias_stall ||
-                            fp_scale_stall ||
-                            softmax_stall ||
+    assign stall_pipeline = softmax_stall ||
                             rope_stall ||
                             rmsnorm_stall ||
                             residual_stall;
@@ -332,8 +277,6 @@ module vxm #(
             s4_bypass_sel_reg   <= 1'b0;
             s4_fp_softmax_reg   <= 1'b0;
             s4_valid            <= 1'b0;
-            fp_bias_inflight    <= 1'b0;
-            fp_scale_inflight   <= 1'b0;
             quant_inflight      <= 1'b0;
             rope_inflight       <= 1'b0;
             rope_result_valid   <= 1'b0;
@@ -351,16 +294,6 @@ module vxm #(
             stream_out_scale_reg <= '0;
             stream_out_valid_reg <= 1'b0;
         end else begin
-            if (fp_bias_launch)
-                fp_bias_inflight <= 1'b1;
-            else if (fp_bias_inflight && fp_bias_done_all)
-                fp_bias_inflight <= 1'b0;
-
-            if (fp_scale_launch)
-                fp_scale_inflight <= 1'b1;
-            else if (fp_scale_inflight && fp_scale_done_all)
-                fp_scale_inflight <= 1'b0;
-
             if (quant_issue)
                 quant_inflight <= 1'b1;
             else if (quantize_valid)
@@ -423,7 +356,7 @@ module vxm #(
                 s0_valid    <= in_valid && !residual_emit_cmd;
 
                 // Stage 1: bias-add capture
-                s1_bias_reg <= (s0_fp_softmax_reg && s0_ctrl_reg[0]) ? fp_bias_result_word : s1_bias_next;
+                s1_bias_reg <= s1_bias_next;
                 s1_ctrl_reg <= s0_ctrl_reg[3:1];
                 s1_fp_softmax_reg <= s0_fp_softmax_reg;
                 s1_valid    <= s0_valid;
@@ -435,7 +368,7 @@ module vxm #(
                 s2_valid    <= s1_valid;
 
                 // Stage 3: scale/bypass capture
-                s3_scale_reg      <= (s2_fp_softmax_reg && s2_ctrl_reg[0]) ? fp_scale_result_word : s3_scale_next;
+                s3_scale_reg      <= s3_scale_next;
                 s3_bypass_sel_reg <= s2_ctrl_reg[1];
                 s3_fp_softmax_reg <= s2_fp_softmax_reg;
                 s3_valid          <= s2_valid;

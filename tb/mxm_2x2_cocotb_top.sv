@@ -50,9 +50,12 @@ module mxm_2x2_cocotb_top (
         .mxm_input_is_signed(input_is_signed),
         .mxm_wght_is_signed(weight_is_signed),
         .mxm_input_in(mxm_input_in),
+        .mxm_input_scale_i(8'sd0),
         .wght_load(wght_load),
         .wght_val(wght_val),
-        .mxm_out(mxm_out)
+        .mxm_wght_scale_i(8'sd0),
+        .mxm_out(mxm_out),
+        .mxm_out_scale_o()
     );
 
 `ifdef WAVEFORM
