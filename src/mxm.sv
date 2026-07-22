@@ -150,7 +150,7 @@ end
 
 assign unused_mxm_use_fp = mxm_use_fp;
 
-always_comb begin 
+always @* begin 
     for (int idx = 0; idx < mxm_size; idx++) begin 
         // Use the current bus word immediately on a capture cycle so the ingress
         // path and the MAC weight-load pulse stay aligned.
@@ -170,7 +170,7 @@ always_comb begin
     end 
 end 
 
-always_comb begin
+always @* begin
     for (int idx = 0; idx < mxm_size; idx++) begin
         mxm_input_mac_feed[idx] = extend_operand(mxm_input_feed[idx], mxm_input_is_signed);
         mxm_wght_mac_feed[idx] = mxm_wght_load_feed[idx]
@@ -179,7 +179,7 @@ always_comb begin
     end
 end
 
-always_comb begin 
+always @* begin 
     mxm_wght_load_feed = '0;
 
     if (mxm_west_capture && mxm_ingress_is_wght) begin 

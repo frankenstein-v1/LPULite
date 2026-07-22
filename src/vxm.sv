@@ -48,7 +48,6 @@ module vxm #(
 );
 
     localparam int ROW_W = LANES * LANE_W;
-    localparam logic [31:0] FP32_ZERO = 32'h0000_0000;
     localparam logic [2:0] RES_OP_PASS = 3'd0;
     localparam logic [2:0] RES_OP_EMIT = 3'd4;
 
@@ -56,31 +55,26 @@ module vxm #(
     logic [ROW_W-1:0] s0_data_reg; 
     logic [ROW_W-1:0] s0_bias_reg;
     logic [3:0]       s0_ctrl_reg;
-    logic             s0_fp_softmax_reg;
     logic             s0_valid;
     
     //stage 1-> bias add registers for each lane
     logic [ROW_W-1:0] s1_bias_reg;
     logic [2:0]       s1_ctrl_reg;
-    logic             s1_fp_softmax_reg;
     logic             s1_valid;
 
     //stage 2 -> ReLU register for each lane
     logic [ROW_W-1:0] s2_relu_reg;
     logic [1:0]       s2_ctrl_reg;
-    logic             s2_fp_softmax_reg;
     logic             s2_valid;
 
     //stage 3-> scale register for each lane
     logic [ROW_W-1:0] s3_scale_reg;
     logic             s3_bypass_sel_reg;
-    logic             s3_fp_softmax_reg;
     logic             s3_valid;
 
     //stage 4-> softmax/quantization register
     logic [ROW_W-1:0] s4_handoff_reg;
     logic             s4_bypass_sel_reg;
-    logic             s4_fp_softmax_reg;
     logic             s4_valid;
 
     logic [ROW_W-1:0] s1_bias_next; // integer bias/bypass result
@@ -166,17 +160,6 @@ module vxm #(
         widen_lane = {{(ALU_W-LANE_W){lane_value[LANE_W-1]}}, lane_value};
     endfunction
 
-    function automatic logic [31:0] fp32_relu_bits(
-        input logic [31:0] fp_bits
-    );
-        begin
-            if ((fp_bits[30:0] == 31'd0) || !fp_bits[31])
-                fp32_relu_bits = fp_bits;
-            else
-                fp32_relu_bits = FP32_ZERO;
-        end
-    endfunction
-
     // stage buffering logic using generate loop for all lanes
     // (Using generate loops and continuous assigns to avoid iverilog compilation issues)
     generate
@@ -194,17 +177,13 @@ module vxm #(
             assign mux1_out     = s0_ctrl_reg[0] ? bias_add_out : widen_lane(data_lane);
             assign s1_bias_next[i*LANE_W +: LANE_W] = mux1_out[LANE_W-1:0];
 
-            // Stage 2: ReLU logic
+            // Stage 2: ReLU logic (32-bit signed fixed-point)
             logic signed [LANE_W-1:0] bias_lane_s1;
             logic signed [ALU_W-1:0]  relu_out_int;
 
             assign bias_lane_s1 = s1_bias_reg[i*LANE_W +: LANE_W];
             assign relu_out_int = (widen_lane(bias_lane_s1) < 0) ? '0 : widen_lane(bias_lane_s1);
-            assign s2_relu_next[i*LANE_W +: LANE_W] = s1_ctrl_reg[0]
-                                                    ? (s1_fp_softmax_reg
-                                                        ? fp32_relu_bits(bias_lane_s1)
-                                                        : relu_out_int[LANE_W-1:0])
-                                                    : bias_lane_s1;
+            assign s2_relu_next[i*LANE_W +: LANE_W] = s1_ctrl_reg[0] ? relu_out_int[LANE_W-1:0] : bias_lane_s1;
 
             // Stage 3: scale logic
             logic signed [LANE_W-1:0] relu_lane;
@@ -260,23 +239,18 @@ module vxm #(
             s0_data_reg         <= '0;
             s0_bias_reg         <= '0;
             s0_ctrl_reg         <= '0;
-            s0_fp_softmax_reg   <= 1'b0;
             s0_valid            <= 1'b0;
             s1_bias_reg         <= '0;
             s1_ctrl_reg         <= '0;
-            s1_fp_softmax_reg   <= 1'b0;
             s1_valid            <= 1'b0;
             s2_relu_reg         <= '0;
             s2_ctrl_reg         <= '0;
-            s2_fp_softmax_reg   <= 1'b0;
             s2_valid            <= 1'b0;
             s3_scale_reg        <= '0;
             s3_bypass_sel_reg   <= 1'b0;
-            s3_fp_softmax_reg   <= 1'b0;
             s3_valid            <= 1'b0;
             s4_handoff_reg      <= '0;
             s4_bypass_sel_reg   <= 1'b0;
-            s4_fp_softmax_reg   <= 1'b0;
             s4_valid            <= 1'b0;
             quant_inflight      <= 1'b0;
             rope_inflight       <= 1'b0;
@@ -327,7 +301,7 @@ module vxm #(
                 residual_active_fp_mode <= (residual_op == RES_OP_PASS)
                                          ? (softmax_active_valid
                                             ? softmax_active_is_fp
-                                            : (rope_en ? 1'b1 : s4_fp_softmax_reg))
+                                            : (rope_en ? 1'b1 : fp_quant_mode))
                                          : 1'b1;
             end
 
@@ -353,31 +327,26 @@ module vxm #(
                 s0_data_reg <= stream_in_data;
                 s0_bias_reg <= stream_in_bias;
                 s0_ctrl_reg <= vxm_ctrl;
-                s0_fp_softmax_reg <= fp_quant_mode;
                 s0_valid    <= in_valid && !residual_emit_cmd;
 
                 // Stage 1: bias-add capture
                 s1_bias_reg <= s1_bias_next;
                 s1_ctrl_reg <= s0_ctrl_reg[3:1];
-                s1_fp_softmax_reg <= s0_fp_softmax_reg;
                 s1_valid    <= s0_valid;
 
                 // Stage 2: ReLU capture
                 s2_relu_reg <= s2_relu_next;
                 s2_ctrl_reg <= s1_ctrl_reg[2:1];
-                s2_fp_softmax_reg <= s1_fp_softmax_reg;
                 s2_valid    <= s1_valid;
 
                 // Stage 3: scale/bypass capture
                 s3_scale_reg      <= s3_scale_next;
                 s3_bypass_sel_reg <= s2_ctrl_reg[1];
-                s3_fp_softmax_reg <= s2_fp_softmax_reg;
                 s3_valid          <= s2_valid;
 
                 // Stage 4: softmax/quantize handoff
                 s4_handoff_reg    <= s3_scale_reg;
                 s4_bypass_sel_reg <= s3_bypass_sel_reg;
-                s4_fp_softmax_reg <= s3_fp_softmax_reg;
                 s4_valid          <= s3_valid;
             end
         end

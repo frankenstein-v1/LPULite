@@ -75,11 +75,11 @@ localparam logic [2:0] VXM_OPERAND_SCALE    = 3'd6;
 localparam logic [2:0] VXM_RES_EMIT         = 3'd4;
 
 // Enum-typed views required at the strongly typed bus module boundaries.
-westbound_consumer_e westbound_consumer_sel_t;
-eastbound_consumer_e eastbound_consumer_sel_t;
+logic [2:0] westbound_consumer_sel_t;
+logic [2:0] eastbound_consumer_sel_t;
 
-westbound_producer_e westbound_sel_t;
-eastbound_producer_e eastbound_sel_t;
+logic [2:0] westbound_sel_t;
+logic [2:0] eastbound_sel_t;
 
 localparam logic [1:0] EXT_TARGET_MEM0 = 2'd0;
 localparam logic [1:0] EXT_TARGET_MEM1 = 2'd1;
@@ -207,8 +207,8 @@ icu u_icu(
 
 //mux logic for mem0 input
 
-assign westbound_consumer_sel_t = westbound_consumer_e'(westbound_consumer_sel);
-assign eastbound_consumer_sel_t = eastbound_consumer_e'(eastbound_consumer_sel);
+assign westbound_consumer_sel_t = westbound_consumer_sel;
+assign eastbound_consumer_sel_t = eastbound_consumer_sel;
 
 assign mem0_write_from_west =
     mem0_write_en && (westbound_consumer_sel_t == WC_MEM0) && westbound_valid;
@@ -220,7 +220,7 @@ assign mem0_write_en_eff = ext_mem0_write || mem0_write_from_west || mem0_write_
 assign mem0_read_en_eff = ext_mem0_read || mem0_read_en;
 assign mem0_addr_eff = ext_mem0_en ? ext_addr[MEM_ADDR_W-1:0] : mem0_addr;
 
-always_comb begin
+always @* begin
     mem0_stream_in = '0;
 
     if (ext_mem0_write) begin
@@ -263,9 +263,8 @@ assign mem1_write_en_eff = ext_mem1_write ||
 assign mem1_read_en_eff = ext_mem1_read || mem1_read_en;
 assign mem1_addr_eff = ext_mem1_en ? ext_addr[MEM_ADDR_W-1:0] : mem1_addr;
 
-assign westbound_sel_t = westbound_producer_e'(westbound_sel);
-
-assign eastbound_sel_t = eastbound_producer_e'(eastbound_sel);
+assign westbound_sel_t = westbound_sel;
+assign eastbound_sel_t = eastbound_sel;
 
 mem #(
     .DATA_W($bits(mem_row_t))
@@ -354,7 +353,7 @@ mxm_row_t mem0_dequant_payload_e_bus;
 
 assign eastbound_payload_lane0 = eastbound_payload[$bits(superlane_t)-1:0];
 
-always_comb begin
+always @* begin
     vxm_payload_e_bus = '0;
     sxm_payload_e_bus = '0;
     mem0_payload_e_bus = '0;
@@ -503,7 +502,7 @@ assign vxm_load_operand_east = vxm_east_en && eastbound_valid;
 assign vxm_load_operand_west = vxm_west_en && westbound_valid;
 assign vxm_load_operand = vxm_load_operand_east || vxm_load_operand_west;
 
-always_comb begin
+always @* begin
     vxm_operand_payload = '0;
     if (vxm_load_operand_east) begin
         if (eastbound_sel_t == EB_MEM0) begin

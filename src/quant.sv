@@ -258,7 +258,7 @@ module quant #(
         end
     end
 
-    always_comb begin
+    always @* begin
         logic [LANE_W-1:0] max_abs_value;
         logic [LANE_W-1:0] lane_abs_value;
         logic [LANE_W-1:0] shifted_max_abs_value;

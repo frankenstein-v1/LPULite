@@ -80,7 +80,7 @@ module mem_row_dequant (
         for (lane = 0; lane < MXM_SIZE; lane++) begin : g_dequant_lane
             logic [31:0] lane_fp32;
 
-            always_comb begin
+            always @* begin
                 lane_fp32 = fp8_e5m2_to_fp32_bits(mem_row_i[lane*8 +: 8]);
                 fp32_row_o[lane*32 +: 32] = fp32_scale_pow2(
                     lane_fp32,

@@ -7,7 +7,7 @@
 // the transposed tile to both bus directions.
 
 module sxm #(
-    parameter int LANES = $bits(superlane_t) / $bits(fp8_t)
+    parameter int LANES = $bits(superlane_t) / $bits(fixed8_lane_t)
 ) (
     input  logic clk,
     input  logic rst_n,
@@ -26,9 +26,9 @@ module sxm #(
     localparam int IDX_W = (LANES <= 1) ? 1 : $clog2(LANES);
     localparam logic [IDX_W-1:0] IDX_ONE = {{(IDX_W-1){1'b0}}, 1'b1};
     localparam logic [IDX_W-1:0] LAST_LOAD_IDX = LANES - 2;
-    localparam logic [IDX_W-1:0] LAST_EMIT_IDX = LANES - 1;
+    localparam logic [IDX_W-1:0] LAST_EMIT_IDX = LANES - 2;
 
-    fp8_t transpose_rows [0:LANES-1][0:LANES-1];
+    fixed8_lane_t transpose_rows [0:LANES-1][0:LANES-1];
     logic [IDX_W-1:0] transpose_load_idx;
     logic [IDX_W-1:0] transpose_emit_idx;
     logic             transpose_loading;
@@ -46,7 +46,7 @@ module sxm #(
         input superlane_t       row_data
     );
         for (int lane = 0; lane < LANES; lane++) begin
-            transpose_rows[row_idx][lane] <= row_data[lane*$bits(fp8_t) +: $bits(fp8_t)];
+            transpose_rows[row_idx][lane] <= row_data[lane*$bits(fixed8_lane_t) +: $bits(fixed8_lane_t)];
         end
     endtask
 
@@ -69,13 +69,17 @@ module sxm #(
                 load_from_west_reg <= load_from_west;
                 capture_row('0, load_from_west ? westbound_in : eastbound_in);
             end else if (transpose_loading) begin
-                capture_row(
-                    transpose_load_idx + IDX_ONE,
-                    load_from_west_reg ? westbound_in : eastbound_in
-                );
-                transpose_load_idx <= transpose_load_idx + IDX_ONE;
-                if (transpose_load_idx == LAST_LOAD_IDX)
+                if (transpose_emit_pulse) begin
                     transpose_loading <= 1'b0;
+                end else begin
+                    capture_row(
+                        transpose_load_idx + IDX_ONE,
+                        load_from_west_reg ? westbound_in : eastbound_in
+                    );
+                    transpose_load_idx <= transpose_load_idx + IDX_ONE;
+                    if (transpose_load_idx == LAST_LOAD_IDX)
+                        transpose_loading <= 1'b0;
+                end
             end
 
             if (transpose_emit_pulse) begin
@@ -99,14 +103,14 @@ module sxm #(
     assign emit_valid = is_emitting;
 
     superlane_t transpose_emit_row;
-    always_comb begin
+    always @* begin
         transpose_emit_row = '0;
         for (int lane = 0; lane < LANES; lane++) begin
-            transpose_emit_row[lane*$bits(fp8_t) +: $bits(fp8_t)] = transpose_rows[lane][current_emit_idx];
+            transpose_emit_row[lane*$bits(fixed8_lane_t) +: $bits(fixed8_lane_t)] = transpose_rows[lane][current_emit_idx];
         end
     end
 
-    always_comb begin
+    always @* begin
         eastbound_out = '0;
         westbound_out = '0;
 

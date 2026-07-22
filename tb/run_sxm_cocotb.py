@@ -16,6 +16,7 @@ def test_sxm():
     runner.build(
         sources=sources,
         hdl_toplevel="sxm",
+        includes=[src_dir],
         always=True,
         waves=True,
     )

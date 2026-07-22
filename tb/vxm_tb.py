@@ -699,94 +699,173 @@ async def test_fp_row_softmax_quant(dut):
 
 
 @cocotb.test()
-async def test_fp_bias_relu_scale_internal_registers(dut):
+async def test_int32_bias_relu_scale_internal_registers(dut):
+    """Verify internal pipeline registers for int32 fixed-point Bias Add, ReLU, and Scaling."""
     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
     await reset_dut(dut)
 
-    data_floats = [1.0, -2.0, 4.0, -1.0, 0.5, -0.5, 2.0, -1.5]
-    bias_floats = [0.5, 0.25, -1.0, 2.0, -0.25, 0.75, 1.0, -1.0]
-    data_lanes = [float_to_bits(value) for value in data_floats]
-    bias_lanes = [float_to_bits(value) for value in bias_floats]
+    data_lanes = [100, -250, 3000, -50000, 0, 123456, -987654, 42]
+    bias_lanes = [50, 300, -1000, -50000, -10, -123456, 987654, -42]
 
-    expected_bias = [float_to_bits(data + bias) for data, bias in zip(data_floats, bias_floats)]
-    expected_relu = [float_to_bits(max(data + bias, 0.0)) for data, bias in zip(data_floats, bias_floats)]
-    expected_scale = [
-        float_to_bits(max(data + bias, 0.0) * 0.5)
-        for data, bias in zip(data_floats, bias_floats)
-    ]
+    # Expected stage outputs for int32 fixed point
+    expected_bias = [d + b for d, b in zip(data_lanes, bias_lanes)]
+    expected_relu = [max(x, 0) for x in expected_bias]
+    expected_scale = [x >> 1 for x in expected_relu]
 
     await wait_for_input_ready(dut)
-    await drive_vector(dut, data_lanes, bias_lanes, valid=1, ctrl=0b0111, fp_quant_mode=1)
+    await drive_vector(dut, data_lanes, bias_lanes, valid=1, ctrl=0b0111, fp_quant_mode=0)
     await RisingEdge(dut.clk)
     dut.in_valid.value = 0
-    dut.fp_quant_mode.value = 0
 
     observed_bias = None
     for _ in range(20):
         await RisingEdge(dut.clk)
         await ReadOnly()
         if int(dut.s1_valid.value) == 1:
-            observed_bias = unpack_u32_lanes(dut.s1_bias_reg.value)
+            observed_bias = unpack_signed_lanes(dut.s1_bias_reg.value)
             break
-    assert observed_bias is not None, "FP VXM pipeline never produced a bias stage result"
+    assert observed_bias is not None, "Int32 VXM pipeline never produced a bias stage result"
 
     observed_relu = None
     for _ in range(20):
         await RisingEdge(dut.clk)
         await ReadOnly()
         if int(dut.s2_valid.value) == 1:
-            observed_relu = unpack_u32_lanes(dut.s2_relu_reg.value)
+            observed_relu = unpack_signed_lanes(dut.s2_relu_reg.value)
             break
-    assert observed_relu is not None, "FP VXM pipeline never produced a ReLU stage result"
+    assert observed_relu is not None, "Int32 VXM pipeline never produced a ReLU stage result"
 
     observed_scale = None
     for _ in range(20):
         await RisingEdge(dut.clk)
         await ReadOnly()
         if int(dut.s3_valid.value) == 1:
-            observed_scale = unpack_u32_lanes(dut.s3_scale_reg.value)
+            observed_scale = unpack_signed_lanes(dut.s3_scale_reg.value)
             break
-    assert observed_scale is not None, "FP VXM pipeline never produced a scaled row in s3"
+    assert observed_scale is not None, "Int32 VXM pipeline never produced a scaled row in s3"
 
     assert observed_bias == expected_bias, (
-        f"FP bias-add mismatch. Observed={observed_bias}, expected={expected_bias}"
+        f"Int32 bias-add mismatch. Observed={observed_bias}, expected={expected_bias}"
     )
     assert observed_relu == expected_relu, (
-        f"FP ReLU mismatch. Observed={observed_relu}, expected={expected_relu}"
+        f"Int32 ReLU mismatch. Observed={observed_relu}, expected={expected_relu}"
     )
     assert observed_scale == expected_scale, (
-        f"FP scale mismatch. Observed={observed_scale}, expected={expected_scale}"
+        f"Int32 scale mismatch. Observed={observed_scale}, expected={expected_scale}"
     )
 
 
 @cocotb.test()
-async def test_fp_full_row_bias_relu_scale_quant(dut):
+async def test_int32_full_row_bias_relu_scale_quant(dut):
+    """Verify full end-to-end Int32 VXM bias->relu->scale->quant path."""
     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
     await reset_dut(dut)
 
-    data_floats = [1.0, -2.0, 4.0, -1.0, 0.5, -0.5, 2.0, -1.5]
-    bias_floats = [0.5, 0.25, -1.0, 2.0, -0.25, 0.75, 1.0, -1.0]
-    data_lanes = [float_to_bits(value) for value in data_floats]
-    bias_lanes = [float_to_bits(value) for value in bias_floats]
+    data_lanes = [15, -32, 64, -1, 10, -20, 30, -40]
+    bias_lanes = [-5, 31, -80, 2, -2, 5, -4, 8]
 
-    final_floats = [max(data + bias, 0.0) * 0.5 for data, bias in zip(data_floats, bias_floats)]
-    expected_lanes, expected_scale = regular_fp8_row_quant_expected(final_floats)
+    # Expected: (data + bias) -> relu -> scale(>>> 1) -> regular int8 quantization
+    bias_res = [d + b for d, b in zip(data_lanes, bias_lanes)]
+    relu_res = [max(x, 0) for x in bias_res]
+    scale_res = [x >> 1 for x in relu_res]
+    expected_lanes = quantize_regular_expected(scale_res)
 
     observed_lanes = await run_vxm_row(
         dut,
         data_lanes,
         bias_lanes,
         ctrl=0b0111,
-        signed_output=False,
-        fp_quant_mode=1,
+        signed_output=True,
+        fp_quant_mode=0,
     )
 
     assert observed_lanes == expected_lanes, (
-        "FP VXM bias->relu->scale->quant path mismatch. "
+        "Int32 VXM bias->relu->scale->quant path mismatch. "
         f"Observed={observed_lanes}, expected={expected_lanes}"
     )
-    assert int(dut.stream_out_scale.value) == expected_scale, (
-        f"FP VXM row scale mismatch. Observed={int(dut.stream_out_scale.value)}, expected={expected_scale}"
+
+
+@cocotb.test()
+async def test_int32_bias_add_only(dut):
+    """Verify Int32 Bias Add stage in isolation (vxm_ctrl=0b0001)."""
+    cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
+    await reset_dut(dut)
+
+    data_lanes = [500, -1200, 35000, -999999, 0, 777, -888, 42]
+    bias_lanes = [100, 200, -5000, 500000, -10, -777, 888, -42]
+    expected_bias = [d + b for d, b in zip(data_lanes, bias_lanes)]
+
+    await wait_for_input_ready(dut)
+    await drive_vector(dut, data_lanes, bias_lanes, valid=1, ctrl=0b0001, fp_quant_mode=0)
+    await RisingEdge(dut.clk)
+    dut.in_valid.value = 0
+
+    observed_bias = None
+    for _ in range(20):
+        await RisingEdge(dut.clk)
+        await ReadOnly()
+        if int(dut.s1_valid.value) == 1:
+            observed_bias = unpack_signed_lanes(dut.s1_bias_reg.value)
+            break
+
+    assert observed_bias == expected_bias, (
+        f"Int32 bias-add only mismatch. Observed={observed_bias}, expected={expected_bias}"
+    )
+
+
+@cocotb.test()
+async def test_int32_relu_only(dut):
+    """Verify Int32 ReLU stage in isolation (vxm_ctrl=0b0010)."""
+    cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
+    await reset_dut(dut)
+
+    data_lanes = [500, -1200, 35000, -999999, 0, 777, -888, 42]
+    bias_lanes = [0] * LANES
+    expected_relu = [max(x, 0) for x in data_lanes]
+
+    await wait_for_input_ready(dut)
+    await drive_vector(dut, data_lanes, bias_lanes, valid=1, ctrl=0b0010, fp_quant_mode=0)
+    await RisingEdge(dut.clk)
+    dut.in_valid.value = 0
+
+    observed_relu = None
+    for _ in range(20):
+        await RisingEdge(dut.clk)
+        await ReadOnly()
+        if int(dut.s2_valid.value) == 1:
+            observed_relu = unpack_signed_lanes(dut.s2_relu_reg.value)
+            break
+
+    assert observed_relu == expected_relu, (
+        f"Int32 ReLU only mismatch. Observed={observed_relu}, expected={expected_relu}"
+    )
+
+
+@cocotb.test()
+async def test_int32_scale_only(dut):
+    """Verify Int32 Scale stage in isolation (vxm_ctrl=0b0100)."""
+    cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
+    await reset_dut(dut)
+
+    data_lanes = [500, -1200, 35000, -999999, 0, 777, -888, 42]
+    bias_lanes = [0] * LANES
+    expected_scale = [x >> 1 for x in data_lanes]
+
+    await wait_for_input_ready(dut)
+    await drive_vector(dut, data_lanes, bias_lanes, valid=1, ctrl=0b0100, fp_quant_mode=0)
+    await RisingEdge(dut.clk)
+    dut.in_valid.value = 0
+
+    observed_scale = None
+    for _ in range(20):
+        await RisingEdge(dut.clk)
+        await ReadOnly()
+        if int(dut.s3_valid.value) == 1:
+            observed_scale = unpack_signed_lanes(dut.s3_scale_reg.value)
+            break
+
+    assert observed_scale == expected_scale, (
+        f"Int32 Scale only mismatch. Observed={observed_scale}, expected={expected_scale}"
     )
 
 

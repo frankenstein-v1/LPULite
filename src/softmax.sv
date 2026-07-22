@@ -164,7 +164,7 @@ module softmax #(
         end
     endfunction
 
-    always_comb begin
+    always @* begin
         active_row = (state_q == ST_CAPTURE) ? x_in : score_buf[read_idx];
 
         row_max = active_row[0 +: LANE_W];
