@@ -389,6 +389,39 @@ def rope_rows_fp32_8(data, cos_bits, sin_bits):
     return out
 
 
+def rope_rows_fixed32_8(data, cos_bytes, sin_bytes):
+    """
+    Fixed-point 8-lane RoPE (32-bit signed data, 8-bit signed Q1.7 cos/sin).
+    Computes pairwise rotations with arithmetic shift by 7 (>>> 7).
+    """
+    out = [0 for _ in range(8)]
+    for pair in range(4):
+        even = 2 * pair
+        odd = even + 1
+        x_even = int(data[even])
+        x_odd = int(data[odd])
+
+        c_val = cos_bytes[even] if isinstance(cos_bytes[even], int) else int(cos_bytes[even])
+        if c_val > 127:
+            c_val -= 256
+        s_val = sin_bytes[even] if isinstance(sin_bytes[even], int) else int(sin_bytes[even])
+        if s_val > 127:
+            s_val -= 256
+
+        prod0 = x_even * c_val
+        prod1 = x_odd * s_val
+        prod2 = x_even * s_val
+        prod3 = x_odd * c_val
+
+        res_even = (prod0 - prod1) >> 7
+        res_odd = (prod2 + prod3) >> 7
+
+        out[even] = res_even
+        out[odd] = res_odd
+    return out
+
+
+
 def matrix_close(actual, expected, *, tol=1e-5):
     assert len(actual) == len(expected)
     assert len(actual[0]) == len(expected[0])
