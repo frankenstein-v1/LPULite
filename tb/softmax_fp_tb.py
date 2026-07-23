@@ -113,7 +113,6 @@ async def test_softmax_boxed_scale_fixed_row(dut):
 
     assert observed == expected
     assert int(dut.y_scale_o.value.to_signed()) == PROB_SCALE
-    assert int(dut.out_mode_fp.value) == 0
 
 
 @cocotb.test()
@@ -131,4 +130,3 @@ async def test_softmax_boxed_scale_peaked_distribution(dut):
 
     assert observed == expected
     assert int(dut.y_scale_o.value.to_signed()) == PROB_SCALE
-    assert int(dut.out_mode_fp.value) == 0

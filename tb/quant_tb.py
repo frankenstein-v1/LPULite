@@ -1,5 +1,3 @@
-import struct
-
 import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge, Timer
@@ -10,7 +8,6 @@ LANE_W = 32
 SOFTMAX_PROB_SCALE = -7
 QUANT_SIGNED_INT8 = 0
 QUANT_SOFTMAX_U8 = 1
-QUANT_FP8_E5M2 = 2
 
 
 def pack_input_lanes(lanes: list[int]) -> int:
@@ -79,41 +76,6 @@ def softmax_quant_reference(p_value: int) -> int:
     if p_value >= 255:
         return 255
     return p_value & 0xFF
-
-
-def float_to_bits(value: float) -> int:
-    return struct.unpack(">I", struct.pack(">f", float(value)))[0]
-
-
-def fp8_e5m2_bits_reference(value: float) -> int:
-    bits = float_to_bits(value)
-    sign = (bits >> 31) & 0x1
-    exp = (bits >> 23) & 0xFF
-    frac = bits & 0x7FFFFF
-
-    if exp == 0 and frac == 0:
-        return sign << 7
-    if exp == 0xFF:
-        return (sign << 7) | 0x7D if frac else (sign << 7) | 0x7C
-    if exp == 0:
-        return sign << 7
-
-    fp8_exp = exp - 127 + 15
-    if fp8_exp <= 0:
-        return sign << 7
-
-    mantissa_full = (1 << 23) | frac
-    mantissa_q = (mantissa_full >> 21) & 0x7
-    guard = (mantissa_full >> 20) & 0x1
-    sticky = mantissa_full & ((1 << 20) - 1)
-    if guard and (sticky or (mantissa_q & 0x1)):
-        mantissa_q += 1
-    if mantissa_q == 8:
-        mantissa_q = 4
-        fp8_exp += 1
-    if fp8_exp >= 31:
-        return (sign << 7) | 0x7C
-    return (sign << 7) | ((fp8_exp & 0x1F) << 2) | (mantissa_q & 0x3)
 
 
 async def reset_dut(dut) -> None:
@@ -278,35 +240,3 @@ async def test_softmax_u8_probability_vector(dut):
         f"u8 softmax quant mismatch: got 0x{observed_word:08x}, expected 0x{expected_word:08x}"
     )
     assert signed_scale(dut) == SOFTMAX_PROB_SCALE
-
-
-@cocotb.test()
-async def test_regular_fp8_quant_mode_vector(dut):
-    cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
-    await reset_dut(dut)
-
-    # absmax = 8.0 => shared row scale exponent = +3, scaled row = [1.0, -0.5, 0.5, -1.0]
-    input_lanes = [
-        float_to_bits(8.0),
-        float_to_bits(-4.0),
-        float_to_bits(4.0),
-        float_to_bits(-8.0),
-    ]
-    observed_word = await drive_transaction(
-        dut,
-        quant_mode=QUANT_FP8_E5M2,
-        lanes=input_lanes,
-    )
-
-    expected_word = pack_output_bytes([
-        fp8_e5m2_bits_reference(1.0),
-        fp8_e5m2_bits_reference(-0.5),
-        fp8_e5m2_bits_reference(0.5),
-        fp8_e5m2_bits_reference(-1.0),
-    ])
-    assert observed_word == expected_word, (
-        f"regular fp8 mode mismatch: got 0x{observed_word:08x}, expected 0x{expected_word:08x}"
-    )
-    assert int(dut.q_scale_out.value) == 3, (
-        f"regular fp8 scale mismatch: got {int(dut.q_scale_out.value)}, expected 3"
-    )

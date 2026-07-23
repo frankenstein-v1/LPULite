@@ -58,8 +58,6 @@ logic [2:0] mxm_e_col_sel;
 logic mxm_e_valid_in;
 logic mxm_input_is_signed;
 logic mxm_wght_is_signed;
-logic mxm_use_fp;
-logic fp_quant_mode;
 logic [1:0] mem_store_fmt;
 logic vxm_rmsnorm_en;
 logic vxm_rope_en;
@@ -136,10 +134,10 @@ logic vxm_west_en;
 superlane_t sxm_stream_out_to_mxm_left;
 superlane_t sxm_stream_out_to_mxm_top;
 
-packed_fp8_row_t vxm_stream_out_live;
+fixed8_row_data_t vxm_stream_out_live;
 logic [31:0] vxm_stream_out_scale_live;
 logic        vxm_out_valid_live;
-packed_fp8_row_t vxm_stream_out_buf;
+fixed8_row_data_t vxm_stream_out_buf;
 logic [31:0] vxm_stream_out_scale_buf;
 logic        vxm_stream_out_buf_valid_w;
 logic        vxm_stream_out_buf_valid_e;
@@ -197,8 +195,6 @@ icu u_icu(
     .mxm_e_valid_in(mxm_e_valid_in),
     .mxm_input_is_signed(mxm_input_is_signed),
     .mxm_wght_is_signed(mxm_wght_is_signed),
-    .mxm_use_fp(mxm_use_fp),
-    .fp_quant_mode(fp_quant_mode),
     .mem_store_fmt(mem_store_fmt),
     .vxm_rmsnorm_en(vxm_rmsnorm_en),
     .vxm_rope_en(vxm_rope_en),
@@ -228,7 +224,7 @@ always @* begin
     end
     else if (mem0_write_from_west) begin
         if (westbound_sel_t == WB_VXM)
-            mem0_stream_in = mem_row_t'(make_fp8_row_mem(westbound_row_data(westbound_payload), vxm_stream_out_scale_buf));
+            mem0_stream_in = mem_row_t'(make_westbound_row(westbound_row_data(westbound_payload), vxm_stream_out_scale_buf));
         else
             mem0_stream_in = mem_row_t'(westbound_payload);
     end
@@ -360,12 +356,12 @@ always @* begin
 
     vxm_payload_e_bus = make_eastbound_row({192'd0, vxm_stream_out_buf}, vxm_stream_out_scale_buf);
     sxm_payload_e_bus = make_eastbound_row({192'd0, sxm_stream_out_to_mxm_left}, '0);
-    mem0_payload_e_bus = make_eastbound_row(mem0_dequant_payload_e_bus, fp8_row_mem_scale(mem0_stream_out));
+    mem0_payload_e_bus = make_eastbound_row(mem0_dequant_payload_e_bus, mem_row_scale(mem0_stream_out));
 end
 
 mem_row_dequant u_mem0_dequant (
-    .mem_row_i(mem0_stream_out),
-    .fp32_row_o(mem0_dequant_payload_e_bus)
+    .raw_row_i(mem0_stream_out),
+    .fixed32_row_o(mem0_dequant_payload_e_bus)
 );
 
 mxm_eastbound_adapter #(
@@ -461,7 +457,6 @@ mxm #(
     .westbound_valid(westbound_valid),
     .mxm_west_en(mxm_west_en),
     .mxm_ingress_mode(mxm_ingress_mode),
-    .mxm_use_fp(mxm_use_fp),
     .mxm_input_is_signed(mxm_input_is_signed),
     .mxm_wght_is_signed(mxm_wght_is_signed),
     .mxm_input_in(mxm_input_in),
@@ -482,8 +477,8 @@ mxm_row_t vxm_bias_reg;
 logic [31:0] vxm_scale_factor_reg;
 mxm_row_t vxm_rmsnorm_gamma_reg;
 mxm_row_t vxm_rmsnorm_beta_reg;
-superlane_t vxm_rope_cos_fp8_reg;
-superlane_t vxm_rope_sin_fp8_reg;
+superlane_t vxm_rope_cos_q1_7_reg;
+superlane_t vxm_rope_sin_q1_7_reg;
 logic     vxm_in_valid;
 logic     vxm_in_ready;
 logic     vxm_fifo_wr_en;
@@ -551,8 +546,8 @@ always_ff @(posedge clk or negedge rst_n) begin
         vxm_scale_factor_reg <= 32'h3f80_0000;
         vxm_rmsnorm_gamma_reg <= {MXM_SIZE{32'h3f800000}};
         vxm_rmsnorm_beta_reg <= '0;
-        vxm_rope_cos_fp8_reg <= {MXM_SIZE{8'h3c}};
-        vxm_rope_sin_fp8_reg <= '0;
+        vxm_rope_cos_q1_7_reg <= {MXM_SIZE{8'sd127}};
+        vxm_rope_sin_q1_7_reg <= '0;
     end else begin
         if (vxm_fifo_wr_en && vxm_fifo_full) begin
             vxm_input_overflow <= 1'b1;
@@ -573,10 +568,10 @@ always_ff @(posedge clk or negedge rst_n) begin
                     vxm_scale_factor_reg <= vxm_operand_payload[31:0];
                 end
                 VXM_OPERAND_ROPE_COS: begin
-                    vxm_rope_cos_fp8_reg <= vxm_operand_payload[$bits(superlane_t)-1:0];
+                    vxm_rope_cos_q1_7_reg <= vxm_operand_payload[$bits(superlane_t)-1:0];
                 end
                 VXM_OPERAND_ROPE_SIN: begin
-                    vxm_rope_sin_fp8_reg <= vxm_operand_payload[$bits(superlane_t)-1:0];
+                    vxm_rope_sin_q1_7_reg <= vxm_operand_payload[$bits(superlane_t)-1:0];
                 end
                 default: begin
                     // Data operands are queued by u_vxm_input_fifo above.
@@ -587,7 +582,7 @@ always_ff @(posedge clk or negedge rst_n) begin
 end
 
 row_fifo #(
-    .DATA_W($bits(packed_fp8_row_t)),
+    .DATA_W($bits(fixed8_row_data_t)),
     .DEPTH(4)
 ) u_vxm_output_fifo (
     .clk(clk),
@@ -629,14 +624,13 @@ vxm #(
     .in_ready(vxm_in_ready),
     .vxm_ctrl(vxm_ctrl),
     .rope_en(vxm_rope_en),
-    .rope_cos_fp8(vxm_rope_cos_fp8_reg),
-    .rope_sin_fp8(vxm_rope_sin_fp8_reg),
+    .rope_cos_q1_7(vxm_rope_cos_q1_7_reg),
+    .rope_sin_q1_7(vxm_rope_sin_q1_7_reg),
     .residual_op(vxm_residual_op),
     .scale_factor(vxm_scale_factor_reg),
     .rmsnorm_bypass(~vxm_rmsnorm_en),
     .rmsnorm_gamma(vxm_rmsnorm_gamma_reg),
     .rmsnorm_beta(vxm_rmsnorm_beta_reg),
-    .fp_quant_mode(fp_quant_mode),
     .stream_out(vxm_stream_out_live),
     .stream_out_scale(vxm_stream_out_scale_live),
     .out_valid(vxm_out_valid_live),

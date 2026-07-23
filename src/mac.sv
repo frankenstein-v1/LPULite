@@ -3,9 +3,9 @@
 // One block-scaled fixed-point MAC.
 //
 // Numeric contract:
-//   input_real  = input_i  * 2**input_scale_i
-//   weight_real = weight_i * 2**weight_scale_i
-//   acc_real    = acc_o    * 2**acc_scale_o
+//   input_value  = input_i  * 2**input_scale_i
+//   weight_value = weight_i * 2**weight_scale_i
+//   acc_value    = acc_o    * 2**acc_scale_o
 //
 // The scale is carried as metadata. This block does not apply the scale to the
 // multiply; it accumulates raw signed products and reports the combined scale.

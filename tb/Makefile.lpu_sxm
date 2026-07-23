@@ -16,7 +16,6 @@ VERILOG_SOURCES = $(PWD)/../src/lpu_pkg.sv \
     $(PWD)/../src/lut_softmax_div.sv \
     $(PWD)/../src/softmax.sv \
     $(PWD)/../src/quant.sv \
-    $(PWD)/../src/lut_rmsnorm.sv \
     $(PWD)/../src/rmsnorm.sv \
     $(PWD)/../src/vxm_rope.sv \
     $(PWD)/../src/residual_add.sv \

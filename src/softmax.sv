@@ -15,7 +15,6 @@ module softmax #(
     output logic                    in_ready,
 
     output logic                    out_valid,
-    output logic                    out_mode_fp,
     output logic [LANES*LANE_W-1:0] y_out,
     output logic signed [7:0]       y_scale_o,
     input  logic                    out_ready,
@@ -201,7 +200,6 @@ module softmax #(
 
     assign in_ready = (state_q == ST_CAPTURE);
     assign out_valid = (state_q == ST_NORM);
-    assign out_mode_fp = 1'b0;
     assign y_scale_o = PROB_SCALE;
     assign busy_o = active_q || (state_q != ST_CAPTURE);
 

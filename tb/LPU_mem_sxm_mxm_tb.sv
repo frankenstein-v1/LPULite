@@ -86,12 +86,12 @@ module lpu_mem_sxm_mxm_cocotb_top (
     assign mem0_read_en_dbg          = u_lpu.mem0_read_en;
     assign mem0_addr_dbg             = u_lpu.mem0_addr;
     assign mem0_valid_dbg            = u_lpu.mem0_valid;
-    assign mem0_stream_out_dbg       = fp8_row_mem_packed(u_lpu.mem0_stream_out);
+    assign mem0_stream_out_dbg       = mem_row_packed(u_lpu.mem0_stream_out);
 
     assign mem1_read_en_dbg          = u_lpu.mem1_read_en;
     assign mem1_addr_dbg             = u_lpu.mem1_addr;
     assign mem1_valid_dbg            = u_lpu.mem1_valid;
-    assign mem1_stream_out_dbg       = fp8_row_mem_packed(u_lpu.mem1_stream_out);
+    assign mem1_stream_out_dbg       = mem_row_packed(u_lpu.mem1_stream_out);
 
     assign westbound_sel_dbg         = u_lpu.westbound_sel;
     assign westbound_consumer_sel_dbg = u_lpu.westbound_consumer_sel;

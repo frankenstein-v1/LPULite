@@ -13,7 +13,6 @@ module mxm#(
     input logic westbound_valid, 
     input logic mxm_west_en, 
     input logic [1:0] mxm_ingress_mode, 
-    input logic mxm_use_fp,
     input logic mxm_input_is_signed,
     input logic mxm_wght_is_signed,
     input logic signed [mxm_size-1 : 0][7:0] mxm_input_in,
@@ -37,7 +36,6 @@ localparam int MAC_SCALE_W   = 8;
 logic signed [MAC_PRODUCT_W-1:0] product_wire [mxm_size-1:0][mxm_size-1:0];
 logic signed [MAC_ACC_W-1:0]     mac_accum_wire [mxm_size-1:0][mxm_size-1:0];
 logic signed [MAC_SCALE_W-1:0]   mac_acc_scale_wire [mxm_size-1:0][mxm_size-1:0];
-logic               unused_mxm_use_fp;
 
 //wire that holds the input vector that came in from the wb bus
 logic signed [7:0] mxm_input_ingress_reg [mxm_size-1:0];
@@ -147,8 +145,6 @@ always_ff @(posedge clk or posedge rst) begin
         end 
     end 
 end 
-
-assign unused_mxm_use_fp = mxm_use_fp;
 
 always @* begin 
     for (int idx = 0; idx < mxm_size; idx++) begin 
