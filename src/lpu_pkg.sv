@@ -190,6 +190,12 @@ typedef enum logic [2:0] {
     EC_MEM1 = 3'd4
 } eastbound_consumer_e;
 
+typedef enum logic [1:0] {
+    QUANT_SIGNED_INT8 = 2'd0,
+    QUANT_SOFTMAX_U8  = 2'd1,
+    QUANT_FP8_E5M2    = 2'd2
+} quant_mode_e;
+
 // Expanded scratch/KV-cache storage for model work.
 // Each memory has 32768 rows. At the current 72-bit mem_row_t width,
 // that is 288 KiB per memory, or 576 KiB across mem0 + mem1.

@@ -8,6 +8,7 @@ def test_quant():
     src_dir = (Path(__file__).parent / "../src").resolve()
     build_dir = (Path(__file__).parent / "sim_build_quant").resolve()
     sources = [
+        src_dir / "lpu_pkg.sv",
         src_dir / "quant.sv",
     ]
 
@@ -15,6 +16,7 @@ def test_quant():
     runner.build(
         sources=sources,
         hdl_toplevel="quant",
+        includes=[src_dir],
         always=True,
         build_dir=build_dir,
     )

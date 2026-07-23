@@ -17,6 +17,7 @@ def test_softmax():
     runner.build(
         sources=sources,
         hdl_toplevel="softmax",
+        parameters={"LANES": 4, "MAX_CHUNKS": 1},
         always=True,
         build_dir=build_dir,
     )

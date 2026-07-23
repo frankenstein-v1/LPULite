@@ -1,35 +1,32 @@
 `timescale 1ns/1ps
 `include "lpu_pkg.sv"
 
-
-module eastbound_bus #(
-    // 8 signed int32 fixed-point lanes plus one shared row scale.
-    parameter int PAYLOAD_E = $bits(eastbound_row_t)
-)(
+module eastbound_bus (
 
     input eastbound_producer_e producer_sel,
 
     //mxm producer 
-    input  logic [PAYLOAD_E-1:0] mxm_payload_e,
+    input  eastbound_row_t       mxm_payload_e,
     input logic                  mxm_valid_e, 
 
     //vxm producer 
 
-    input logic [PAYLOAD_E-1:0] vxm_payload_e, 
+    input eastbound_row_t       vxm_payload_e,
     input logic                 vxm_valid_e,
 
     //sxm prod
-    input logic [PAYLOAD_E-1:0] sxm_payload_e, 
+    input eastbound_row_t       sxm_payload_e,
     input logic                 sxm_valid_e, 
 
     //mem0 prod 
-    input logic [PAYLOAD_E-1:0] mem0_payload_e, 
+    input eastbound_row_t       mem0_payload_e,
     input logic                 mem0_valid_e, 
 
     // Shared eastbound bus output: [255:0] = 8x int32 lanes, [263:256] = scale.
-    output logic [PAYLOAD_E-1:0] eastbound_payload, 
+    output eastbound_row_t      eastbound_payload,
     output logic                 eastbound_valid
 );
+    localparam int PAYLOAD_E = $bits(eastbound_row_t);
 
     logic [4:0][PAYLOAD_E-1:0] producer_payloads;
     logic [4:0]                producer_valids;

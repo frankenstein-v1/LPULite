@@ -1,5 +1,3 @@
-import struct
-
 import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge, Timer
@@ -7,18 +5,7 @@ from cocotb.triggers import RisingEdge, Timer
 
 LANES = 4
 LANE_W = 32
-
-
-def float_to_bits(value: float) -> int:
-    return struct.unpack(">I", struct.pack(">f", float(value)))[0]
-
-
-def bits_to_float(bits: int) -> float:
-    return struct.unpack(">f", struct.pack(">I", bits & 0xFFFF_FFFF))[0]
-
-
-def to_f32(value: float) -> float:
-    return bits_to_float(float_to_bits(value))
+PROB_SCALE = -7
 
 
 def pack_lanes(values: list[int]) -> int:
@@ -29,10 +16,12 @@ def pack_lanes(values: list[int]) -> int:
 
 
 def unpack_lanes(word: int) -> list[int]:
-    lanes = []
-    for i in range(LANES):
-        lanes.append((word >> (i * LANE_W)) & 0xFFFF_FFFF)
-    return lanes
+    return [(word >> (i * LANE_W)) & 0xFFFF_FFFF for i in range(LANES)]
+
+
+def to_signed32(value: int) -> int:
+    value &= 0xFFFF_FFFF
+    return value - (1 << 32) if value & 0x8000_0000 else value
 
 
 def lut_softmax_exp_expected(q_value: int) -> int:
@@ -46,85 +35,42 @@ def lut_softmax_exp_expected(q_value: int) -> int:
     return lut_value >> z_value
 
 
-def fp32_to_q8_8(fp_bits: int) -> int:
-    sign_bit = (fp_bits >> 31) & 0x1
-    exp_bits = (fp_bits >> 23) & 0xFF
-    frac_bits = fp_bits & 0x7FFFFF
-
-    if exp_bits == 0 and frac_bits == 0:
-        return 0
-    if exp_bits == 0xFF:
-        return -0x8000_0000 if sign_bit else 0x7FFF_FFFF
-
-    if exp_bits == 0:
-        significand = frac_bits
-        exp_unbiased = -126
-    else:
-        significand = (1 << 23) | frac_bits
-        exp_unbiased = exp_bits - 127
-
-    shift_amount = exp_unbiased - 23 + 8
-    scaled_value = significand
+def align_int32_to_q8_8(raw_value: int, scale: int) -> int:
+    raw_value = to_signed32(raw_value)
+    shift_amount = scale + 8
     if shift_amount >= 0:
-        scaled_value = 0x7FFF_FFFF if shift_amount > 30 else (scaled_value << shift_amount)
+        if shift_amount > 30:
+            scaled = -(1 << 31) if raw_value < 0 else (1 << 31) - 1
+        else:
+            scaled = raw_value << shift_amount
     elif -shift_amount > 62:
-        scaled_value = 0
+        scaled = -1 if raw_value < 0 else 0
     else:
-        scaled_value >>= -shift_amount
+        scaled = raw_value >> (-shift_amount)
 
-    if sign_bit:
-        scaled_value = -scaled_value
-
-    if scaled_value > 0x7FFF_FFFF:
-        return 0x7FFF_FFFF
-    if scaled_value < -0x8000_0000:
-        return -0x8000_0000
-    return scaled_value
+    if scaled > (1 << 31) - 1:
+        return (1 << 31) - 1
+    if scaled < -(1 << 31):
+        return -(1 << 31)
+    return scaled
 
 
-def uq8_8_to_fp32(fixed_value: int) -> int:
-    if fixed_value == 0:
-        return 0
-
-    msb_idx = max(idx for idx in range(32) if (fixed_value >> idx) & 0x1)
-    exponent_bits = msb_idx + 119
-    if msb_idx <= 23:
-        normalized = fixed_value << (23 - msb_idx)
-    else:
-        normalized = fixed_value >> (msb_idx - 23)
-    return ((exponent_bits & 0xFF) << 23) | (normalized & 0x7FFFFF)
-
-
-def softmax_fp_expected(float_values: list[float]) -> list[int]:
-    lane_max = to_f32(max(float_values))
-    delta_bits = [float_to_bits(to_f32(value - lane_max)) for value in float_values]
-    exp_bits = [
-        uq8_8_to_fp32(lut_softmax_exp_expected(fp32_to_q8_8(bits)))
-        for bits in delta_bits
-    ]
-    exp_values = [bits_to_float(bits) for bits in exp_bits]
-
-    sum01 = to_f32(exp_values[0] + exp_values[1])
-    sum23 = to_f32(exp_values[2] + exp_values[3])
-    sum_exp = to_f32(sum01 + sum23)
-
-    return [float_to_bits(to_f32(value / sum_exp)) for value in exp_values]
-
-
-def softmax_int_expected(lanes: list[int]) -> list[int]:
-    lane_max = max(lanes)
-    lane_sub = [lane - lane_max for lane in lanes]
-    lane_exp = [lut_softmax_exp_expected(lane) for lane in lane_sub]
+def softmax_fixed_expected(lanes: list[int], scale: int) -> list[int]:
+    aligned = [align_int32_to_q8_8(value, scale) for value in lanes]
+    lane_max = max(aligned)
+    lane_exp = [lut_softmax_exp_expected(value - lane_max) for value in aligned]
     sum_exp = sum(lane_exp)
-    quotient = (1 << 30) // sum_exp
-    return [((quotient * lane) >> 22) & 0xFFFF_FFFF for lane in lane_exp]
+    if sum_exp == 0:
+        return [0 for _ in lanes]
+    return [min(255, ((value << (-PROB_SCALE)) + (sum_exp >> 1)) // sum_exp) for value in lane_exp]
 
 
 async def reset_dut(dut) -> None:
     dut.rst_n.value = 0
     dut.in_valid.value = 0
-    dut.input_mode_fp.value = 0
     dut.x_in.value = 0
+    dut.x_scale_i.value = 0
+    dut.out_ready.value = 1
     await RisingEdge(dut.clk)
     await Timer(1, unit="ns")
     await RisingEdge(dut.clk)
@@ -134,14 +80,14 @@ async def reset_dut(dut) -> None:
     await Timer(1, unit="ns")
 
 
-async def drive_softmax_row(dut, *, input_mode_fp: int, lanes: list[int]) -> list[int]:
+async def drive_softmax_row(dut, *, scale: int, lanes: list[int]) -> list[int]:
     dut.in_valid.value = 1
-    dut.input_mode_fp.value = input_mode_fp
+    dut.x_scale_i.value = scale
     dut.x_in.value = pack_lanes(lanes)
     await RisingEdge(dut.clk)
     await Timer(1, unit="ns")
     dut.in_valid.value = 0
-    dut.input_mode_fp.value = 0
+    dut.x_scale_i.value = 0
 
     for _ in range(20):
         await RisingEdge(dut.clk)
@@ -152,37 +98,37 @@ async def drive_softmax_row(dut, *, input_mode_fp: int, lanes: list[int]) -> lis
 
 
 @cocotb.test()
-async def test_softmax_fp_row(dut):
+async def test_softmax_boxed_scale_fixed_row(dut):
     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
     await reset_dut(dut)
 
-    values = [1.0, 0.5, -0.5, 2.0]
-    observed = await drive_softmax_row(
-        dut,
-        input_mode_fp=1,
-        lanes=[float_to_bits(value) for value in values],
-    )
-    expected = softmax_fp_expected(values)
+    lanes = [4, 1, -2, 0]
+    scale = -2
+    observed_words = await drive_softmax_row(dut, scale=scale, lanes=lanes)
+    observed = [word & 0xFF for word in observed_words]
+    expected = softmax_fixed_expected(lanes, scale)
 
-    for obs_bits, exp_bits in zip(observed, expected):
-        obs_value = bits_to_float(obs_bits)
-        exp_value = bits_to_float(exp_bits)
-        assert abs(obs_value - exp_value) < 1e-6, (
-            f"softmax fp mismatch: got {obs_value} expected {exp_value}"
-        )
-    assert int(dut.out_mode_fp.value) == 1, "fp mode should be reflected on output"
+    dut._log.info("softmax raw logits=%s scale=%d", lanes, scale)
+    dut._log.info("softmax probability bytes observed=%s expected=%s", observed, expected)
+
+    assert observed == expected
+    assert int(dut.y_scale_o.value.to_signed()) == PROB_SCALE
+    assert int(dut.out_mode_fp.value) == 0
 
 
 @cocotb.test()
-async def test_softmax_integer_mode_regression(dut):
+async def test_softmax_boxed_scale_peaked_distribution(dut):
     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
     await reset_dut(dut)
 
-    lanes = [16, 8, 4, 0]
-    observed = await drive_softmax_row(dut, input_mode_fp=0, lanes=lanes)
-    expected = softmax_int_expected(lanes)
+    lanes = [18, -4, -8, -12]
+    scale = -3
+    observed_words = await drive_softmax_row(dut, scale=scale, lanes=lanes)
+    observed = [word & 0xFF for word in observed_words]
+    expected = softmax_fixed_expected(lanes, scale)
 
-    assert observed == expected, (
-        f"softmax integer regression mismatch: got {observed}, expected {expected}"
-    )
-    assert int(dut.out_mode_fp.value) == 0, "integer mode should clear output fp flag"
+    dut._log.info("peaked softmax probability bytes observed=%s expected=%s", observed, expected)
+
+    assert observed == expected
+    assert int(dut.y_scale_o.value.to_signed()) == PROB_SCALE
+    assert int(dut.out_mode_fp.value) == 0

@@ -1,4 +1,5 @@
 `timescale 1ns/1ns
+`include "lpu_pkg.sv"
 
 module vxm #(
     parameter int LANES   = 8,
@@ -90,6 +91,7 @@ module vxm #(
     logic                     chunked_softmax_out_valid;
     logic                     chunked_softmax_out_mode_fp;
     logic [ROW_W-1:0]         chunked_softmax_out;
+    logic signed [7:0]        chunked_softmax_out_scale;
     logic                     chunked_softmax_out_ready;
     logic                     chunked_softmax_busy;
     logic                     softmax_stall;
@@ -105,8 +107,7 @@ module vxm #(
     logic                     softmax_result_can_take;
     logic [LANES*LANE_W-1:0]  mux_out;
     logic                     mux_valid;
-    logic                     quant_mode_softmax;
-    logic                     quant_fp_mode;
+    quant_mode_e              quant_mode;
     logic                     quant_issue;
     logic                     quant_inflight;
     logic                     quant_slot_available;
@@ -203,8 +204,14 @@ module vxm #(
 
     assign mux_out   = softmax_active_valid ? softmax_active_data : s4_handoff_reg;
     assign mux_valid = softmax_active_valid || (s4_valid && !s4_bypass_sel_reg);
-    assign quant_mode_softmax = residual_result_mode_softmax;
-    assign quant_fp_mode = residual_result_fp_mode;
+    always_comb begin
+        if (residual_result_mode_softmax)
+            quant_mode = QUANT_SOFTMAX_U8;
+        else if (residual_result_fp_mode)
+            quant_mode = QUANT_FP8_E5M2;
+        else
+            quant_mode = QUANT_SIGNED_INT8;
+    end
     assign quant_slot_available = !quant_inflight && (!stream_out_valid_reg || out_ready);
     assign quant_issue = residual_result_valid && quant_slot_available;
     assign rope_start = rope_en && mux_valid && !rope_inflight && !rope_result_valid;
@@ -361,10 +368,12 @@ module vxm #(
         .rst_n(rst_n),
         .in_valid(chunked_softmax_in_valid),
         .x_in(s4_handoff_reg),
+        .x_scale_i(8'sd0),
         .in_ready(chunked_softmax_in_ready),
         .out_valid(chunked_softmax_out_valid),
         .out_mode_fp(chunked_softmax_out_mode_fp),
         .y_out(chunked_softmax_out),
+        .y_scale_o(chunked_softmax_out_scale),
         .out_ready(chunked_softmax_out_ready),
         .busy_o(chunked_softmax_busy)
     );
@@ -431,9 +440,7 @@ module vxm #(
         .clk(clk),
         .rst_n(rst_n),
         .in_valid(quant_issue),
-        .mode_softmax(quant_mode_softmax),
-        .fp_quant_mode(quant_fp_mode),
-        .softmax_input_is_fp(residual_result_fp_mode),
+        .quant_mode_i(quant_mode),
         .x_input(residual_result_reg),
         .out_valid(quantize_valid),
         .q_row_out(quantize_out),

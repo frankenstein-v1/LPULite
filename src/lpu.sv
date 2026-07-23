@@ -360,7 +360,7 @@ always @* begin
 
     vxm_payload_e_bus = make_eastbound_row({192'd0, vxm_stream_out_buf}, vxm_stream_out_scale_buf);
     sxm_payload_e_bus = make_eastbound_row({192'd0, sxm_stream_out_to_mxm_left}, '0);
-    mem0_payload_e_bus = mem_row_to_eastbound(mem0_stream_out);
+    mem0_payload_e_bus = make_eastbound_row(mem0_dequant_payload_e_bus, fp8_row_mem_scale(mem0_stream_out));
 end
 
 mem_row_dequant u_mem0_dequant (
@@ -505,21 +505,7 @@ assign vxm_load_operand = vxm_load_operand_east || vxm_load_operand_west;
 always @* begin
     vxm_operand_payload = '0;
     if (vxm_load_operand_east) begin
-        if (eastbound_sel_t == EB_MEM0) begin
-            unique case (vxm_operand_sel)
-                VXM_OPERAND_DATA,
-                VXM_OPERAND_BIAS,
-                VXM_OPERAND_GAMMA,
-                VXM_OPERAND_BETA: begin
-                    vxm_operand_payload = mem0_dequant_payload_e_bus;
-                end
-                default: begin
-                    vxm_operand_payload = eastbound_row_data(eastbound_payload);
-                end
-            endcase
-        end else begin
-            vxm_operand_payload = eastbound_row_data(eastbound_payload);
-        end
+        vxm_operand_payload = eastbound_row_data(eastbound_payload);
     end else if (vxm_load_operand_west) begin
         vxm_operand_payload[$bits(superlane_t)-1:0] = westbound_row_data(westbound_payload);
     end

@@ -1,16 +1,16 @@
 `timescale 1ns/1ns
+`include "lpu_pkg.sv"
 
 module quant #(
     parameter int LANES  = 8,
-    parameter int LANE_W = 32
+    parameter int LANE_W = 32,
+    parameter logic signed [7:0] SOFTMAX_PROB_SCALE = -8'sd7
 ) (
     input  logic                            clk,
     input  logic                            rst_n,
 
     input  logic                            in_valid,
-    input  logic                            mode_softmax,
-    input  logic                            fp_quant_mode,
-    input  logic                            softmax_input_is_fp,
+    input  quant_mode_e                     quant_mode_i,
     input  logic signed [LANES*LANE_W-1:0]  x_input,
 
     output logic                            out_valid,
@@ -21,22 +21,18 @@ module quant #(
     localparam int OUT_W = LANES * 8;
 
     logic signed [LANES*LANE_W-1:0] ingress_data_reg;
-    logic                           ingress_mode_reg;
-    logic                           ingress_fp_quant_mode_reg;
-    logic                           ingress_softmax_is_fp_reg;
+    quant_mode_e                    ingress_mode_reg;
     logic                           ingress_valid_reg;
 
     logic signed [7:0] regular_lane_q [0:LANES-1];
     logic        [7:0] regular_fp8_q [0:LANES-1];
     logic        [7:0] softmax_lane_q [0:LANES-1];
-    logic        [7:0] softmax_fp8_q [0:LANES-1];
     logic [7:0]        regular_row_shift;
     logic signed [7:0] regular_row_scale_exp;
 
     logic signed [OUT_W-1:0] regular_word;
     logic        [OUT_W-1:0] regular_fp8_word;
     logic        [OUT_W-1:0] softmax_word;
-    logic        [OUT_W-1:0] softmax_fp8_word;
     logic        [OUT_W-1:0] mux_word;
     logic [31:0]             scale_word;
 
@@ -66,60 +62,6 @@ module quant #(
                 rounding_step = $signed({{(LANE_W-1){1'b0}}, 1'b1}) <<< (shift_amount - 1);
                 adjusted_value = (value >= 0) ? (value + rounding_step) : (value - rounding_step);
                 round_shift_signed = adjusted_value >>> shift_amount;
-            end
-        end
-    endfunction
-
-    function automatic logic [8:0] fp32_to_uq0_8(
-        input logic [31:0] fp_bits
-    );
-        logic [7:0]  exp_bits;
-        logic [22:0] frac_bits;
-        logic [23:0] significand;
-        integer      exp_unbiased;
-        integer      shift_amount;
-        longint unsigned scaled_value;
-        longint unsigned rounded_value;
-        begin
-            if (fp_bits[31]) begin
-                fp32_to_uq0_8 = 9'd0;
-            end else begin
-                exp_bits = fp_bits[30:23];
-                frac_bits = fp_bits[22:0];
-
-                if ((exp_bits == 8'h00) && (frac_bits == 23'd0)) begin
-                    fp32_to_uq0_8 = 9'd0;
-                end else if (exp_bits == 8'hff) begin
-                    fp32_to_uq0_8 = 9'd255;
-                end else begin
-                    if (exp_bits == 8'h00) begin
-                        significand = {1'b0, frac_bits};
-                        exp_unbiased = -126;
-                    end else begin
-                        significand = {1'b1, frac_bits};
-                        exp_unbiased = exp_bits - 127;
-                    end
-
-                    shift_amount = exp_unbiased - 23 + 8;
-                    scaled_value = {40'd0, significand};
-
-                    if (shift_amount >= 0) begin
-                        if (shift_amount > 8)
-                            rounded_value = 64'd255;
-                        else
-                            rounded_value = scaled_value << shift_amount;
-                    end else if (-shift_amount > 62) begin
-                        rounded_value = 64'd0;
-                    end else begin
-                        rounded_value = scaled_value + (64'd1 << ((-shift_amount) - 1));
-                        rounded_value = rounded_value >> (-shift_amount);
-                    end
-
-                    if (rounded_value > 64'd255)
-                        fp32_to_uq0_8 = 9'd255;
-                    else
-                        fp32_to_uq0_8 = rounded_value[8:0];
-                end
             end
         end
     endfunction
@@ -238,18 +180,14 @@ module quant #(
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             ingress_data_reg  <= '0;
-            ingress_mode_reg  <= 1'b0;
-            ingress_fp_quant_mode_reg <= 1'b0;
-            ingress_softmax_is_fp_reg <= 1'b0;
+            ingress_mode_reg  <= QUANT_SIGNED_INT8;
             ingress_valid_reg <= 1'b0;
             q_row_out         <= '0;
             q_scale_out       <= '0;
             out_valid         <= 1'b0;
         end else begin
             ingress_data_reg  <= x_input;
-            ingress_mode_reg  <= mode_softmax;
-            ingress_fp_quant_mode_reg <= fp_quant_mode;
-            ingress_softmax_is_fp_reg <= softmax_input_is_fp;
+            ingress_mode_reg  <= quant_mode_i;
             ingress_valid_reg <= in_valid;
 
             q_row_out <= mux_word;
@@ -264,7 +202,6 @@ module quant #(
         logic [LANE_W-1:0] shifted_max_abs_value;
         logic signed [LANE_W-1:0] lane_in_val;
         logic signed [LANE_W-1:0] shifted_lane;
-        logic [8:0]               softmax_fp_lane_q;
         logic [30:0]              max_abs_mag_fp;
         logic [30:0]              lane_abs_mag_fp;
         logic signed [7:0]        row_scale_exp_next;
@@ -274,7 +211,6 @@ module quant #(
         regular_word = '0;
         regular_fp8_word = '0;
         softmax_word = '0;
-        softmax_fp8_word = '0;
         mux_word = '0;
         scale_word = '0;
         max_abs_value = '0;
@@ -320,33 +256,28 @@ module quant #(
             );
             regular_fp8_q[i] = fp32_to_fp8_e5m2(scaled_fp_lane_bits);
 
-            if (ingress_softmax_is_fp_reg) begin
-                softmax_fp_lane_q = fp32_to_uq0_8(ingress_data_reg[i*LANE_W +: LANE_W]);
-                softmax_lane_q[i] = (softmax_fp_lane_q > 9'd255) ? 8'd255 : softmax_fp_lane_q[7:0];
-                softmax_fp8_q[i] = fp32_to_fp8_e5m2(ingress_data_reg[i*LANE_W +: LANE_W]);
-            end else begin
-                softmax_lane_q[i] = (lane_in_val <= 0) ? 8'd0 :
-                                    (lane_in_val >= 32'sd255) ? 8'd255 :
-                                    lane_in_val[7:0];
-                softmax_fp8_q[i] = fp32_to_fp8_e5m2(ingress_data_reg[i*LANE_W +: LANE_W]);
-            end
+            softmax_lane_q[i] = (lane_in_val <= 0) ? 8'd0 :
+                                (lane_in_val >= 32'sd255) ? 8'd255 :
+                                lane_in_val[7:0];
             regular_word[i*8 +: 8] = regular_lane_q[i];
             regular_fp8_word[i*8 +: 8] = regular_fp8_q[i];
             softmax_word[i*8 +: 8] = softmax_lane_q[i];
-            softmax_fp8_word[i*8 +: 8] = softmax_fp8_q[i];
         end
 
-        if (ingress_mode_reg) begin
-            mux_word = (ingress_fp_quant_mode_reg && ingress_softmax_is_fp_reg)
-                     ? softmax_fp8_word
-                     : softmax_word;
-            scale_word = 32'd0;
-        end else begin
-            mux_word = ingress_fp_quant_mode_reg ? regular_fp8_word : regular_word;
-            scale_word = ingress_fp_quant_mode_reg
-                       ? {{24{regular_row_scale_exp[7]}}, regular_row_scale_exp[7:0]}
-                       : {24'd0, regular_row_shift};
-        end
+        unique case (ingress_mode_reg)
+            QUANT_SOFTMAX_U8: begin
+                mux_word = softmax_word;
+                scale_word = {{24{SOFTMAX_PROB_SCALE[7]}}, SOFTMAX_PROB_SCALE};
+            end
+            QUANT_FP8_E5M2: begin
+                mux_word = regular_fp8_word;
+                scale_word = {{24{regular_row_scale_exp[7]}}, regular_row_scale_exp[7:0]};
+            end
+            default: begin
+                mux_word = regular_word;
+                scale_word = {24'd0, regular_row_shift};
+            end
+        endcase
     end
 
 endmodule

@@ -19,7 +19,7 @@ module mxm_eastbound_adapter #(
 
     // Packed MXM row feed into eastbound_bus:
     // [255:0] = 8x int32 lanes, [263:256] = fixed-point row scale.
-    output logic [MXM_SIZE*PAYLOAD_W+SCALE_W-1:0] mxm_payload,
+    output eastbound_row_t          mxm_payload,
     output logic                 mxm_valid
 );
 
