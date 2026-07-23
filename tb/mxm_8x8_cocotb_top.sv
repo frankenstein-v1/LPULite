@@ -43,7 +43,6 @@ module mxm_8x8_cocotb_top (
         .westbound_valid(1'b0),
         .mxm_west_en(1'b0),
         .mxm_ingress_mode(2'b00),
-        .mxm_use_fp(1'b0),
         .mxm_input_is_signed(1'b1),
         .mxm_wght_is_signed(1'b1),
         .mxm_input_in(mxm_input_in),

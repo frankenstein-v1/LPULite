@@ -344,8 +344,8 @@ async def reset_dut(dut):
     dut.fp_quant_mode.value = 0
     if hasattr(dut, "rope_en"):
         dut.rope_en.value = 0
-        dut.rope_cos_fp8.value = int.from_bytes(bytes([0x3C] * LANES), "little")
-        dut.rope_sin_fp8.value = 0
+        dut.rope_cos_q1_7.value = int.from_bytes(bytes([0x7F] * LANES), "little")
+        dut.rope_sin_q1_7.value = 0
     if hasattr(dut, "residual_op"):
         dut.residual_op.value = 0
     if hasattr(dut, "scale_factor"):

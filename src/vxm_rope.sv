@@ -3,7 +3,7 @@
 // Fixed-point VXM RoPE (Rotary Position Embedding) stage.
 //
 // Computes 2D vector rotations on adjacent element pairs using 32-bit signed
-// fixed-point inputs (x_in) and 8-bit signed fixed-point trig values (cos_fp8/sin_fp8, Q1.7).
+// fixed-point inputs (x_in) and 8-bit signed fixed-point trig values (cos_q1_7/sin_q1_7).
 // Intermediate 40-bit products are combined and arithmetic right-shifted by 7 (>>> 7).
 module vxm_rope #(
     parameter int LANES  = 8,
@@ -13,8 +13,8 @@ module vxm_rope #(
     input  logic                    rst_n,
     input  logic                    start_i,
     input  logic [LANES*LANE_W-1:0] x_in,
-    input  logic [LANES*8-1:0]      cos_fp8, // 8-lane signed int8 fixed-point cos (Q1.7)
-    input  logic [LANES*8-1:0]      sin_fp8, // 8-lane signed int8 fixed-point sin (Q1.7)
+    input  logic [LANES*8-1:0]      cos_q1_7, // 8-lane signed int8 fixed-point cos (Q1.7)
+    input  logic [LANES*8-1:0]      sin_q1_7, // 8-lane signed int8 fixed-point sin (Q1.7)
     output logic [LANES*LANE_W-1:0] y_out,
     output logic                    done_o,
     output logic                    busy_o
@@ -47,8 +47,8 @@ module vxm_rope #(
 
             assign x_even = $signed(x_in[EVEN*LANE_W +: LANE_W]);
             assign x_odd  = $signed(x_in[ODD*LANE_W  +: LANE_W]);
-            assign c_val  = $signed(cos_fp8[EVEN*8   +: 8]);
-            assign s_val  = $signed(sin_fp8[EVEN*8   +: 8]);
+            assign c_val  = $signed(cos_q1_7[EVEN*8   +: 8]);
+            assign s_val  = $signed(sin_q1_7[EVEN*8   +: 8]);
 
             assign prod0 = x_even * c_val;
             assign prod1 = x_odd  * s_val;

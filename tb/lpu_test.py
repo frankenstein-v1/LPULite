@@ -342,6 +342,19 @@ def fp8_quantize_matrix(matrix):
     return bits, decoded
 
 
+def q1_7_bits(value):
+    quantized = int(round(float(value) * 128.0))
+    quantized = max(-128, min(127, quantized))
+    return quantized & 0xFF
+
+
+def q1_7_to_f32(byte_value):
+    signed_value = int(byte_value) & 0xFF
+    if signed_value & 0x80:
+        signed_value -= 256
+    return signed_value / 128.0
+
+
 def pack_fp32_row(row):
     word = 0
     for idx, value in enumerate(row):
@@ -360,8 +373,8 @@ def rope_rows_fp32(data, cos_bits, sin_bits):
         odd = even + 1
         x_even = lpu.to_f32(data[even])
         x_odd = lpu.to_f32(data[odd])
-        cos_value = lpu.fp8_e5m2_to_f32(cos_bits[even])
-        sin_value = lpu.fp8_e5m2_to_f32(sin_bits[even])
+        cos_value = q1_7_to_f32(cos_bits[even])
+        sin_value = q1_7_to_f32(sin_bits[even])
         out[even] = lpu.to_f32(
             lpu.to_f32(x_even * cos_value) - lpu.to_f32(x_odd * sin_value)
         )
@@ -378,8 +391,8 @@ def rope_rows_fp32_8(data, cos_bits, sin_bits):
         odd = even + 1
         x_even = lpu.to_f32(data[even])
         x_odd = lpu.to_f32(data[odd])
-        cos_value = lpu.fp8_e5m2_to_f32(cos_bits[even])
-        sin_value = lpu.fp8_e5m2_to_f32(sin_bits[even])
+        cos_value = q1_7_to_f32(cos_bits[even])
+        sin_value = q1_7_to_f32(sin_bits[even])
         out[even] = lpu.to_f32(
             lpu.to_f32(x_even * cos_value) - lpu.to_f32(x_odd * sin_value)
         )
@@ -801,9 +814,9 @@ async def run_forced_vxm_row(
     if beta is not None:
         dut.u_lpu.vxm_rmsnorm_beta_reg.value = pack_fp32_row(beta)
     if rope_cos_bits is not None:
-        dut.u_lpu.vxm_rope_cos_fp8_reg.value = lpu.pack_bytes(rope_cos_bits)
+        dut.u_lpu.vxm_rope_cos_q1_7_reg.value = lpu.pack_bytes(rope_cos_bits)
     if rope_sin_bits is not None:
-        dut.u_lpu.vxm_rope_sin_fp8_reg.value = lpu.pack_bytes(rope_sin_bits)
+        dut.u_lpu.vxm_rope_sin_q1_7_reg.value = lpu.pack_bytes(rope_sin_bits)
 
     dut.u_lpu.u_vxm.stream_in_data.value = Force(pack_fp32_row(data))
     dut.u_lpu.u_vxm.vxm_ctrl.value = Force(vxm_ctrl)
@@ -1043,8 +1056,8 @@ async def test_lpu_vxm_hardware_relu_softmax_layernorm_paths(dut):
         ),
     ]
     await lpu.run_lpu_program(dut, load_rope_operands, extra_cycles=6)
-    assert int(dut.u_lpu.vxm_rope_cos_fp8_reg.value) == lpu.pack_bytes(cos_bits)
-    assert int(dut.u_lpu.vxm_rope_sin_fp8_reg.value) == lpu.pack_bytes(sin_bits)
+    assert int(dut.u_lpu.vxm_rope_cos_q1_7_reg.value) == lpu.pack_bytes(cos_bits)
+    assert int(dut.u_lpu.vxm_rope_sin_q1_7_reg.value) == lpu.pack_bytes(sin_bits)
 
     rope_expected = rope_rows_fp32(rope_data, cos_bits, sin_bits)
     rope_expected_bits, rope_expected_scale = lpu.regular_fp8_row_quant_expected(rope_expected)
@@ -1068,8 +1081,8 @@ async def test_lpu_vxm_hardware_relu_softmax_layernorm_paths(dut):
         f"rope_state={int(dut.u_lpu.u_vxm.rope_inst.state_q.value)}, "
         f"mux_valid={int(dut.u_lpu.u_vxm.mux_valid.value)}, "
         f"rope_result_valid={int(dut.u_lpu.u_vxm.rope_result_valid.value)}, "
-        f"cos=0x{int(dut.u_lpu.vxm_rope_cos_fp8_reg.value):08x}, "
-        f"sin=0x{int(dut.u_lpu.vxm_rope_sin_fp8_reg.value):08x}"
+        f"cos=0x{int(dut.u_lpu.vxm_rope_cos_q1_7_reg.value):08x}, "
+        f"sin=0x{int(dut.u_lpu.vxm_rope_sin_q1_7_reg.value):08x}"
     )
     assert (rope_scale & 0xFF) == (rope_expected_scale & 0xFF)
     dut._log.info(
@@ -1356,8 +1369,8 @@ def get_user_input(prompt: str) -> str:
 
 
 async def drive_rope_registers(dut, cos_bits, sin_bits):
-    dut.u_lpu.vxm_rope_cos_fp8_reg.value = pack_bytes_8(cos_bits)
-    dut.u_lpu.vxm_rope_sin_fp8_reg.value = pack_bytes_8(sin_bits)
+    dut.u_lpu.vxm_rope_cos_q1_7_reg.value = pack_bytes_8(cos_bits)
+    dut.u_lpu.vxm_rope_sin_q1_7_reg.value = pack_bytes_8(sin_bits)
 
 
 def pack_fp32_row_8(row):
@@ -1825,8 +1838,8 @@ async def run_lpu_model_forward_8(dut, input_ids, id_to_token, weights, *, label
         k_rot_hw = [[0.0 for _ in range(k_width)] for _ in range(seq_len)]
         for t in range(seq_len):
             cos_val, sin_val = get_rope_cos_sin(t, head_dim=head_dim)
-            cos_bits = [lpu.fp8_e5m2_bits(c) for c in cos_val]
-            sin_bits = [lpu.fp8_e5m2_bits(s) for s in sin_val]
+            cos_bits = [q1_7_bits(c) for c in cos_val]
+            sin_bits = [q1_7_bits(s) for s in sin_val]
             for h in range(heads):
                 start = h * head_dim
                 rotated_chunk = await run_forced_vxm_rope_chunk(
@@ -2548,8 +2561,8 @@ async def run_lpu_decode_token_kv_8(
         )
 
         cos_val, sin_val = get_rope_cos_sin(token_pos, head_dim=head_dim)
-        cos_bits = [lpu.fp8_e5m2_bits(c) for c in cos_val]
-        sin_bits = [lpu.fp8_e5m2_bits(s) for s in sin_val]
+        cos_bits = [q1_7_bits(c) for c in cos_val]
+        sin_bits = [q1_7_bits(s) for s in sin_val]
 
         q_rot = [0.0 for _ in range(dim)]
         for h in range(heads):
@@ -2853,8 +2866,8 @@ async def test_lpu_instruction_driven_vxm_chunks(dut):
     assert residual_observed == residual_expected
 
     rope_in = [0.5, 1.0, -1.5, 2.0, -2.5, 3.0, -3.5, 4.0]
-    cos_bits = [lpu.fp8_e5m2_bits(v) for v in [1.0, 0.875, 0.75, 0.5, 1.0, 0.875, 0.75, 0.5]]
-    sin_bits = [lpu.fp8_e5m2_bits(v) for v in [0.0, 0.5, 0.75, 0.875, 0.0, 0.5, 0.75, 0.875]]
+    cos_bits = [q1_7_bits(v) for v in [1.0, 0.875, 0.75, 0.5, 1.0, 0.875, 0.75, 0.5]]
+    sin_bits = [q1_7_bits(v) for v in [0.0, 0.5, 0.75, 0.875, 0.0, 0.5, 0.75, 0.875]]
     rope_observed = await run_lpu_vxm_rope_chunk(dut, rope_in, cos_bits, sin_bits)
     rope_expected = rope_rows_fp32_8(rope_in, cos_bits, sin_bits)
     rope_bits, rope_scale = lpu.regular_fp8_row_quant_expected(rope_expected)
@@ -3239,8 +3252,8 @@ async def test_interactive_prompt(dut):
                 # Apply RoPE for Q
                 for t in range(seq_len):
                     cos_val, sin_val = get_rope_cos_sin(t, head_dim=8)
-                    cos_bits = [lpu.fp8_e5m2_bits(c) for c in cos_val]
-                    sin_bits = [lpu.fp8_e5m2_bits(s) for s in sin_val]
+                    cos_bits = [q1_7_bits(c) for c in cos_val]
+                    sin_bits = [q1_7_bits(s) for s in sin_val]
                     for h in range(8):
                         start = h * 8
                         rotated_chunk = await run_forced_vxm_rope_chunk(
@@ -3255,8 +3268,8 @@ async def test_interactive_prompt(dut):
                 # Apply RoPE for K
                 for t in range(seq_len):
                     cos_val, sin_val = get_rope_cos_sin(t, head_dim=8)
-                    cos_bits = [lpu.fp8_e5m2_bits(c) for c in cos_val]
-                    sin_bits = [lpu.fp8_e5m2_bits(s) for s in sin_val]
+                    cos_bits = [q1_7_bits(c) for c in cos_val]
+                    sin_bits = [q1_7_bits(s) for s in sin_val]
                     for kh in range(4):
                         start = kh * 8
                         rotated_chunk = await run_forced_vxm_rope_chunk(

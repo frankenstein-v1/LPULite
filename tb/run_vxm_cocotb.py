@@ -10,7 +10,6 @@ def test_vxm():
 
     sources = [
         src_dir / "lpu_pkg.sv",
-        src_dir / "lut_rmsnorm.sv",
         src_dir / "rmsnorm.sv",
         src_dir / "vxm_rope.sv",
         src_dir / "residual_add.sv",

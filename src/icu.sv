@@ -50,8 +50,6 @@ module icu #(
     output logic      mxm_e_valid_in,
     output logic      mxm_input_is_signed,
     output logic      mxm_wght_is_signed,
-    output logic      mxm_use_fp,
-    output logic      fp_quant_mode,
     output logic [1:0] mem_store_fmt,
     output logic      vxm_rmsnorm_en,
     output logic      vxm_rope_en,
@@ -102,7 +100,7 @@ module icu #(
     //   [11:0]  bus control
     //   [28:12] mem0 read/write/address
     //   [45:29] mem1 read/write/address
-    //   [62:46] MXM + quant/store controls
+    //   [62:46] MXM + fixed-point store controls
     //   [65:63] SXM transpose controls
     //   [78:66] VXM controls
     //   [95:79] reserved
@@ -126,8 +124,6 @@ module icu #(
     assign mxm_e_valid_in      = current_instruction[56];
     assign mxm_input_is_signed = current_instruction[57];
     assign mxm_wght_is_signed  = current_instruction[58];
-    assign mxm_use_fp          = current_instruction[59];
-    assign fp_quant_mode       = current_instruction[60];
     assign mem_store_fmt       = current_instruction[62:61];
 
     // SXM transpose-only control

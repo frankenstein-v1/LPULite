@@ -5,8 +5,8 @@ module tb_vxm_rope_fixed;
     logic        rst_n;
     logic        start_i;
     logic [255:0] x_in;
-    logic [63:0]  cos_fp8;
-    logic [63:0]  sin_fp8;
+    logic [63:0]  cos_q1_7;
+    logic [63:0]  sin_q1_7;
     logic [255:0] y_out;
     logic        done_o;
     logic        busy_o;
@@ -19,8 +19,8 @@ module tb_vxm_rope_fixed;
         .rst_n(rst_n),
         .start_i(start_i),
         .x_in(x_in),
-        .cos_fp8(cos_fp8),
-        .sin_fp8(sin_fp8),
+        .cos_q1_7(cos_q1_7),
+        .sin_q1_7(sin_q1_7),
         .y_out(y_out),
         .done_o(done_o),
         .busy_o(busy_o)
@@ -33,8 +33,8 @@ module tb_vxm_rope_fixed;
         rst_n = 0;
         start_i = 0;
         x_in = '0;
-        cos_fp8 = '0;
-        sin_fp8 = '0;
+        cos_q1_7 = '0;
+        sin_q1_7 = '0;
 
         #20 rst_n = 1;
         #10;
@@ -50,17 +50,17 @@ module tb_vxm_rope_fixed;
         x_in[ 7*32 +: 32] = 32'sd64;
 
         // Cos/Sin Q1.7 trig values (scaled by 128):
-        cos_fp8[0*8 +: 8] = 8'sd123; cos_fp8[1*8 +: 8] = 8'sd123;
-        sin_fp8[0*8 +: 8] = 8'sd37;  sin_fp8[1*8 +: 8] = 8'sd37;
+        cos_q1_7[0*8 +: 8] = 8'sd123; cos_q1_7[1*8 +: 8] = 8'sd123;
+        sin_q1_7[0*8 +: 8] = 8'sd37;  sin_q1_7[1*8 +: 8] = 8'sd37;
 
-        cos_fp8[2*8 +: 8] = 8'sd100; cos_fp8[3*8 +: 8] = 8'sd100;
-        sin_fp8[2*8 +: 8] = -8'sd81; sin_fp8[3*8 +: 8] = -8'sd81;
+        cos_q1_7[2*8 +: 8] = 8'sd100; cos_q1_7[3*8 +: 8] = 8'sd100;
+        sin_q1_7[2*8 +: 8] = -8'sd81; sin_q1_7[3*8 +: 8] = -8'sd81;
 
-        cos_fp8[4*8 +: 8] = 8'sd127; cos_fp8[5*8 +: 8] = 8'sd127;
-        sin_fp8[4*8 +: 8] = 8'sd0;   sin_fp8[5*8 +: 8] = 8'sd0;
+        cos_q1_7[4*8 +: 8] = 8'sd127; cos_q1_7[5*8 +: 8] = 8'sd127;
+        sin_q1_7[4*8 +: 8] = 8'sd0;   sin_q1_7[5*8 +: 8] = 8'sd0;
 
-        cos_fp8[6*8 +: 8] = 8'sd0;   cos_fp8[7*8 +: 8] = 8'sd0;
-        sin_fp8[6*8 +: 8] = 8'sd127; sin_fp8[7*8 +: 8] = 8'sd127;
+        cos_q1_7[6*8 +: 8] = 8'sd0;   cos_q1_7[7*8 +: 8] = 8'sd0;
+        sin_q1_7[6*8 +: 8] = 8'sd127; sin_q1_7[7*8 +: 8] = 8'sd127;
 
         start_i = 1;
         @(posedge clk);

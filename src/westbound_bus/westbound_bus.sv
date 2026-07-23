@@ -1,36 +1,34 @@
 `timescale 1ns/1ps
 `include "lpu_pkg.sv"
 
-module westbound_bus #(
-    // 8 signed int8 fixed-point lanes plus one shared row scale.
-    parameter int PAYLOAD_W = $bits(westbound_row_t)
-) (
+module westbound_bus (
     // Producer select (encoded): choose exactly one source for this cycle.
     input  westbound_producer_e producer_sel,
 
     // SXM producer
-    input  logic [PAYLOAD_W-1:0] sxm_payload,
+    input  westbound_row_t       sxm_payload,
     input  logic                 sxm_valid,
 
     // MEM0 producer
-    input  logic [PAYLOAD_W-1:0] mem0_payload,
+    input  westbound_row_t       mem0_payload,
     input  logic                 mem0_valid,
 
     // VXM producer
-    input  logic [PAYLOAD_W-1:0] vxm_payload,
+    input  westbound_row_t       vxm_payload,
     input  logic                 vxm_valid,
 
     // MEM1 producer
-    input  logic [PAYLOAD_W-1:0] mem1_payload,
+    input  westbound_row_t       mem1_payload,
     input  logic                 mem1_valid,
 
     // Shared westbound bus output: [63:0] = 8x int8 lanes, [71:64] = scale.
-    output logic [PAYLOAD_W-1:0] westbound_payload,
+    output westbound_row_t       westbound_payload,
     output logic                 westbound_valid
 );
+    localparam int PAYLOAD_W = $bits(westbound_row_t);
 
     logic [4:0][PAYLOAD_W-1:0] producer_payloads;
-    logic [4:0]                producer_valids;
+    logic [4:0]                 producer_valids;
 
     always_comb begin
         producer_payloads = '0;
