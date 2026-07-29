@@ -45,7 +45,7 @@ model = TinyLM(
 model.load_state_dict(checkpoint["model_state_dict"])
 model.eval()
 
-def generate(prompt, max_new_tokens=5):
+def generate(prompt, max_new_tokens=40):
     ids = tokenizer.encode(prompt, bos=True, eos=False)
 
     for _ in range(max_new_tokens):
@@ -68,7 +68,7 @@ def generate(prompt, max_new_tokens=5):
         ids.append(next_id)
 
         next_token = tokenizer.id_to_token.get(next_id, "")
-        if next_token == "." or next_id == 2 or next_token == "\n</s>\n":
+        if next_id in (0, 2, 3) or next_token in ("<pad>", "<eos>", "</s>", "\n</s>\n"):
             break
 
     # Decode to text
@@ -79,14 +79,21 @@ def generate(prompt, max_new_tokens=5):
 if __name__ == "__main__":
     if len(sys.argv) > 1:
         # Prompt passed from CLI argument
-        prompt = " ".join(sys.argv[1:])
-        completed = generate(prompt)
+        args = sys.argv[1:]
+        max_tokens = 40
+        if len(args) > 1 and args[-1].isdigit():
+            max_tokens = int(args[-1])
+            prompt = " ".join(args[:-1])
+        else:
+            prompt = " ".join(args)
+            
+        completed = generate(prompt, max_new_tokens=max_tokens)
         print(f"\nPrompt:      '{prompt}'")
         print(f"Completion:  '{completed}'")
     else:
         # Interactive shell
         print("\n=== TinyLM Interactive Generator ===")
-        print("Type a prompt (e.g. 'he is', 'he is very', 'it is') or type 'exit' to quit.\n")
+        print("Type a prompt (e.g. 'one day , lily') or type 'exit' to quit.\n")
         while True:
             try:
                 prompt = input("Prompt > ")
@@ -94,7 +101,7 @@ if __name__ == "__main__":
                     break
                 if not prompt.strip():
                     continue
-                completed = generate(prompt)
+                completed = generate(prompt, max_new_tokens=40)
                 print(f"Gen    > {completed}\n")
             except (KeyboardInterrupt, EOFError):
                 break
