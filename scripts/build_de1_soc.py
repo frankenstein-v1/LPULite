@@ -65,7 +65,7 @@ def patch_rtl() -> None:
     # The wrapper holds the LPU reset while programming.  ICU's programming
     # port is independently clocked already; retain the same capability for
     # the SRAMs so that MEM0/MEM1 writes are not discarded during that reset.
-    if "External writes remain available while reset is asserted." not in text:
+    if "External writes remain available while reset is asserted." not in text and "ext_write_en" not in text:
         text = replace_once(text,
             r"(ext_data_out\s*<=\s*'0;)",
             r"\1\n            // External writes remain available while reset is asserted.\n            if (ext_write_en) sram_array[ext_addr] <= ext_data_in;", "mem reset programming")

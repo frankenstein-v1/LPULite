@@ -404,6 +404,7 @@ module vxm #(
         .start_i(residual_start),
         .op_i(residual_op),
         .row_i(residual_row_in),
+        .scale_i(8'sd0),
         .ready_o(residual_ready),
         .busy_o(residual_busy),
         .done_o(residual_done),
