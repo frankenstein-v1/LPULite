@@ -1,0 +1,160 @@
+q: what is 10 plus 10 ? a: 20 .
+question: what is the largest ocean in the world ? answer: pacific ocean .
+question: what is the capital of england ? answer: london .
+question: what is the capital of brazil ? answer: brasilia .
+question: what animal says oink ? answer: a pig .
+q: what is the capital of brazil ? a: brasilia .
+question: what is the largest planet in our solar system ? answer: jupiter .
+q: what is 1 plus 1 ? a: 2 .
+q: what is 2 plus 2 ? a: 4 .
+question: what is 3 plus 3 ? answer: 6 .
+q: who developed the theory of relativity ? a: albert einstein .
+question: what is the largest animal in the world ? answer: blue whale .
+q: what gas do plants absorb from air ? a: carbon dioxide .
+question: how many minutes are in one hour ? answer: 60 minutes .
+question: what animal says moo ? answer: a cow .
+q: what is the largest planet in our solar system ? a: jupiter .
+question: what is the capital of australia ? answer: canberra .
+q: where is the statue of liberty ? a: new york city .
+q: where are the great pyramids located ? a: egypt .
+question: what star is at the center of our solar system ? answer: the sun .
+q: what is the largest continent ? a: asia .
+q: who painted the mona lisa ? a: leonardo da vinci .
+q: how many days are in one year ? a: 365 days .
+q: what is the capital of japan ? a: tokyo .
+question: what is the smallest continent ? answer: australia .
+question: what fpga chip is on the de1-soc board ? answer: intel cyclone v .
+question: who developed the theory of relativity ? answer: albert einstein .
+q: how many sides does a triangle have ? a: 3 sides .
+question: what is the capital of france ? answer: paris .
+q: what gas do humans breathe to live ? a: oxygen .
+question: what color do you get when you mix blue and yellow ? answer: green .
+question: how many sides does a triangle have ? answer: 3 sides .
+q: what animal says oink ? a: a pig .
+q: how many seconds are in one minute ? a: 60 seconds .
+q: what is the capital of england ? a: london .
+question: what is the main operating system for pc ? answer: windows .
+question: what color do you get when you mix red and yellow ? answer: orange .
+question: what is the tallest tower in japan ? answer: tokyo skytree .
+question: who painted the mona lisa ? answer: leonardo da vinci .
+question: what color is the sky on a clear day ? answer: blue .
+question: what is the capital of china ? answer: beijing .
+q: what chemical element has symbol h ? a: hydrogen .
+q: what is 5 times 5 ? a: 25 .
+q: what is the tallest building in the world ? a: burj khalifa in dubai .
+q: what color is a strawberry ? a: red .
+q: what is the largest animal in the world ? a: blue whale .
+question: what color is a ripe banana ? answer: yellow .
+question: what color is fresh snow ? answer: white .
+q: who wrote romeo and juliet ? a: william shakespeare .
+question: how many seconds are in one minute ? answer: 60 seconds .
+question: what color is a strawberry ? answer: red .
+q: what animal says meow ? a: a cat .
+question: what is 2 plus 2 ? answer: 4 .
+q: where is the eiffel tower located ? a: paris in france .
+question: where is the eiffel tower located ? answer: paris in france .
+question: what is the tallest animal in the world ? answer: giraffe .
+q: what is the closest planet to the sun ? a: mercury .
+question: what is the largest continent ? answer: asia .
+q: how many sides does a hexagon have ? a: 6 sides .
+question: what gas do humans breathe to live ? answer: oxygen .
+q: what is 5 plus 5 ? a: 10 .
+q: what is the capital of italy ? a: rome .
+question: what chemical element has symbol o ? answer: oxygen .
+q: what color do you get when you mix blue and yellow ? a: green .
+question: what is the tallest building in the world ? answer: burj khalifa in dubai .
+question: what does lpu stand for in hardware ? answer: language processing unit .
+q: what animal says woof ? a: a dog .
+question: what is the famous clock tower in london ? answer: big ben .
+q: who was the first president of the united states ? a: george washington .
+q: what is the largest desert in the world ? a: antarctica .
+question: what is the capital of spain ? answer: madrid .
+question: what is the capital of india ? answer: new delhi .
+q: what is the capital of germany ? a: berlin .
+q: where is the burj khalifa located ? a: dubai in united arab emirates .
+q: what does lpu stand for in hardware ? a: language processing unit .
+q: how many minutes are in one hour ? a: 60 minutes .
+question: what is 5 plus 5 ? answer: 10 .
+q: what fpga chip is on the de1-soc board ? a: intel cyclone v .
+q: what color is fresh snow ? a: white .
+question: where is the burj khalifa located ? answer: dubai in united arab emirates .
+question: what is the fastest land animal ? answer: cheetah .
+q: what is 10 times 10 ? a: 100 .
+question: what chemical element has symbol au ? answer: gold .
+q: where is the taj mahal located ? a: india .
+question: what bird cannot fly and lives in cold ice ? answer: penguin .
+question: how many days are in one week ? answer: 7 days .
+q: what is the tallest tower in japan ? a: tokyo skytree .
+q: what color do you get when you mix red and yellow ? a: orange .
+q: what is the capital of united states ? a: washington dc .
+question: what animal says quack ? answer: a duck .
+question: what is 5 times 5 ? answer: 25 .
+question: how many sides does a hexagon have ? answer: 6 sides .
+q: what chemical element has symbol ag ? a: silver .
+q: what is the capital of spain ? a: madrid .
+q: what animal says quack ? a: a duck .
+q: what is the longest river in the world ? a: nile river .
+q: what color are grass and leaves ? a: green .
+question: who wrote romeo and juliet ? answer: william shakespeare .
+question: how many sides does a square have ? answer: 4 sides .
+q: what is 3 plus 3 ? a: 6 .
+q: what color is a ripe banana ? a: yellow .
+q: what does cpu stand for in computers ? a: central processing unit .
+question: what is 4 plus 4 ? answer: 8 .
+q: how many days are in one week ? a: 7 days .
+q: what state of matter is water vapor ? a: gas .
+q: what state of matter is water ice ? a: solid .
+q: what color is the sky on a clear day ? a: blue .
+question: what is the highest mountain in the world ? answer: mount everest .
+question: what is the capital of italy ? answer: rome .
+question: what is the satellite of earth ? answer: the moon .
+q: what star is at the center of our solar system ? a: the sun .
+question: where is the taj mahal located ? answer: india .
+q: what is the main operating system for pc ? a: windows .
+question: what is the capital of japan ? answer: tokyo .
+question: what is the capital of canada ? answer: ottawa .
+question: what planet is known as the red planet ? answer: mars .
+question: what is 10 times 10 ? answer: 100 .
+question: what is 1 plus 1 ? answer: 2 .
+q: what is the capital of canada ? a: ottawa .
+q: what animal says moo ? a: a cow .
+q: what is the capital of france ? a: paris .
+q: how many sides does a square have ? a: 4 sides .
+question: what state of matter is water ice ? answer: solid .
+q: what is the capital of china ? a: beijing .
+question: what color are grass and leaves ? answer: green .
+q: what is 4 plus 4 ? a: 8 .
+question: where are the great pyramids located ? answer: egypt .
+question: what animal says woof ? answer: a dog .
+question: who invented the light bulb ? answer: thomas edison .
+q: what is the smallest continent ? a: australia .
+q: what is the capital of australia ? a: canberra .
+q: what is the fastest land animal ? a: cheetah .
+q: what is the satellite of earth ? a: the moon .
+question: where is the statue of liberty ? answer: new york city .
+question: what chemical element has symbol h ? answer: hydrogen .
+question: what animal says meow ? answer: a cat .
+q: who invented the light bulb ? a: thomas edison .
+q: what is the tallest animal in the world ? a: giraffe .
+q: what bird cannot fly and lives in cold ice ? a: penguin .
+question: what gas do plants absorb from air ? answer: carbon dioxide .
+question: what is the closest planet to the sun ? answer: mercury .
+question: how many days are in one year ? answer: 365 days .
+question: what is the capital of germany ? answer: berlin .
+q: what is the capital of india ? a: new delhi .
+question: who was the first president of the united states ? answer: george washington .
+question: how many hours are in one day ? answer: 24 hours .
+question: what is 10 plus 10 ? answer: 20 .
+q: what planet is known as the red planet ? a: mars .
+q: what is the largest ocean in the world ? a: pacific ocean .
+question: what state of matter is water vapor ? answer: gas .
+q: what chemical element has symbol o ? a: oxygen .
+q: what is the highest mountain in the world ? a: mount everest .
+question: what is the capital of united states ? answer: washington dc .
+q: what is the famous clock tower in london ? a: big ben .
+question: what is the longest river in the world ? answer: nile river .
+q: how many hours are in one day ? a: 24 hours .
+question: what is the largest desert in the world ? answer: antarctica .
+question: what does cpu stand for in computers ? answer: central processing unit .
+q: what chemical element has symbol au ? a: gold .
+question: what chemical element has symbol ag ? answer: silver .

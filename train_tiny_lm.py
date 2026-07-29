@@ -444,7 +444,7 @@ if __name__ == "__main__":
 
     import argparse
     parser = argparse.ArgumentParser(description="Train Tiny LPU LM")
-    parser.add_argument("--preset", type=str, default="tiny", choices=["tiny", "stories10k", "stories260k", "stories288k_lpu"], help="Preset configuration")
+    parser.add_argument("--preset", type=str, default="tiny", choices=["tiny", "stories10k", "stories260k", "stories288k_lpu", "qa476k_lpu"], help="Preset configuration")
     parser.add_argument("--dim", type=int, default=None)
     parser.add_argument("--ffn-dim", type=int, default=None)
     parser.add_argument("--layers", type=int, default=None)
@@ -462,7 +462,21 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Apply preset defaults
-    if args.preset == "stories288k_lpu":
+    if args.preset == "qa476k_lpu":
+        preset_config = {
+            "dim": 64,
+            "ffn_dim": 224,
+            "layers": 10,
+            "heads": 4,
+            "kv_heads": 2,
+            "seq_len": 512,
+            "vocab_size": 512,
+            "epochs": 50,
+            "batch_size": 32,
+            "lr": 2e-3,
+            "patience": 10,
+        }
+    elif args.preset == "stories288k_lpu":
         preset_config = {
             "dim": 64,
             "ffn_dim": 192,
@@ -531,7 +545,11 @@ if __name__ == "__main__":
     BATCH_SIZE = args.batch_size if args.batch_size is not None else preset_config["batch_size"]
     LR = args.lr if args.lr is not None else preset_config["lr"]
     PATIENCE = args.patience if args.patience is not None else preset_config["patience"]
-    if args.preset == "stories288k_lpu":
+    if args.preset == "qa476k_lpu":
+        default_data_dir = Path("model") / "qa_facts"
+        default_model_path = Path("model") / "qa_facts" / "qa476k_model.pt"
+        default_export_path = Path("model") / "qa_facts" / "qa476k_weights_export.json"
+    elif args.preset == "stories288k_lpu":
         default_data_dir = Path("model") / "stories288k"
         default_model_path = Path("model") / "stories288k" / "stories288k_model.pt"
         default_export_path = Path("model") / "stories288k" / "stories288k_weights_export.json"
