@@ -3,7 +3,7 @@
 
 module lpu #(
     parameter int RMSNORM_CHUNKS = 8,
-    parameter int SOFTMAX_CHUNKS = 64
+    parameter int SOFTMAX_CHUNKS = 16
 ) (
     input  logic        clk,
     input  logic        rst_n,
@@ -317,7 +317,7 @@ logic        sxm_emit_valid;
 logic        sxm_load_from_west;
 
 westbound_bus u_westbound_bus(
-    .producer_sel(westbound_sel_t),
+    .producer_sel(westbound_producer_e'(westbound_sel)),
     .mem0_payload(westbound_row_t'(mem0_stream_out)),
     .mem1_payload(westbound_row_t'(mem1_stream_out)),
     .mem0_valid(mem0_valid),
@@ -332,7 +332,7 @@ westbound_bus u_westbound_bus(
 );
 
 westbound_consumer_decode u_westbound_consumer_decode(
-    .consumer_sel(westbound_consumer_sel_t),
+    .consumer_sel(westbound_consumer_e'(westbound_consumer_sel)),
     .westbound_valid(westbound_valid),
     .mxm_west_en(mxm_west_en),
     .sxm_west_en(sxm_west_en),
@@ -378,7 +378,7 @@ mxm_eastbound_adapter #(
 );
 
 eastbound_bus u_eastbound_bus(
-    .producer_sel(eastbound_sel_t),
+    .producer_sel(eastbound_producer_e'(eastbound_sel)),
     .mxm_payload_e(mxm_payload_e),
     .mxm_valid_e(mxm_valid_e),
     .vxm_payload_e(vxm_payload_e_bus),
@@ -397,7 +397,7 @@ logic vxm_east_en;
 logic mem1_east_en;
 
 eastbound_consumer_decode u_eastbound_consumer_decode(
-    .consumer_sel(eastbound_consumer_sel_t),
+    .consumer_sel(eastbound_consumer_e'(eastbound_consumer_sel)),
     .eastbound_valid(eastbound_valid),
     .sxm_east_en(sxm_east_en),
     .mem0_east_en(mem0_east_en),

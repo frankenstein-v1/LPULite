@@ -36,38 +36,20 @@ module mem #(
     // The actual SRAM vault. Width defaults to one fixed8 memory row.
     logic [DATA_W-1:0] sram_array [0:DEPTH-1];
 
-    // Sequential logic: Everything happens strictly on the clock edge
-    always_ff @(posedge clk or negedge rst_n) begin
-        if (!rst_n) begin
-            // On reset, we clear the outgoing stream.
-            stream_out   <= '0;
-            ext_data_out <= '0;
-            // External writes remain available while reset is asserted.
-            if (ext_write_en) sram_array[ext_addr] <= ext_data_in;
-        end else begin
-            
-            // Synchronous Write: Open the SRAM vault and catch incoming data
-            if (write_en) begin
-                sram_array[addr] <= stream_in;
-            end else if (ext_write_en) begin
-                sram_array[ext_addr] <= ext_data_in;
-            end
+    // Sequential logic: True dual-port M10K Block RAM inference
+    always_ff @(posedge clk) begin
+        if (write_en) begin
+            sram_array[addr] <= stream_in;
+        end else if (ext_write_en) begin
+            sram_array[ext_addr] <= ext_data_in;
+        end
 
-            // Synchronous Read: Grab data from SRAM and push it onto the stream
-            if (read_en) begin
-                stream_out <= sram_array[addr];
-            end else begin
-                // Push bubbles (all zeros) onto the stream if we aren't reading
-                stream_out <= '0; 
-            end
+        if (read_en) begin
+            stream_out <= sram_array[addr];
+        end
 
-            // Synchronous External Read: Grab data for the JTAG host readout
-            if (ext_read_en) begin
-                ext_data_out <= sram_array[ext_addr];
-            end else begin
-                ext_data_out <= '0;
-            end
-            
+        if (ext_read_en) begin
+            ext_data_out <= sram_array[ext_addr];
         end
     end
 

@@ -170,9 +170,9 @@ typedef enum logic [1:0] {
 } quant_mode_e;
 
 // Expanded scratch/KV-cache storage for model work.
-// Each memory has 32768 rows. At the current 72-bit mem_row_t width,
-// that is 288 KiB per memory, or 576 KiB across mem0 + mem1.
-localparam int MEM_DEPTH  = 32768;
+// Each memory has 16384 rows. At the current 72-bit mem_row_t width,
+// that is 144 KiB per memory, or 288 KiB across mem0 + mem1 (fits cleanly on Cyclone V DE1-SoC).
+localparam int MEM_DEPTH  = 16384;
 localparam int MEM_ADDR_W = $clog2(MEM_DEPTH);
 
 // Current TinyLPU GQA decode cache map.

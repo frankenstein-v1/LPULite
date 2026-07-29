@@ -65,13 +65,7 @@ module icu #(
     // A simple register that tracks what line of code we are on.
     logic [31:0] pc;
 
-    always_ff @(posedge clk) begin
-        if (ext_imem_en && ext_imem_write) begin
-            imem_array[ext_imem_addr] <= ext_imem_wdata;
-        end
-    end
-
-    assign ext_imem_rdata = imem_array[ext_imem_addr];
+    logic [95:0] current_instruction;
 
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
@@ -85,10 +79,13 @@ module icu #(
         end
     end
 
-    // 3. THE SLICER (The Dispatcher)
-    // We grab the current 96-bit word sitting at the current PC address.
-    logic [95:0] current_instruction;
-    assign current_instruction = imem_array[pc];
+    always_ff @(posedge clk) begin
+        if (ext_imem_en && ext_imem_write) begin
+            imem_array[ext_imem_addr] <= ext_imem_wdata;
+        end
+        ext_imem_rdata <= imem_array[ext_imem_addr];
+        current_instruction <= imem_array[pc];
+    end
 
     // bus control
     assign westbound_sel          = current_instruction[2:0];

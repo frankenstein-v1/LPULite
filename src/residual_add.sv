@@ -20,7 +20,7 @@ module residual_add #(
     input  logic                    start_i,
     input  logic [2:0]              op_i,
     input  logic [LANES*LANE_W-1:0] row_i,
-    input  logic signed [SCALE_W-1:0] scale_i = '0,
+    input  logic signed [SCALE_W-1:0] scale_i,
 
     output logic                    ready_o,
     output logic                    busy_o,
@@ -54,7 +54,8 @@ module residual_add #(
     localparam logic signed [LANE_W-1:0] MIN_INT = {1'b1, {(LANE_W-1){1'b0}}};
 
     generate
-        for (genvar lane = 0; lane < LANES; lane++) begin : g_residual_lanes
+        genvar lane;
+        for (lane = 0; lane < LANES; lane++) begin : g_residual_lanes
             logic signed [LANE_W-1:0] acc_lane;
             logic signed [LANE_W-1:0] row_lane;
             logic signed [LANE_W:0]   sum_ext;

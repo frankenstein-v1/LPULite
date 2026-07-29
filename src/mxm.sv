@@ -189,7 +189,7 @@ always @* begin
     end 
 end 
 
-always_ff @(posedge clk or posedge rst) begin
+always_ff @(posedge clk) begin
     if (rst || mxm_clear) begin
         for (int idx = 0; idx < mxm_size; idx++) begin
             mxm_wght_reg[idx] <= '0;
