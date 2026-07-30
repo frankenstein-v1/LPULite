@@ -12,5 +12,7 @@ results.xml
 *.json
 .DS_Store
 .pytest_cache/
+*.exe
+lpu_driver
 .vscode
 .agents

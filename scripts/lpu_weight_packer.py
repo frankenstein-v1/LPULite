@@ -24,17 +24,30 @@ def prepare_mem1_weights(weights: dict, config: dict) -> dict[int, list[int]]:
     """Convert PyTorch float / INT8 weights into FPGA MEM1 word rows mapped by row address."""
     mem1_map = {}
 
+    def get_tensor_row(key, row_idx):
+        val = weights.get(key)
+        if val is None: return [0] * 64
+        if hasattr(val, 'tolist'): val = val.tolist()
+        if row_idx < len(val):
+            r = val[row_idx]
+            if hasattr(r, 'tolist'): r = r.tolist()
+            return [int(round(x * 127.0)) if isinstance(x, (float, int)) else 0 for x in r]
+        return [0] * 64
+
     # 1. Query Head vector initialization (MEM1[0..7])
-    q_proj = weights.get("blocks.0.attn.q_proj.weight", [])
-    for k in range(min(8, len(q_proj))):
-        col_vals = [int(round(q_proj[row][k] * 127.0)) if isinstance(q_proj[row], list) else 0 for row in range(min(8, len(q_proj)))]
+    for k in range(8):
+        col_vals = []
+        for r in range(8):
+            row_data = get_tensor_row("blocks.0.attn.q_proj.weight", r)
+            col_vals.append(row_data[k] if k < len(row_data) else 0)
         mem1_map[k] = pack_int8_row_to_words(col_vals)
 
-    # 2. Complete LM Head Weight Matrix (MEM1[30..157] for all 128 vocabulary tokens)
-    lm_head = weights.get("lm_head.weight", [])
-    vocab_size = len(lm_head) if lm_head else 128
+    # 2. LM Head Weight Matrix (MEM1[30..541] for up to 512 vocabulary tokens)
+    lm_head = weights.get("lm_head.weight")
+    vocab_size = len(lm_head) if lm_head is not None else 512
+
     for tok_idx in range(vocab_size):
-        row_vals = [int(round(lm_head[tok_idx][d] * 127.0)) if d < len(lm_head[tok_idx]) else 0 for d in range(min(8, len(lm_head[tok_idx])))]
+        row_vals = get_tensor_row("lm_head.weight", tok_idx)[:64]
         mem1_map[30 + tok_idx] = pack_int8_row_to_words(row_vals)
 
     return mem1_map
