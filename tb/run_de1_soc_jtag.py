@@ -366,12 +366,45 @@ def main():
     print("      DE1-SOC FPGA HARDWARE LPU RUNNER (REAL JTAG TRANSACTIONS)        ", flush=True)
     print("========================================================================", flush=True)
 
-    with open(WEIGHTS_PATH, "r", encoding="utf-8") as f:
-        export = json.load(f)
-    config = export["config"]
-    vocab = export["vocab"]
-    weights = export["weights"]
-    tokenizer = StoriesTokenizer(VOCAB_PATH)
+    pt_path = ROOT_DIR / "model" / "stories288k" / "stories288k_model.pt"
+    if pt_path.is_file():
+        import torch
+        ckpt = torch.load(pt_path, map_location="cpu")
+        weights = ckpt["model_state_dict"] if "model_state_dict" in ckpt else ckpt
+        config = ckpt.get("config", {"vocab_size": 512, "dim": 64})
+        vocab_raw = ckpt.get("vocab", {})
+        if isinstance(vocab_raw, dict):
+            vocab = {v if not isinstance(v, dict) else k: k if not isinstance(v, dict) else v.get("id", i) for i, (k, v) in enumerate(vocab_raw.items())}
+        else:
+            vocab = {tok: i for i, tok in enumerate(vocab_raw)}
+    else:
+        with open(WEIGHTS_PATH, "r", encoding="utf-8") as f:
+            export = json.load(f)
+        config = export["config"]
+        vocab = export["vocab"]
+        weights = export["weights"]
+
+    class BPETokenizer:
+        def __init__(self, vocab_map):
+            self.vocab = vocab_map
+            self.id_to_token = {v: k for k, v in self.vocab.items()}
+        def encode(self, text, bos=True):
+            ids = [1] if bos else []
+            for word in text.lower().strip().split():
+                ids.append(self.vocab.get(word, 2))
+            return ids
+        def decode(self, ids):
+            words = []
+            for i in ids:
+                t = self.id_to_token.get(i, "")
+                if t in ["<bos>", "<pad>", "<unk>", "<eos>", "<s>", "</s>"]: continue
+                if t.startswith("<0x"):
+                    try: words.append(chr(int(t[4:6], 16)))
+                    except: pass
+                else: words.append(t)
+            return " ".join(words)
+
+    tokenizer = BPETokenizer(vocab)
     eos_id = vocab.get("<eos>", 3)
 
     try:

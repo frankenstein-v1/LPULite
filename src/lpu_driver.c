@@ -260,9 +260,11 @@ void lpu_generate_story(lpu_hardware_t *lpu, const char *prompt_text, uint32_t m
     printf("REAL DE1-SOC C HARDWARE OUTPUT (%.2f ms):\n  ", elapsed_ms);
     for (size_t i = 0; i < token_count; i++) {
         const char *w = g_vocab_words[tokens[i]];
-        if (strcmp(w, "<bos>") == 0 || strcmp(w, "<pad>") == 0 || strcmp(w, "<unk>") == 0) continue;
-        if (strcmp(w, ".") == 0 || strcmp(w, ",") == 0) {
-            printf("%s ", w);
+        if (strcmp(w, "<bos>") == 0 || strcmp(w, "<pad>") == 0 || strcmp(w, "<unk>") == 0 || strstr(w, "<s>") != NULL || strstr(w, "</s>") != NULL) continue;
+        
+        unsigned int byte_val;
+        if (sscanf(w, "<0x%X>", &byte_val) == 1) {
+            printf("%c", (char)byte_val);
         } else {
             printf("%s ", w);
         }

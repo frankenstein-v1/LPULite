@@ -131,8 +131,9 @@ def compile_stories10k_vliw_program() -> list[int]:
     for _ in range(8):
         program.append(build_instruction(eastbound_sel=EB_VXM, eastbound_consumer_sel=EC_MEM1, mem1_write_en=1, mem1_addr=10))
 
-    # Phase 3: Complete LM Head Projection across all 128 vocabulary tokens
-    for chunk in range(16):
+    # Phase 3: Complete LM Head Projection across all 512 vocabulary tokens
+    vocab_chunks = 64 # 64 superlanes x 8 = 512 tokens
+    for chunk in range(vocab_chunks):
         program.append(build_instruction(mxm_clear=1))
         for k in range(8):
             tok_idx = chunk * 8 + k

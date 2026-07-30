@@ -46,14 +46,25 @@ def export_vliw_header(vliw_program: list[int], out_file: Path):
 
 def export_weights_header(weights: dict, vocab: dict, out_file: Path):
     """Export packed MEM1 weights and token embedding lookup arrays to include/lpu_weights.h."""
-    token_emb = weights.get("token_emb.weight", [])
+    token_emb = weights.get("token_emb.weight")
+    if hasattr(token_emb, "tolist"): token_emb = token_emb.tolist()
+    if token_emb is None: token_emb = []
+
     mem1_weights = prepare_mem1_weights(weights, {})
 
-    vocab_size = len(token_emb)
-    embed_dim = len(token_emb[0]) if token_emb else 64
+    vocab_size = len(token_emb) if token_emb else 512
+    embed_dim = len(token_emb[0]) if token_emb and len(token_emb) > 0 else 64
 
     # Build vocab mapping tables
-    id_to_word = {v: k for k, v in vocab.items()}
+    id_to_word = {}
+    if isinstance(vocab, dict):
+        for k, v in vocab.items():
+            if isinstance(v, dict):
+                id_to_word[v.get("id", 0)] = k
+            elif isinstance(v, int):
+                id_to_word[v] = k
+            else:
+                id_to_word[k] = v
 
     lines = [
         "/* Auto-generated TinyLPU Model Weights & Vocabulary Header */",
@@ -64,13 +75,13 @@ def export_weights_header(weights: dict, vocab: dict, out_file: Path):
         "",
         f"#define LPU_VOCAB_SIZE {vocab_size}",
         f"#define LPU_EMBED_DIM  {embed_dim}",
-        f"#define LPU_MEM1_ROWS  160",
+        f"#define LPU_MEM1_ROWS  600",
         "",
-        "/* Packed MEM1 Weights (Row Address 0..159, 3 x 32-bit words per 96-bit row) */",
+        "/* Packed MEM1 Weights (Row Address 0..599, 3 x 32-bit words per 96-bit row) */",
         "static const uint32_t g_mem1_weights[LPU_MEM1_ROWS][3] = {"
     ]
 
-    for row in range(160):
+    for row in range(600):
         words = mem1_weights.get(row, [0, 0, 0])
         w0 = words[0] if len(words) > 0 else 0
         w1 = words[1] if len(words) > 1 else 0
@@ -79,10 +90,12 @@ def export_weights_header(weights: dict, vocab: dict, out_file: Path):
     lines.append("};")
     lines.append("")
 
-    lines.append("/* Quantized INT8 Token Embeddings Array [128][64] */")
+    lines.append("/* Quantized INT8 Token Embeddings Array [512][64] */")
     lines.append("static const int8_t g_token_embeddings[LPU_VOCAB_SIZE][LPU_EMBED_DIM] = {")
     for tok_id in range(vocab_size):
-        row_vals = [max(-128, min(127, int(round(token_emb[tok_id][d] * 127.0)))) if tok_id < len(token_emb) and d < len(token_emb[tok_id]) else 0 for d in range(embed_dim)]
+        row_vec = token_emb[tok_id] if tok_id < len(token_emb) else [0] * embed_dim
+        if hasattr(row_vec, "tolist"): row_vec = row_vec.tolist()
+        row_vals = [max(-128, min(127, int(round(row_vec[d] * 127.0)))) if d < len(row_vec) else 0 for d in range(embed_dim)]
         str_vals = ", ".join(f"{v:4d}" for v in row_vals)
         lines.append(f"    /* Token {tok_id:3d} */ {{ {str_vals} }},")
     lines.append("};")
@@ -91,8 +104,8 @@ def export_weights_header(weights: dict, vocab: dict, out_file: Path):
     lines.append("/* Vocabulary ID to Token String Mapping */")
     lines.append("static const char *g_vocab_words[LPU_VOCAB_SIZE] = {")
     for tok_id in range(vocab_size):
-        word = id_to_word.get(tok_id, "<unk>")
-        escaped_word = word.replace('"', '\\"')
+        word = id_to_word.get(tok_id, f"<token_{tok_id}>")
+        escaped_word = word.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n").replace("\r", "\\r")
         lines.append(f'    "{escaped_word}",')
     lines.append("};")
     lines.append("")
@@ -103,12 +116,23 @@ def export_weights_header(weights: dict, vocab: dict, out_file: Path):
 
 def main():
     INCLUDE_DIR.mkdir(parents=True, exist_ok=True)
-    with open(WEIGHTS_PATH, "r", encoding="utf-8") as f:
-        export = json.load(f)
-    weights = export["weights"]
-
-    with open(VOCAB_PATH, "r", encoding="utf-8") as f:
-        vocab = json.load(f)
+    pt_path = ROOT_DIR / "model" / "stories288k" / "stories288k_model.pt"
+    
+    if pt_path.is_file():
+        import torch
+        ckpt = torch.load(pt_path, map_location="cpu")
+        weights = ckpt["model_state_dict"] if "model_state_dict" in ckpt else ckpt
+        vocab_raw = ckpt.get("vocab", {})
+        if isinstance(vocab_raw, dict):
+            vocab = {v if not isinstance(v, dict) else k: k if not isinstance(v, dict) else v.get("id", i) for i, (k, v) in enumerate(vocab_raw.items())}
+        else:
+            vocab = {tok: i for i, tok in enumerate(vocab_raw)}
+    else:
+        with open(WEIGHTS_PATH, "r", encoding="utf-8") as f:
+            export = json.load(f)
+        weights = export["weights"]
+        with open(VOCAB_PATH, "r", encoding="utf-8") as f:
+            vocab = json.load(f)
 
     vliw_prog = compile_stories10k_vliw_program()
     export_vliw_header(vliw_prog, INCLUDE_DIR / "lpu_vliw.h")
