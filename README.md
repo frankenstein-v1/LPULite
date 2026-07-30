@@ -1,86 +1,46 @@
-# TinyLPU Verilog Workspace
+# TinyLPU
 
-This project is set up as a minimal Language Processing Unit (LPU) Verilog workspace with a local toolchain and helper scripts.
+TinyLPU is an 8-lane language-processing accelerator built around an 8×8
+matrix engine, vector post-processing pipeline, banked memories, and a 96-bit
+VLIW control path.
 
-## Included
+## Repository layout
 
-- `Makefile` targets for:
-  - `make sim` – compile + run the default testbench with iverilog
-  - `make wave` – compile and run simulation with VCD output
-  - `make lint` – run Verilator linting
-  - `make synth` – run Yosys synthesis sanity check
-  - `make clean` – remove build artifacts
-- `scripts/setup-verilog-toolchain.sh` – install required tools
-- `src/lpu_top.sv` – minimal LPU datapath module
-- `tb/lpu_top_tb.sv` – starter testbench
-- `src/half_adder.sv` – sample 1-bit half-adder module
-- `tb/half_adder_tb.sv` – half-adder testbench with optional waveform dump
+| Path | Purpose |
+| --- | --- |
+| `src/` | Core synthesizable SystemVerilog |
+| `tb/` | Core RTL testbench |
+| `model/` | Training, datasets, checkpoints, inference, and model exporters |
+| `synthesis/` | Quartus/DE1-SoC project, wrappers, drivers, and FPGA tests |
+| `asic/` | SKY130/OpenLane experiments and GDS3D visualizations |
+| `archive/` | Historical implementations and legacy tests |
+| `misc/` | General utilities and retained miscellaneous artifacts |
 
-## Prerequisites
+Each major directory has its own README with focused commands and details.
 
-- `iverilog`
-- `verilator`
-- `yosys`
-- `gtkwave` (optional for waveform viewing)
-
-## Toolchain install
+## Quick checks
 
 ```bash
-./scripts/setup-verilog-toolchain.sh
+make asic-audit
+python -m pytest model/tests/test_tokenizer.py model/tests/test_lm_shift.py
 ```
 
-### macOS (Homebrew)
+Generate or train the reference model:
 
 ```bash
-brew install icarus-verilog verilator yosys gtkwave
+python model/scripts/generate_tiny_lm_dataset.py
+python model/scripts/train_tiny_lm.py
+python model/scripts/generate.py
 ```
 
-If `gtkwave` on macOS is blocked or shows the "not compatible with macOS 14+" message, use a local build:
+Build the DE1-SoC project:
 
 ```bash
-# build gtkwave from source into ~/opt/gtkwave
-git clone --depth 1 https://github.com/gtkwave/gtkwave.git /tmp/gtkwave-src
-cd /tmp/gtkwave-src
-brew install meson ninja gtk+3 gtk-mac-integration gobject-introspection shared-mime-info desktop-file-utils gtk4 json-glib
-meson setup build --prefix=$HOME/opt/gtkwave
-meson compile -C build
-meson install -C build
+python synthesis/scripts/build_de1_soc.py
 ```
 
-### Ubuntu/Debian
+Generate the logic-level GDS3D showcase:
 
 ```bash
-sudo apt-get update
-sudo apt-get install -y iverilog verilator yosys gtkwave
-```
-
-### Fedora/Rocky/Alma (dnf)
-
-```bash
-sudo dnf install -y iverilog verilator yosys gtkwave
-```
-
-## Quick start
-
-```bash
-# Build and run the default testbench
-make sim
-
-# Generate a waveform for half_adder
-make wave TOP=half_adder
-# open waveform (fixes missing Switch.pm if installed in ~/perl5 and auto-loads signals)
-./scripts/open-wave.sh build/half_adder.vcd
-
-# or manually
-open build/half_adder.vcd  # macOS
-~/opt/gtkwave/bin/gtkwave build/half_adder.vcd
-
-# If macOS blocks GTKWave as unverified software
-xattr -dr com.apple.quarantine /Applications/gtkwave.app
-
-# Run Verilator lint
-make lint TOP=half_adder
-
-# Run a synthesis check
-make synth TOP=half_adder
+klayout -b -r asic/make_logic_showcase_gds.py
 ```

@@ -56,35 +56,52 @@ module icu #(
     output logic [2:0] vxm_residual_op
 );
 
-    // 1. THE INSTRUCTION MEMORY (IMEM)
-    // This is the physical SRAM vault holding your compiled software.
-    // It is 96 bits wide and has INSTRUCTION_COUNT rows.
+`ifndef TINYLPU_USE_SKY130_SRAM
+    // Behavioral instruction memory used by simulation and FPGA builds.
     logic [95:0] imem_array [0:INSTRUCTION_COUNT-1];
+`endif
 
     // 2. THE PROGRAM COUNTER (PC)
     // A simple register that tracks what line of code we are on.
     logic [31:0] pc;
-
     logic [95:0] current_instruction;
 
-    always_ff @(posedge clk or negedge rst_n) begin
-        if (!rst_n) begin
-            pc <= 32'd0; // Reset back to line 0
-        end else if (pc_load_en) begin
-            pc <= pc_load_value;
-        end else if (run_en) begin
-            pc <= pc + 1;
-        end else begin
-            pc <= pc;
-        end
-    end
-
+`ifdef TINYLPU_USE_SKY130_SRAM
+    tinylpu_sram_banked #(
+        .DATA_W(96)
+    ) u_imem_sram (
+        .clk,
+        .rw_en(ext_imem_en),
+        .write_en(ext_imem_write),
+        .rw_addr(ext_imem_addr),
+        .write_data(ext_imem_wdata),
+        .rw_data(ext_imem_rdata),
+        .read2_en(run_en || pc_load_en),
+        .read2_addr(pc[9:0]),
+        .read2_data(current_instruction)
+    );
+`else
     always_ff @(posedge clk) begin
         if (ext_imem_en && ext_imem_write) begin
             imem_array[ext_imem_addr] <= ext_imem_wdata;
         end
-        ext_imem_rdata <= imem_array[ext_imem_addr];
-        current_instruction <= imem_array[pc];
+    end
+
+    assign ext_imem_rdata = imem_array[ext_imem_addr];
+
+    // 3. THE SLICER (The Dispatcher)
+    // We grab the current 96-bit word sitting at the current PC address.
+    assign current_instruction = imem_array[pc];
+`endif
+
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            pc <= 32'd0;
+        end else if (pc_load_en) begin
+            pc <= pc_load_value;
+        end else if (run_en) begin
+            pc <= pc + 1;
+        end
     end
 
     // bus control

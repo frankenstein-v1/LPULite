@@ -26,7 +26,7 @@ module eastbound_bus (
     output eastbound_row_t      eastbound_payload,
     output logic                 eastbound_valid
 );
-    localparam int PAYLOAD_E = $bits(eastbound_row_t);
+    localparam int PAYLOAD_E = 264;
 
     logic [4:0][PAYLOAD_E-1:0] producer_payloads;
     logic [4:0]                producer_valids;
@@ -48,7 +48,7 @@ module eastbound_bus (
     shared_bus_mux #(
         .PAYLOAD_W(PAYLOAD_E),
         .N_SOURCES(5),
-        .SEL_W($bits(eastbound_producer_e))
+        .SEL_W(3)
     ) u_shared_bus_mux (
         .select_i(producer_sel),
         .payload_i(producer_payloads),

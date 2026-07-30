@@ -189,8 +189,14 @@ always @* begin
     end 
 end 
 
-always_ff @(posedge clk) begin
-    if (rst || mxm_clear) begin
+always_ff @(posedge clk or posedge rst) begin
+    if (rst) begin
+        for (int idx = 0; idx < mxm_size; idx++) begin
+            mxm_wght_reg[idx] <= '0;
+        end
+        mxm_wght_scale_reg <= '0;
+        mxm_mac_en_feed <= '0;
+    end else if (mxm_clear) begin
         for (int idx = 0; idx < mxm_size; idx++) begin
             mxm_wght_reg[idx] <= '0;
         end

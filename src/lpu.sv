@@ -3,7 +3,8 @@
 
 module lpu #(
     parameter int RMSNORM_CHUNKS = 8,
-    parameter int SOFTMAX_CHUNKS = 16
+    parameter int SOFTMAX_CHUNKS = 16,
+    parameter int DATA_MEM_DEPTH = MEM_DEPTH
 ) (
     input  logic        clk,
     input  logic        rst_n,
@@ -220,7 +221,7 @@ always @* begin
     mem0_stream_in = '0;
 
     if (ext_mem0_write) begin
-        mem0_stream_in = ext_wdata[$bits(mem_row_t)-1:0];
+        mem0_stream_in = ext_wdata[71:0];
     end
     else if (mem0_write_from_west) begin
         if (westbound_sel_t == WB_VXM)
@@ -233,7 +234,8 @@ always @* begin
 end
 
 mem #(
-    .DATA_W($bits(mem_row_t))
+    .DATA_W(72),
+    .DEPTH(DATA_MEM_DEPTH)
 ) u_mem0(
     .clk(clk),
     .rst_n(rst_n),
@@ -245,7 +247,7 @@ mem #(
     .ext_write_en(1'b0),
     .ext_read_en(1'b0),
     .ext_addr({MEM_ADDR_W{1'b0}}),
-    .ext_data_in({$bits(mem_row_t){1'b0}}),
+    .ext_data_in(72'b0),
     .ext_data_out()
 );
 
@@ -263,11 +265,12 @@ assign westbound_sel_t = westbound_sel;
 assign eastbound_sel_t = eastbound_sel;
 
 mem #(
-    .DATA_W($bits(mem_row_t))
+    .DATA_W(72),
+    .DEPTH(DATA_MEM_DEPTH)
 ) u_mem1(
     .clk(clk),
     .rst_n(rst_n),
-    .row_in(ext_mem1_write ? ext_wdata[$bits(mem_row_t)-1:0] : truncate_eastbound_to_mem_row(eastbound_payload)),
+    .row_in(ext_mem1_write ? ext_wdata[71:0] : truncate_eastbound_to_mem_row(eastbound_payload)),
     .row_out(mem1_stream_out),
     .read_en(mem1_read_en_eff),
     .write_en(mem1_write_en_eff),
@@ -275,7 +278,7 @@ mem #(
     .ext_write_en(1'b0),
     .ext_read_en(1'b0),
     .ext_addr({MEM_ADDR_W{1'b0}}),
-    .ext_data_in({$bits(mem_row_t){1'b0}}),
+    .ext_data_in(72'b0),
     .ext_data_out()
 );
 
@@ -283,10 +286,10 @@ always_comb begin
     ext_rdata = '0;
     unique case (ext_target)
         EXT_TARGET_MEM0: begin
-            ext_rdata[$bits(mem_row_t)-1:0] = mem0_stream_out;
+            ext_rdata[71:0] = mem0_stream_out;
         end
         EXT_TARGET_MEM1: begin
-            ext_rdata[$bits(mem_row_t)-1:0] = mem1_stream_out;
+            ext_rdata[71:0] = mem1_stream_out;
         end
         EXT_TARGET_IMEM: begin
             ext_rdata = ext_imem_rdata;
@@ -347,7 +350,7 @@ eastbound_row_t sxm_payload_e_bus;
 eastbound_row_t mem0_payload_e_bus;
 mxm_row_t mem0_dequant_payload_e_bus;
 
-assign eastbound_payload_lane0 = eastbound_payload[$bits(superlane_t)-1:0];
+assign eastbound_payload_lane0 = eastbound_payload[63:0];
 
 always @* begin
     vxm_payload_e_bus = '0;
@@ -502,7 +505,7 @@ always @* begin
     if (vxm_load_operand_east) begin
         vxm_operand_payload = eastbound_row_data(eastbound_payload);
     end else if (vxm_load_operand_west) begin
-        vxm_operand_payload[$bits(superlane_t)-1:0] = westbound_row_data(westbound_payload);
+        vxm_operand_payload[63:0] = westbound_row_data(westbound_payload);
     end
 end
 
@@ -526,7 +529,7 @@ assign vxm_out_ready = !vxm_result_full;
 assign vxm_result_wr_en = vxm_out_valid_live && vxm_out_ready;
 
 row_fifo #(
-    .DATA_W($bits(mxm_row_t)),
+    .DATA_W(256),
     .DEPTH(4)
 ) u_vxm_input_fifo (
     .clk(clk),
@@ -568,10 +571,10 @@ always_ff @(posedge clk or negedge rst_n) begin
                     vxm_scale_factor_reg <= vxm_operand_payload[31:0];
                 end
                 VXM_OPERAND_ROPE_COS: begin
-                    vxm_rope_cos_q1_7_reg <= vxm_operand_payload[$bits(superlane_t)-1:0];
+                    vxm_rope_cos_q1_7_reg <= vxm_operand_payload[63:0];
                 end
                 VXM_OPERAND_ROPE_SIN: begin
-                    vxm_rope_sin_q1_7_reg <= vxm_operand_payload[$bits(superlane_t)-1:0];
+                    vxm_rope_sin_q1_7_reg <= vxm_operand_payload[63:0];
                 end
                 default: begin
                     // Data operands are queued by u_vxm_input_fifo above.
@@ -582,7 +585,7 @@ always_ff @(posedge clk or negedge rst_n) begin
 end
 
 row_fifo #(
-    .DATA_W($bits(fixed8_row_data_t)),
+    .DATA_W(64),
     .DEPTH(4)
 ) u_vxm_output_fifo (
     .clk(clk),

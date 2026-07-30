@@ -25,7 +25,7 @@ module westbound_bus (
     output westbound_row_t       westbound_payload,
     output logic                 westbound_valid
 );
-    localparam int PAYLOAD_W = $bits(westbound_row_t);
+    localparam int PAYLOAD_W = 72;
 
     logic [4:0][PAYLOAD_W-1:0] producer_payloads;
     logic [4:0]                 producer_valids;
@@ -47,7 +47,7 @@ module westbound_bus (
     shared_bus_mux #(
         .PAYLOAD_W(PAYLOAD_W),
         .N_SOURCES(5),
-        .SEL_W($bits(westbound_producer_e))
+        .SEL_W(3)
     ) u_shared_bus_mux (
         .select_i(producer_sel),
         .payload_i(producer_payloads),
