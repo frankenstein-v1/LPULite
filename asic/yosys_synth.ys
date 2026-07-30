@@ -1,0 +1,38 @@
+read_verilog -sv -D TINYLPU_USE_SKY130_SRAM -I src \
+    src/lpu_pkg.sv \
+    asic/src/sky130_sram_blackbox.v \
+    asic/src/tinylpu_sram_banks.sv \
+    src/mac.sv \
+    src/acc.sv \
+    src/mxm.sv \
+    src/mem.sv \
+    src/mem_row_dequant.sv \
+    src/icu.sv \
+    src/sxm.sv \
+    src/vxm_rope.sv \
+    src/residual_add.sv \
+    src/rmsnorm.sv \
+    src/lut_rmsnorm.sv \
+    src/lut_softmax_exp.sv \
+    src/lut_softmax_div.sv \
+    src/softmax.sv \
+    src/quant.sv \
+    src/vxm.sv \
+    src/row_fifo.sv \
+    src/shared_bus_mux.sv \
+    src/westbound_bus/westbound_bus.sv \
+    src/westbound_bus/westbound_consumer_decode.sv \
+    src/eastbound_bus/eastbound_bus.sv \
+    src/eastbound_bus/eastbound_consumer_decode.sv \
+    src/eastbound_bus/mxm_eastbound_adapter.sv \
+    src/lpu.sv \
+    asic/src/tinylpu_asic_top.sv
+
+hierarchy -check -top tinylpu_asic_top
+flatten
+select -assert-count 30 t:sky130_sram_1kbyte_1rw1r_8x1024_8
+proc
+memory_dff
+memory_collect
+check
+stat

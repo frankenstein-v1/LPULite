@@ -7,7 +7,9 @@
 // the transposed tile to both bus directions.
 
 module sxm #(
-    parameter int LANES = $bits(superlane_t) / $bits(fixed8_lane_t)
+    // The architectural lane count is fixed at eight.  A literal default
+    // also keeps the module consumable by Yosys' SystemVerilog frontend.
+    parameter int LANES = 8
 ) (
     input  logic clk,
     input  logic rst_n,
@@ -46,7 +48,7 @@ module sxm #(
         input superlane_t       row_data
     );
         for (int lane = 0; lane < LANES; lane++) begin
-            transpose_rows[row_idx][lane] <= row_data[lane*$bits(fixed8_lane_t) +: $bits(fixed8_lane_t)];
+            transpose_rows[row_idx][lane] <= row_data[lane*8 +: 8];
         end
     endtask
 
@@ -106,7 +108,7 @@ module sxm #(
     always @* begin
         transpose_emit_row = '0;
         for (int lane = 0; lane < LANES; lane++) begin
-            transpose_emit_row[lane*$bits(fixed8_lane_t) +: $bits(fixed8_lane_t)] = transpose_rows[lane][current_emit_idx];
+            transpose_emit_row[lane*8 +: 8] = transpose_rows[lane][current_emit_idx];
         end
     end
 

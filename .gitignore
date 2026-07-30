@@ -1,5 +1,10 @@
 build/
+synthesis/build/
 sim_build/
+model/tests/sim_build*/
+model/**/__pycache__/
+synthesis/**/__pycache__/
+asic/runs/
 tb/sim_build*/
 tb/__pycache__/
 __pycache__/
