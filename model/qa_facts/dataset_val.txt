@@ -1,0 +1,2610 @@
+q: what is 12 plus 24 ? a: 36 .
+question: what is 5 minus 3 ? answer: 2 .
+question: what is 24 plus 23 ? answer: 47 .
+q: who painted the mona lisa ? a: leonardo da vinci .
+q: what is 15 times 8 ? a: 120 .
+question: what is 11 plus 13 ? answer: 24 .
+q: what is 21 plus 14 ? a: 35 .
+q: what is 15 times 6 ? a: 90 .
+q: what is 19 plus 11 ? a: 30 .
+question: what is 23 plus 16 ? answer: 39 .
+question: what is 13 minus 4 ? answer: 9 .
+q: what sound does a cat make ? a: meow .
+question: what is the capital of florida ? answer: tallahassee .
+q: what element has the chemical symbol ar ? a: argon .
+q: what is 20 plus 16 ? a: 36 .
+q: what is 4 times 9 ? a: 36 .
+question: what is 12 times 11 ? answer: 132 .
+q: what is 22 plus 23 ? a: 45 .
+q: what is 11 plus 8 ? a: 19 .
+question: what is 16 minus 11 ? answer: 5 .
+question: what is 9 times 13 ? answer: 117 .
+q: what is the chemical symbol for magnesium ? a: mg .
+q: what is 15 plus 23 ? a: 38 .
+question: what is 14 times 12 ? answer: 168 .
+question: what is the capital of texas ? answer: austin .
+q: what is 21 plus 16 ? a: 37 .
+question: what is 14 minus 4 ? answer: 10 .
+q: what black and white bear eats bamboo ? a: panda .
+q: what is 16 plus 5 ? a: 21 .
+question: what is 7 minus 7 ? answer: 0 .
+question: what is 16 plus 20 ? answer: 36 .
+question: what is 9 times 5 ? answer: 45 .
+q: what is 6 times 12 ? a: 72 .
+question: what is 14 times 14 ? answer: 196 .
+q: what is 7 times 1 ? a: 7 .
+question: what is 4 plus 19 ? answer: 23 .
+q: what is 19 plus 2 ? a: 21 .
+question: what is 19 plus 24 ? answer: 43 .
+q: what is 18 plus 15 ? a: 33 .
+question: what is the capital of thailand ? answer: bangkok .
+question: what is 11 plus 9 ? answer: 20 .
+question: what is 18 plus 7 ? answer: 25 .
+q: what is the capital of alabama ? a: montgomery .
+q: how many sides does a square have ? a: 4 sides .
+q: what is the chemical symbol for hydrogen ? a: h .
+q: what element has the chemical symbol fe ? a: iron .
+question: what is the capital of england ? answer: london .
+question: how many hours are in one day ? answer: 24 hours .
+question: what is 2 plus 15 ? answer: 17 .
+q: what is 3 plus 12 ? a: 15 .
+q: what is 10 plus 21 ? a: 31 .
+question: what is 1 plus 1 ? answer: 2 .
+q: what is 17 minus 3 ? a: 14 .
+question: what is 21 plus 25 ? answer: 46 .
+question: what is 10 times 9 ? answer: 90 .
+q: what is 11 plus 12 ? a: 23 .
+q: what is 13 minus 13 ? a: 0 .
+question: what is 9 plus 19 ? answer: 28 .
+question: what is 20 plus 21 ? answer: 41 .
+question: what animal says crow ? answer: rooster .
+question: what is 13 times 6 ? answer: 78 .
+question: what is 10 plus 11 ? answer: 21 .
+question: what is 21 plus 17 ? answer: 38 .
+question: what is 13 plus 10 ? answer: 23 .
+q: what is 20 minus 8 ? a: 12 .
+q: what is 11 plus 22 ? a: 33 .
+q: what is the capital of thailand ? a: bangkok .
+question: what animal says buzz ? answer: bee .
+q: what is 7 plus 10 ? a: 17 .
+question: what is 7 plus 21 ? answer: 28 .
+question: what is 11 minus 5 ? answer: 6 .
+q: what is 1 plus 20 ? a: 21 .
+q: what is 7 plus 13 ? a: 20 .
+question: what is 14 times 7 ? answer: 98 .
+question: what is 16 minus 12 ? answer: 4 .
+q: what is 12 plus 13 ? a: 25 .
+question: what is 8 minus 7 ? answer: 1 .
+q: what is 15 minus 3 ? a: 12 .
+q: what is 3 plus 16 ? a: 19 .
+q: what is 0 and 0 ? a: 0 .
+question: what is 3 plus 7 ? answer: 10 .
+question: what is the chemical symbol for silver ? answer: ag .
+q: what is 19 plus 17 ? a: 36 .
+question: what memory is inside fpga block ram ? answer: on chip sram .
+q: what is 25 plus 19 ? a: 44 .
+q: what is 7 plus 11 ? a: 18 .
+q: what is 24 plus 22 ? a: 46 .
+question: what is 17 plus 21 ? answer: 38 .
+q: what is 20 plus 6 ? a: 26 .
+q: what is the capital of china ? a: beijing .
+question: what is 16 plus 6 ? answer: 22 .
+question: what is 23 plus 10 ? answer: 33 .
+q: what is 22 plus 5 ? a: 27 .
+question: what is 3 times 11 ? answer: 33 .
+question: what is the capital of connecticut ? answer: hartford .
+question: what is 16 plus 16 ? answer: 32 .
+q: what is 9 minus 4 ? a: 5 .
+question: what is 2 times 9 ? answer: 18 .
+question: what is the chemical symbol for zinc ? answer: zn .
+q: what is 19 plus 4 ? a: 23 .
+q: what is 5 plus 21 ? a: 26 .
+question: what is 3 plus 23 ? answer: 26 .
+q: what is 10 minus 7 ? a: 3 .
+question: what is the capital of italy ? answer: rome .
+q: what is the capital of belgium ? a: brussels .
+question: what is 12 times 2 ? answer: 24 .
+q: what is the largest desert in the world ? a: antarctica .
+q: what is 13 times 15 ? a: 195 .
+question: what is 15 plus 13 ? answer: 28 .
+question: what is 17 plus 12 ? answer: 29 .
+question: what is 3 plus 4 ? answer: 7 .
+q: what is 15 minus 4 ? a: 11 .
+question: what is 9 minus 4 ? answer: 5 .
+q: what state of matter is steam ? a: gas .
+question: what is the capital of india ? answer: new delhi .
+q: what is 13 minus 12 ? a: 1 .
+question: who was the first president of the united states ? answer: george washington .
+question: what does dram stand for ? answer: dynamic random access memory .
+q: what is 8 plus 13 ? a: 21 .
+question: what is 5 times 14 ? answer: 70 .
+question: what is 16 plus 2 ? answer: 18 .
+q: what element has the chemical symbol ni ? a: nickel .
+q: what is 1 times 3 ? a: 3 .
+question: what sound does a owl make ? answer: hoot .
+q: what is 9 plus 24 ? a: 33 .
+q: what is 8 plus 2 ? a: 10 .
+q: what is 11 minus 9 ? a: 2 .
+q: what is 12 times 5 ? a: 60 .
+q: what is 12 plus 2 ? a: 14 .
+q: what is 18 minus 6 ? a: 12 .
+question: what is 6 plus 5 ? answer: 11 .
+question: what is 14 minus 6 ? answer: 8 .
+question: what is 20 plus 17 ? answer: 37 .
+question: what is 11 minus 2 ? answer: 9 .
+question: what is 14 plus 18 ? answer: 32 .
+q: what is 11 times 10 ? a: 110 .
+q: what is 11 plus 18 ? a: 29 .
+question: what is 7 plus 5 ? answer: 12 .
+q: what is 5 plus 16 ? a: 21 .
+question: what is 11 times 7 ? answer: 77 .
+question: what is 7 plus 20 ? answer: 27 .
+question: what is 22 plus 20 ? answer: 42 .
+question: what is 21 plus 7 ? answer: 28 .
+q: where is the burj khalifa located ? a: dubai in united arab emirates .
+question: what is the capital of egypt ? answer: cairo .
+q: what does fpga stand for ? a: field programmable gate array .
+q: what is 3 plus 4 ? a: 7 .
+q: what is 14 minus 9 ? a: 5 .
+q: what is 19 plus 8 ? a: 27 .
+question: what is 13 plus 23 ? answer: 36 .
+q: what is 23 plus 17 ? a: 40 .
+q: what is 22 plus 9 ? a: 31 .
+question: what animal says oink ? answer: pig .
+q: what is 13 minus 2 ? a: 11 .
+question: what is 2 plus 5 ? answer: 7 .
+q: what is 14 minus 13 ? a: 1 .
+question: what is 8 minus 6 ? answer: 2 .
+q: what animal says moo ? a: cow .
+q: what is 5 times 9 ? a: 45 .
+question: what organ pumps blood in human body ? answer: heart .
+q: what is 5 plus 24 ? a: 29 .
+question: what is 17 plus 16 ? answer: 33 .
+question: what is 18 plus 13 ? answer: 31 .
+q: what is 9 plus 16 ? a: 25 .
+q: what is the capital of italy ? a: rome .
+question: what is 19 minus 17 ? answer: 2 .
+q: what is 5 plus 17 ? a: 22 .
+q: what is 20 minus 6 ? a: 14 .
+question: how many seconds are in one minute ? answer: 60 seconds .
+q: what is 7 times 3 ? a: 21 .
+q: what is 1 plus 16 ? a: 17 .
+question: what is 12 times 3 ? answer: 36 .
+question: what architecture does lpu use ? answer: vliw and systolic mac lanes .
+q: what is 1 plus 22 ? a: 23 .
+question: what is 10 plus 1 ? answer: 11 .
+q: what is 15 plus 18 ? a: 33 .
+q: what does lpu stand for ? a: language processing unit .
+q: what is 11 plus 1 ? a: 12 .
+question: what is 6 plus 9 ? answer: 15 .
+q: what is the largest hot desert ? a: sahara desert .
+q: what is 9 times 6 ? a: 54 .
+q: what is 12 plus 7 ? a: 19 .
+q: what is 19 minus 9 ? a: 10 .
+question: what is 20 minus 11 ? answer: 9 .
+q: what is 14 plus 16 ? a: 30 .
+question: what is 12 times 6 ? answer: 72 .
+q: what is 6 plus 21 ? a: 27 .
+q: what is 4 plus 14 ? a: 18 .
+q: what is 6 plus 14 ? a: 20 .
+question: what is 14 plus 20 ? answer: 34 .
+question: what is 10 plus 14 ? answer: 24 .
+q: what is 12 plus 9 ? a: 21 .
+question: what is 2 times 1 ? answer: 2 .
+question: what is 14 plus 25 ? answer: 39 .
+question: what is 1 times 9 ? answer: 9 .
+question: what is 5 plus 7 ? answer: 12 .
+question: what is 7 plus 13 ? answer: 20 .
+question: what is the largest desert in the world ? answer: antarctica .
+q: what is the chemical symbol for nickel ? a: ni .
+q: what is 5 times 14 ? a: 70 .
+question: what is 11 plus 4 ? answer: 15 .
+q: what is 11 plus 21 ? a: 32 .
+question: what is 7 minus 1 ? answer: 6 .
+question: what is 24 plus 16 ? answer: 40 .
+question: what is 16 plus 18 ? answer: 34 .
+q: what is 24 plus 23 ? a: 47 .
+question: what is 16 minus 15 ? answer: 1 .
+q: what is 16 plus 7 ? a: 23 .
+question: what is 8 plus 3 ? answer: 11 .
+q: what is 12 plus 5 ? a: 17 .
+q: what is 6 plus 6 ? a: 12 .
+question: what is 14 times 5 ? answer: 70 .
+q: what is 5 plus 14 ? a: 19 .
+question: what is 10 plus 4 ? answer: 14 .
+question: what is the capital of indiana ? answer: indianapolis .
+q: what is 2 times 5 ? a: 10 .
+question: what is 17 plus 19 ? answer: 36 .
+q: what is 5 plus 7 ? a: 12 .
+question: what is the capital of georgia ? answer: atlanta .
+q: how many sides does a triangle have ? a: 3 sides .
+q: what is 7 plus 12 ? a: 19 .
+q: what is 11 minus 11 ? a: 0 .
+q: what is 3 minus 1 ? a: 2 .
+question: what is 17 minus 5 ? answer: 12 .
+question: what is the capital of washington ? answer: olympia .
+question: what is 5 times 9 ? answer: 45 .
+question: what is 8 plus 6 ? answer: 14 .
+q: what frequency does de1-soc clock run at ? a: 50 megahertz .
+q: what is 12 minus 9 ? a: 3 .
+q: what is 11 plus 14 ? a: 25 .
+question: what is 7 plus 25 ? answer: 32 .
+question: what is 16 plus 13 ? answer: 29 .
+q: what is 15 plus 14 ? a: 29 .
+q: what is 4 times 4 ? a: 16 .
+q: what is 10 plus 1 ? a: 11 .
+question: what is 12 plus 8 ? answer: 20 .
+question: what is 12 plus 9 ? answer: 21 .
+q: what is 14 times 5 ? a: 70 .
+q: what memory is inside fpga block ram ? a: on chip sram .
+question: what is 1 times 5 ? answer: 5 .
+q: what is 21 plus 7 ? a: 28 .
+q: what is 12 plus 10 ? a: 22 .
+question: what animal says croak ? answer: frog .
+q: what is 4 plus 8 ? a: 12 .
+q: what is 7 minus 5 ? a: 2 .
+q: what is 9 plus 14 ? a: 23 .
+q: what is 4 plus 21 ? a: 25 .
+question: what is 19 minus 3 ? answer: 16 .
+question: what is 11 times 12 ? answer: 132 .
+q: what is 14 minus 11 ? a: 3 .
+question: what is 16 plus 12 ? answer: 28 .
+question: what is 6 plus 2 ? answer: 8 .
+q: what is 14 times 12 ? a: 168 .
+question: what element has the chemical symbol pb ? answer: lead .
+question: what is the capital of california ? answer: sacramento .
+question: what is the capital of australia ? answer: canberra .
+q: what is 24 plus 4 ? a: 28 .
+q: what is 14 times 15 ? a: 210 .
+q: what is 13 times 12 ? a: 156 .
+question: what is 8 times 6 ? answer: 48 .
+q: what is 15 times 9 ? a: 135 .
+question: what black and white bear eats bamboo ? answer: panda .
+q: what is 10 plus 6 ? a: 16 .
+question: what is 8 plus 19 ? answer: 27 .
+question: what is 15 plus 7 ? answer: 22 .
+question: what is 10 plus 22 ? answer: 32 .
+q: what is 11 times 7 ? a: 77 .
+question: what is 19 plus 10 ? answer: 29 .
+question: what animal says quack ? answer: duck .
+q: what is 13 times 14 ? a: 182 .
+q: what animal has a long trunk ? a: elephant .
+question: what animal says baa ? answer: sheep .
+question: what is 5 plus 19 ? answer: 24 .
+question: what is 5 times 7 ? answer: 35 .
+q: what is 5 times 10 ? a: 50 .
+question: what is the largest hot desert ? answer: sahara desert .
+q: what is 7 times 11 ? a: 77 .
+q: what is 14 minus 2 ? a: 12 .
+question: what is 21 plus 1 ? answer: 22 .
+question: what is 10 minus 3 ? answer: 7 .
+q: what is 12 minus 6 ? a: 6 .
+question: what is 20 plus 20 ? answer: 40 .
+q: what is the capital of germany ? a: berlin .
+q: what is 18 minus 8 ? a: 10 .
+q: what is 12 minus 5 ? a: 7 .
+q: what is 14 plus 17 ? a: 31 .
+question: what is 5 plus 25 ? answer: 30 .
+q: what is 13 plus 19 ? a: 32 .
+q: what is 6 plus 12 ? a: 18 .
+q: what is 13 minus 7 ? a: 6 .
+question: what is 19 minus 15 ? answer: 4 .
+question: what is 18 plus 3 ? answer: 21 .
+question: what animal says meow ? answer: cat .
+q: what sound does a bee make ? a: buzz .
+question: what is 2 plus 2 ? answer: 4 .
+question: what is 4 plus 16 ? answer: 20 .
+question: what is 2 times 2 ? answer: 4 .
+q: what is 3 times 3 ? a: 9 .
+q: what is 5 times 4 ? a: 20 .
+question: what is 9 minus 8 ? answer: 1 .
+q: what is 19 minus 1 ? a: 18 .
+question: what is 17 minus 10 ? answer: 7 .
+question: what is 24 plus 20 ? answer: 44 .
+q: what is 10 times 9 ? a: 90 .
+q: what is 13 plus 8 ? a: 21 .
+q: what is 25 plus 14 ? a: 39 .
+question: what is 12 minus 9 ? answer: 3 .
+question: what is 4 times 1 ? answer: 4 .
+q: what is 21 plus 17 ? a: 38 .
+q: what is 7 minus 1 ? a: 6 .
+q: what process do plants use to make food from sunlight ? a: photosynthesis .
+q: what is 10 times 7 ? a: 70 .
+q: what is 17 plus 13 ? a: 30 .
+question: what is 11 plus 18 ? answer: 29 .
+q: what is 22 plus 18 ? a: 40 .
+q: what is 1 plus 4 ? a: 5 .
+q: what is 15 plus 24 ? a: 39 .
+q: what is 13 plus 20 ? a: 33 .
+question: what is 4 times 8 ? answer: 32 .
+question: what is 7 plus 9 ? answer: 16 .
+question: what is 23 plus 7 ? answer: 30 .
+q: what color is a ripe banana ? a: yellow .
+q: what is 10 minus 9 ? a: 1 .
+question: what element has the chemical symbol cl ? answer: chlorine .
+question: what is 0 and 0 ? answer: 0 .
+q: what is the chemical symbol for tin ? a: sn .
+question: what is 1 plus 3 ? answer: 4 .
+question: what is 15 plus 4 ? answer: 19 .
+question: what is 24 plus 25 ? answer: 49 .
+q: what is 8 times 1 ? a: 8 .
+q: what is 10 times 2 ? a: 20 .
+question: what animal says hoot ? answer: owl .
+question: what is 18 minus 13 ? answer: 5 .
+question: what is 25 plus 16 ? answer: 41 .
+question: what is 4 times 5 ? answer: 20 .
+question: what is 17 plus 7 ? answer: 24 .
+question: what is 19 plus 17 ? answer: 36 .
+question: what is 7 times 3 ? answer: 21 .
+question: what is 20 plus 1 ? answer: 21 .
+question: what is 9 plus 15 ? answer: 24 .
+q: what is 10 plus 10 ? a: 20 .
+q: what planet is eighth from the sun ? a: neptune .
+q: what is 16 minus 11 ? a: 5 .
+q: what is 16 plus 2 ? a: 18 .
+q: what is 9 plus 18 ? a: 27 .
+question: what is 19 plus 20 ? answer: 39 .
+question: what sound does a rooster make ? answer: crow .
+question: what is 18 plus 8 ? answer: 26 .
+question: what is 12 times 15 ? answer: 180 .
+q: what is 18 minus 18 ? a: 0 .
+question: what is the freezing point of water in celsius ? answer: 0 degrees .
+q: what is the chemical symbol for sulfur ? a: s .
+q: what is 2 plus 10 ? a: 12 .
+question: what is 3 plus 11 ? answer: 14 .
+q: what is 2 plus 18 ? a: 20 .
+q: what is the chemical symbol for calcium ? a: ca .
+q: what is 12 minus 1 ? a: 11 .
+question: what is 25 plus 6 ? answer: 31 .
+question: what is 18 minus 16 ? answer: 2 .
+question: what sound does a duck make ? answer: quack .
+question: what is 19 minus 16 ? answer: 3 .
+q: what is 4 times 1 ? a: 4 .
+q: what is 6 minus 1 ? a: 5 .
+q: what is 9 plus 15 ? a: 24 .
+question: what is 12 plus 2 ? answer: 14 .
+question: what is 1 plus 9 ? answer: 10 .
+q: what is 9 plus 20 ? a: 29 .
+q: what is 3 plus 22 ? a: 25 .
+question: what is 17 minus 13 ? answer: 4 .
+q: what is 11 times 12 ? a: 132 .
+question: what is 10 plus 2 ? answer: 12 .
+q: what is 17 minus 7 ? a: 10 .
+q: what is 16 minus 13 ? a: 3 .
+question: what planet is eighth from the sun ? answer: neptune .
+q: what is 4 plus 15 ? a: 19 .
+q: what is 10 times 15 ? a: 150 .
+q: what is the chemical symbol for boron ? a: b .
+q: what is 20 plus 4 ? a: 24 .
+question: what is the largest planet in our solar system ? answer: jupiter .
+question: what is 16 minus 16 ? answer: 0 .
+q: what is the capital of india ? a: new delhi .
+q: what is 23 plus 18 ? a: 41 .
+q: what is 16 minus 5 ? a: 11 .
+question: what is the capital of minnesota ? answer: saint paul .
+question: what is 15 plus 9 ? answer: 24 .
+q: what is 11 plus 24 ? a: 35 .
+question: what is 2 plus 10 ? answer: 12 .
+question: what is 11 minus 9 ? answer: 2 .
+question: what animal is known as king of the jungle ? answer: lion .
+question: what is the chemical symbol for magnesium ? answer: mg .
+q: what is 24 plus 25 ? a: 49 .
+q: what is 5 plus 2 ? a: 7 .
+question: what is 5 plus 23 ? answer: 28 .
+q: what is 17 minus 2 ? a: 15 .
+question: what is 25 plus 19 ? answer: 44 .
+question: what is 13 times 5 ? answer: 65 .
+question: what is 2 plus 7 ? answer: 9 .
+q: what is 2 plus 3 ? a: 5 .
+q: what is 15 plus 19 ? a: 34 .
+q: what is 23 plus 1 ? a: 24 .
+question: what is 7 minus 3 ? answer: 4 .
+q: what is 14 plus 10 ? a: 24 .
+q: what is 7 times 10 ? a: 70 .
+q: what is the capital of greece ? a: athens .
+q: what is 16 plus 25 ? a: 41 .
+q: what is 20 plus 14 ? a: 34 .
+question: what is 23 plus 19 ? answer: 42 .
+q: what is 17 minus 4 ? a: 13 .
+q: what is 16 plus 23 ? a: 39 .
+q: what is the capital of canada ? a: ottawa .
+question: what is 13 plus 9 ? answer: 22 .
+question: what is 15 plus 14 ? answer: 29 .
+question: what is 10 times 3 ? answer: 30 .
+q: what is 19 plus 1 ? a: 20 .
+q: what is 15 plus 22 ? a: 37 .
+q: what is 16 plus 17 ? a: 33 .
+question: what is 4 plus 11 ? answer: 15 .
+q: what is 14 minus 3 ? a: 11 .
+q: what is 25 plus 22 ? a: 47 .
+question: what state of matter is ice ? answer: solid .
+question: what is 6 plus 4 ? answer: 10 .
+question: what is 14 plus 23 ? answer: 37 .
+q: what is 10 plus 7 ? a: 17 .
+q: what is 7 plus 25 ? a: 32 .
+q: how many sides does an octagon have ? a: 8 sides .
+question: what is 13 times 13 ? answer: 169 .
+q: what is 19 minus 14 ? a: 5 .
+question: what is 11 minus 3 ? answer: 8 .
+question: what is not 0 ? answer: 1 .
+question: what is 11 times 1 ? answer: 11 .
+question: what is 2 plus 20 ? answer: 22 .
+q: what is 11 times 9 ? a: 99 .
+question: what is 21 plus 20 ? answer: 41 .
+question: what is 25 plus 3 ? answer: 28 .
+question: what is 16 minus 2 ? answer: 14 .
+question: what is 6 plus 6 ? answer: 12 .
+question: what is 10 plus 25 ? answer: 35 .
+q: what is 13 plus 14 ? a: 27 .
+q: what is 13 times 9 ? a: 117 .
+q: what animal says croak ? a: frog .
+question: what is 7 plus 19 ? answer: 26 .
+question: what is 11 plus 10 ? answer: 21 .
+question: what does ram stand for ? answer: random access memory .
+q: what is 22 plus 3 ? a: 25 .
+q: what is 9 plus 10 ? a: 19 .
+q: what animal says quack ? a: duck .
+question: what is 20 minus 20 ? answer: 0 .
+question: what is 3 plus 2 ? answer: 5 .
+question: what is 11 plus 14 ? answer: 25 .
+q: what is 10 plus 9 ? a: 19 .
+question: what is 22 plus 2 ? answer: 24 .
+q: what is 3 plus 11 ? a: 14 .
+question: what is 14 plus 5 ? answer: 19 .
+question: what is 8 times 5 ? answer: 40 .
+question: what is 18 plus 15 ? answer: 33 .
+q: what is 14 plus 25 ? a: 39 .
+q: what is 6 times 3 ? a: 18 .
+q: what is 13 minus 1 ? a: 12 .
+question: what is 18 minus 4 ? answer: 14 .
+q: what gas do humans breathe out ? a: carbon dioxide .
+question: what is 9 plus 18 ? answer: 27 .
+question: what is 1 or 0 ? answer: 1 .
+question: what is 15 times 4 ? answer: 60 .
+q: what is 10 times 4 ? a: 40 .
+q: what is 3 plus 19 ? a: 22 .
+q: what is 13 plus 23 ? a: 36 .
+question: how many days are in one week ? answer: 7 days .
+q: where are the great pyramids located ? a: giza in egypt .
+q: what is 11 plus 13 ? a: 24 .
+q: what is 8 plus 16 ? a: 24 .
+question: what is 24 plus 2 ? answer: 26 .
+q: what is 22 plus 24 ? a: 46 .
+q: what is the capital of utah ? a: salt lake city .
+question: what planet is closest to the sun ? answer: mercury .
+q: what is 8 times 15 ? a: 120 .
+q: what is 9 times 5 ? a: 45 .
+q: what is 8 plus 8 ? a: 16 .
+q: what is 10 plus 8 ? a: 18 .
+question: what is 19 plus 11 ? answer: 30 .
+q: what is 9 times 2 ? a: 18 .
+q: what is 6 times 13 ? a: 78 .
+q: what is 4 plus 13 ? a: 17 .
+question: what is 13 plus 8 ? answer: 21 .
+q: what is 10 plus 15 ? a: 25 .
+q: what is the chemical symbol for lead ? a: pb .
+question: what is 13 plus 15 ? answer: 28 .
+question: what force pulls objects toward earth ? answer: gravity .
+q: what is 5 plus 20 ? a: 25 .
+question: what is 1 and 1 ? answer: 1 .
+q: what is 11 minus 8 ? a: 3 .
+q: what is 1 plus 7 ? a: 8 .
+q: what is 15 minus 8 ? a: 7 .
+q: what is 9 times 9 ? a: 81 .
+question: what is 1 xor 0 ? answer: 1 .
+q: what is 2 times 10 ? a: 20 .
+question: what is 5 minus 5 ? answer: 0 .
+q: what is 17 minus 8 ? a: 9 .
+question: what is 6 minus 3 ? answer: 3 .
+q: what is 12 times 12 ? a: 144 .
+q: what is 9 plus 1 ? a: 10 .
+question: what is 21 plus 16 ? answer: 37 .
+q: what is 16 minus 14 ? a: 2 .
+q: what is 1 times 4 ? a: 4 .
+q: what is 21 plus 22 ? a: 43 .
+question: what is 20 plus 9 ? answer: 29 .
+question: what is 1 times 6 ? answer: 6 .
+q: what is 8 plus 20 ? a: 28 .
+question: what is 6 plus 3 ? answer: 9 .
+question: what is 13 minus 8 ? answer: 5 .
+q: what is 7 plus 17 ? a: 24 .
+question: what is 20 minus 14 ? answer: 6 .
+q: what does cpu stand for ? a: central processing unit .
+q: what is 22 plus 7 ? a: 29 .
+q: what is 12 times 14 ? a: 168 .
+q: what is 15 plus 13 ? a: 28 .
+q: what element has the chemical symbol hg ? a: mercury .
+q: what is 7 plus 22 ? a: 29 .
+q: what is 9 times 11 ? a: 99 .
+q: what is 9 plus 17 ? a: 26 .
+q: what is 12 minus 8 ? a: 4 .
+question: what is 17 minus 3 ? answer: 14 .
+q: what is 25 plus 3 ? a: 28 .
+question: what is 23 plus 5 ? answer: 28 .
+question: what is 15 times 15 ? answer: 225 .
+q: what is 20 plus 17 ? a: 37 .
+question: what is 18 plus 20 ? answer: 38 .
+question: what is 22 plus 5 ? answer: 27 .
+question: what is 14 plus 17 ? answer: 31 .
+question: what is the capital of germany ? answer: berlin .
+question: what element has the chemical symbol c ? answer: carbon .
+q: what is 14 plus 13 ? a: 27 .
+q: what is 8 times 2 ? a: 16 .
+q: what is 2 times 13 ? a: 26 .
+question: what is 8 times 8 ? answer: 64 .
+q: what is 12 plus 23 ? a: 35 .
+q: what color is the sky on a clear day ? a: blue .
+q: what is the capital of michigan ? a: lansing .
+question: what is 5 plus 13 ? answer: 18 .
+question: what is 1 times 2 ? answer: 2 .
+q: what is 13 plus 24 ? a: 37 .
+q: what is 24 plus 1 ? a: 25 .
+q: what is 16 plus 3 ? a: 19 .
+question: what is 24 plus 14 ? answer: 38 .
+question: what is 22 plus 13 ? answer: 35 .
+question: what is 14 plus 12 ? answer: 26 .
+question: what is 3 minus 3 ? answer: 0 .
+q: what is 6 plus 25 ? a: 31 .
+question: what is 15 minus 11 ? answer: 4 .
+q: what is 2 plus 12 ? a: 14 .
+q: what is 12 plus 22 ? a: 34 .
+question: what is 15 plus 18 ? answer: 33 .
+question: what is the capital of alabama ? answer: montgomery .
+question: what is the capital of japan ? answer: tokyo .
+q: what is 11 plus 6 ? a: 17 .
+q: what is 15 plus 20 ? a: 35 .
+q: what is 16 plus 20 ? a: 36 .
+question: what is 5 times 6 ? answer: 30 .
+question: what is 15 plus 21 ? answer: 36 .
+q: what is the fastest land animal ? a: cheetah .
+question: what is 21 plus 23 ? answer: 44 .
+q: what is 19 plus 9 ? a: 28 .
+question: what is 21 plus 12 ? answer: 33 .
+question: what is 15 times 6 ? answer: 90 .
+q: what is 21 plus 8 ? a: 29 .
+q: what is 12 plus 21 ? a: 33 .
+question: what is 24 plus 17 ? answer: 41 .
+q: how many seconds are in one minute ? a: 60 seconds .
+question: what is 17 plus 2 ? answer: 19 .
+question: what is 18 plus 16 ? answer: 34 .
+question: what is 2 times 7 ? answer: 14 .
+q: what element has the chemical symbol s ? a: sulfur .
+question: what is 25 plus 11 ? answer: 36 .
+question: what is 6 times 14 ? answer: 84 .
+q: what is 5 plus 18 ? a: 23 .
+question: what is 9 times 11 ? answer: 99 .
+q: what is 20 minus 5 ? a: 15 .
+question: what is 15 minus 4 ? answer: 11 .
+q: what is 16 minus 1 ? a: 15 .
+question: what is 15 plus 19 ? answer: 34 .
+q: what is 22 plus 14 ? a: 36 .
+question: what galaxy do we live in ? answer: milky way galaxy .
+q: what gas do plants absorb from air ? a: carbon dioxide .
+q: what is 15 times 10 ? a: 150 .
+q: what is 11 minus 3 ? a: 8 .
+q: what is 5 times 3 ? a: 15 .
+question: what australian animal carries baby in pouch ? answer: kangaroo .
+q: what is 1 plus 25 ? a: 26 .
+question: what is 24 plus 24 ? answer: 48 .
+question: what is 7 plus 15 ? answer: 22 .
+q: what is 3 plus 7 ? a: 10 .
+question: what is 25 plus 18 ? answer: 43 .
+q: what is 2 plus 25 ? a: 27 .
+q: what is 1 plus 9 ? a: 10 .
+question: what is 23 plus 15 ? answer: 38 .
+q: what is 19 plus 10 ? a: 29 .
+question: what is 7 plus 10 ? answer: 17 .
+q: what is 14 plus 12 ? a: 26 .
+question: what is 17 minus 8 ? answer: 9 .
+q: what is 8 minus 7 ? a: 1 .
+question: what is 12 minus 10 ? answer: 2 .
+question: what is 15 plus 22 ? answer: 37 .
+q: what is the capital of norway ? a: oslo .
+question: what is 6 plus 1 ? answer: 7 .
+q: what is 8 minus 8 ? a: 0 .
+question: what is 5 plus 24 ? answer: 29 .
+q: what is the capital of turkey ? a: ankara .
+q: what is 2 plus 13 ? a: 15 .
+q: what is 20 plus 20 ? a: 40 .
+question: what is 12 times 13 ? answer: 156 .
+question: what is 5 plus 3 ? answer: 8 .
+q: what is 12 plus 4 ? a: 16 .
+q: what is 10 plus 3 ? a: 13 .
+question: what is 12 minus 5 ? answer: 7 .
+q: what is 5 plus 15 ? a: 20 .
+q: what is the capital of vietnam ? a: hanoi .
+question: what is 8 times 12 ? answer: 96 .
+q: what is 8 plus 18 ? a: 26 .
+question: what is 12 minus 7 ? answer: 5 .
+question: what is 23 plus 8 ? answer: 31 .
+q: what is 8 times 14 ? a: 112 .
+question: what is 3 plus 19 ? answer: 22 .
+q: what is 18 plus 6 ? a: 24 .
+q: what is 20 minus 18 ? a: 2 .
+q: what is 17 plus 15 ? a: 32 .
+question: what is 6 plus 13 ? answer: 19 .
+question: what is 13 plus 20 ? answer: 33 .
+q: what is 25 plus 8 ? a: 33 .
+question: what is 3 plus 14 ? answer: 17 .
+question: what is 13 times 12 ? answer: 156 .
+question: what is 8 plus 11 ? answer: 19 .
+question: what is the chemical symbol for copper ? answer: cu .
+question: what is 4 plus 23 ? answer: 27 .
+question: what is 1 times 14 ? answer: 14 .
+q: what is 15 plus 17 ? a: 32 .
+q: what is 14 minus 4 ? a: 10 .
+q: what is 11 times 11 ? a: 121 .
+question: what is the chemical symbol for neon ? answer: ne .
+question: what is 10 plus 16 ? answer: 26 .
+q: what is 5 plus 12 ? a: 17 .
+question: what is 15 times 14 ? answer: 210 .
+q: what is 19 minus 2 ? a: 17 .
+question: what is 1 minus 1 ? answer: 0 .
+question: what is 1 plus 19 ? answer: 20 .
+question: what is 13 times 15 ? answer: 195 .
+question: what is 15 plus 17 ? answer: 32 .
+q: what organs help humans breathe air ? a: lungs .
+question: what is 17 minus 15 ? answer: 2 .
+q: what is 4 times 2 ? a: 8 .
+question: what is 10 plus 23 ? answer: 33 .
+question: what is 6 times 8 ? answer: 48 .
+question: what satellite orbits earth ? answer: the moon .
+question: what is 16 plus 21 ? answer: 37 .
+q: what is 5 plus 19 ? a: 24 .
+q: what is 8 plus 4 ? a: 12 .
+q: what is 4 plus 10 ? a: 14 .
+question: what is 5 times 12 ? answer: 60 .
+question: what is 12 plus 1 ? answer: 13 .
+q: what is 21 plus 12 ? a: 33 .
+question: what is 17 minus 9 ? answer: 8 .
+question: what is 16 plus 4 ? answer: 20 .
+q: what is 20 minus 2 ? a: 18 .
+q: what is 14 plus 4 ? a: 18 .
+question: what is 22 plus 23 ? answer: 45 .
+question: what is 19 minus 8 ? answer: 11 .
+q: what is 5 times 12 ? a: 60 .
+q: what is 20 plus 2 ? a: 22 .
+q: what is 8 plus 3 ? a: 11 .
+question: what element has the chemical symbol sn ? answer: tin .
+q: what is 14 minus 1 ? a: 13 .
+q: what is 16 plus 6 ? a: 22 .
+q: what is 19 plus 6 ? a: 25 .
+q: what is 23 plus 25 ? a: 48 .
+q: what is 5 times 11 ? a: 55 .
+question: what is the capital of switzerland ? answer: bern .
+question: what sound does a dog make ? answer: woof .
+question: what does fpga stand for ? answer: field programmable gate array .
+q: what sound does a dog make ? a: woof .
+question: what is 5 plus 2 ? answer: 7 .
+q: what is 5 times 13 ? a: 65 .
+q: what is 2 plus 1 ? a: 3 .
+question: what is 25 plus 7 ? answer: 32 .
+q: what is 12 times 8 ? a: 96 .
+q: what is 10 plus 11 ? a: 21 .
+question: what is 18 minus 10 ? answer: 8 .
+question: what is 14 plus 16 ? answer: 30 .
+q: what is the capital of indiana ? a: indianapolis .
+q: what is 9 plus 2 ? a: 11 .
+question: what is 15 plus 6 ? answer: 21 .
+q: what is 8 times 11 ? a: 88 .
+q: what is the largest river by water volume ? a: amazon river .
+q: what is 14 times 8 ? a: 112 .
+question: what is 9 plus 23 ? answer: 32 .
+question: what is 9 plus 20 ? answer: 29 .
+question: what is 23 plus 3 ? answer: 26 .
+question: what is 12 plus 3 ? answer: 15 .
+q: what satellite orbits earth ? a: the moon .
+question: what continent is south pole on ? answer: antarctica .
+question: what is 15 minus 2 ? answer: 13 .
+q: what is 17 minus 15 ? a: 2 .
+question: what is 3 plus 8 ? answer: 11 .
+question: what is 2 times 11 ? answer: 22 .
+q: what is 13 plus 4 ? a: 17 .
+q: what sound does a owl make ? a: hoot .
+q: what is 14 minus 10 ? a: 4 .
+q: where is the statue of liberty ? a: new york city .
+q: what is 6 times 10 ? a: 60 .
+question: what is 1 plus 8 ? answer: 9 .
+q: what is 10 minus 6 ? a: 4 .
+question: what is 14 minus 9 ? answer: 5 .
+q: what is 19 minus 17 ? a: 2 .
+question: what does gpu stand for ? answer: graphics processing unit .
+q: what is 3 times 7 ? a: 21 .
+question: what is 4 times 13 ? answer: 52 .
+question: what is 1 times 10 ? answer: 10 .
+q: what is 23 plus 14 ? a: 37 .
+q: what is 14 times 3 ? a: 42 .
+question: what is 22 plus 24 ? answer: 46 .
+q: what is 18 plus 5 ? a: 23 .
+q: what is 5 times 5 ? a: 25 .
+q: what is 6 times 1 ? a: 6 .
+q: what is 4 plus 3 ? a: 7 .
+q: what is 22 plus 10 ? a: 32 .
+q: what is 14 plus 2 ? a: 16 .
+q: what is 21 plus 19 ? a: 40 .
+q: what is 15 times 14 ? a: 210 .
+q: what is 5 times 6 ? a: 30 .
+question: what is the capital of wisconsin ? answer: madison .
+question: what is the chemical symbol for phosphorus ? answer: p .
+question: what is 25 plus 15 ? answer: 40 .
+q: what is the capital of north carolina ? a: raleigh .
+q: what is 19 plus 20 ? a: 39 .
+question: what is 3 times 6 ? answer: 18 .
+question: what is 10 plus 18 ? answer: 28 .
+q: what is 23 plus 24 ? a: 47 .
+q: what sound does a frog make ? a: croak .
+question: what is 2 minus 2 ? answer: 0 .
+question: what is 6 plus 15 ? answer: 21 .
+q: what is 16 minus 7 ? a: 9 .
+q: what is 14 plus 23 ? a: 37 .
+question: what is 1 plus 15 ? answer: 16 .
+question: what is 1 plus 21 ? answer: 22 .
+q: what is 24 plus 2 ? a: 26 .
+q: what is 3 plus 18 ? a: 21 .
+q: what is 7 plus 16 ? a: 23 .
+question: what is 10 times 4 ? answer: 40 .
+q: what element has the chemical symbol sn ? a: tin .
+q: what is 24 plus 13 ? a: 37 .
+q: what is the second largest ocean ? a: atlantic ocean .
+q: what is 3 plus 3 ? a: 6 .
+question: what is 3 times 2 ? answer: 6 .
+q: what is 20 plus 23 ? a: 43 .
+q: what is 18 minus 16 ? a: 2 .
+question: what is 9 times 12 ? answer: 108 .
+question: what is 19 plus 16 ? answer: 35 .
+question: what is 20 plus 14 ? answer: 34 .
+q: what is 2 times 11 ? a: 22 .
+q: what planet has famous rings around it ? a: saturn .
+q: what is 18 plus 24 ? a: 42 .
+question: what is 14 plus 15 ? answer: 29 .
+question: what is 10 times 12 ? answer: 120 .
+question: what is 7 plus 22 ? answer: 29 .
+question: what is 8 times 7 ? answer: 56 .
+question: what is 24 plus 8 ? answer: 32 .
+q: what is 24 plus 12 ? a: 36 .
+question: what is 13 times 2 ? answer: 26 .
+question: what is 25 plus 12 ? answer: 37 .
+q: what is 15 minus 10 ? a: 5 .
+question: what color is grass ? answer: green .
+q: what is 15 plus 12 ? a: 27 .
+q: what planet is closest to the sun ? a: mercury .
+q: what is 19 minus 10 ? a: 9 .
+question: what is 11 times 14 ? answer: 154 .
+question: what is the capital of greece ? answer: athens .
+question: what is 11 plus 6 ? answer: 17 .
+question: what is 12 plus 11 ? answer: 23 .
+q: what sound does a sheep make ? a: baa .
+q: what is 18 plus 23 ? a: 41 .
+question: what is 4 times 7 ? answer: 28 .
+q: what is 11 plus 19 ? a: 30 .
+question: what is 8 plus 2 ? answer: 10 .
+q: what is 15 plus 3 ? a: 18 .
+question: what is the boiling point of water in celsius ? answer: 100 degrees .
+question: what element has the chemical symbol h ? answer: hydrogen .
+question: what is 12 plus 10 ? answer: 22 .
+question: what is the capital of mexico ? answer: mexico city .
+q: what is 14 plus 5 ? a: 19 .
+question: what is 2 plus 25 ? answer: 27 .
+q: what is 2 plus 15 ? a: 17 .
+q: what is 7 plus 3 ? a: 10 .
+q: what does gpu stand for ? a: graphics processing unit .
+q: what is 16 plus 21 ? a: 37 .
+question: what is 6 minus 5 ? answer: 1 .
+question: what does cpu stand for ? answer: central processing unit .
+question: what is 13 times 14 ? answer: 182 .
+q: what is 19 plus 18 ? a: 37 .
+question: what is 21 plus 24 ? answer: 45 .
+question: what is 17 plus 8 ? answer: 25 .
+question: what is 15 minus 13 ? answer: 2 .
+question: what is 3 plus 21 ? answer: 24 .
+question: what is 4 plus 14 ? answer: 18 .
+q: what is 16 minus 15 ? a: 1 .
+q: how many days are in one year ? a: 365 days .
+question: what is 21 plus 10 ? answer: 31 .
+question: what is the capital of poland ? answer: warsaw .
+question: what is the longest river in the world ? answer: nile river .
+question: what is 10 times 15 ? answer: 150 .
+question: what is 11 minus 11 ? answer: 0 .
+question: what is 11 plus 5 ? answer: 16 .
+q: what is 13 plus 13 ? a: 26 .
+question: what is 6 times 3 ? answer: 18 .
+question: what is 17 plus 25 ? answer: 42 .
+q: what is 2 times 9 ? a: 18 .
+q: what animal says buzz ? a: bee .
+q: what element has the chemical symbol u ? a: uranium .
+q: what is 1 plus 1 ? a: 2 .
+question: what is 11 times 11 ? answer: 121 .
+q: what is 15 plus 6 ? a: 21 .
+q: what is 15 minus 12 ? a: 3 .
+question: what is 13 plus 11 ? answer: 24 .
+q: what is 15 times 2 ? a: 30 .
+question: what is 9 plus 6 ? answer: 15 .
+q: what element has the chemical symbol ag ? a: silver .
+q: what is 20 plus 7 ? a: 27 .
+question: what is 6 times 12 ? answer: 72 .
+question: what is 8 plus 9 ? answer: 17 .
+question: what is 15 times 5 ? answer: 75 .
+question: what is 7 plus 6 ? answer: 13 .
+q: what is 4 plus 9 ? a: 13 .
+question: what sound does a sheep make ? answer: baa .
+question: what is the chemical symbol for sodium ? answer: na .
+question: what is 0 and 1 ? answer: 0 .
+question: what is 13 times 7 ? answer: 91 .
+question: what is 14 plus 1 ? answer: 15 .
+q: what is 3 plus 15 ? a: 18 .
+q: what is 11 minus 1 ? a: 10 .
+q: what is 15 plus 11 ? a: 26 .
+q: what is the capital of argentina ? a: buenos aires .
+question: what is 19 minus 2 ? answer: 17 .
+q: what animal says hoot ? a: owl .
+q: what is 8 minus 6 ? a: 2 .
+question: what is 18 plus 24 ? answer: 42 .
+question: what is 15 minus 3 ? answer: 12 .
+q: how many minutes are in one hour ? a: 60 minutes .
+question: what is 17 plus 23 ? answer: 40 .
+question: what is 15 minus 6 ? answer: 9 .
+question: what is 1 times 12 ? answer: 12 .
+q: what is the chemical symbol for phosphorus ? a: p .
+question: what is 12 minus 12 ? answer: 0 .
+q: what is the capital of missouri ? a: jefferson city .
+question: what is 14 times 3 ? answer: 42 .
+q: what is 13 plus 22 ? a: 35 .
+q: what is 6 plus 4 ? a: 10 .
+question: what is 17 minus 17 ? answer: 0 .
+question: what is 12 times 1 ? answer: 12 .
+question: what is 21 plus 9 ? answer: 30 .
+question: what is 10 minus 6 ? answer: 4 .
+q: what is 24 plus 10 ? a: 34 .
+q: what is 23 plus 2 ? a: 25 .
+q: what is 24 plus 3 ? a: 27 .
+question: what is 20 minus 17 ? answer: 3 .
+q: what is 12 times 3 ? a: 36 .
+q: what is 17 minus 11 ? a: 6 .
+q: what is 24 plus 7 ? a: 31 .
+q: what element has the chemical symbol al ? a: aluminum .
+q: what is 23 plus 23 ? a: 46 .
+question: what is the chemical symbol for helium ? answer: he .
+q: what is 19 plus 16 ? a: 35 .
+question: what is 18 plus 9 ? answer: 27 .
+q: what is 7 plus 15 ? a: 22 .
+question: what is 3 plus 3 ? answer: 6 .
+q: what is 8 minus 4 ? a: 4 .
+question: what is the chemical symbol for gold ? answer: au .
+q: what is 8 minus 2 ? a: 6 .
+question: what is 4 plus 13 ? answer: 17 .
+q: what is 12 minus 12 ? a: 0 .
+question: what is 10 minus 5 ? answer: 5 .
+q: what element has the chemical symbol li ? a: lithium .
+q: what is 13 minus 3 ? a: 10 .
+question: what is 12 plus 19 ? answer: 31 .
+question: what is the chemical symbol for calcium ? answer: ca .
+question: what is 1 times 1 ? answer: 1 .
+q: what is 14 times 1 ? a: 14 .
+question: what gas do plants absorb from air ? answer: carbon dioxide .
+q: what is 13 plus 1 ? a: 14 .
+q: what is 3 plus 10 ? a: 13 .
+question: what is 7 plus 4 ? answer: 11 .
+question: what is 25 plus 21 ? answer: 46 .
+question: what is 17 minus 4 ? answer: 13 .
+q: what is 5 minus 2 ? a: 3 .
+q: what is the chemical symbol for iron ? a: fe .
+question: what is 1 plus 18 ? answer: 19 .
+q: what is 6 plus 3 ? a: 9 .
+question: what is 24 plus 21 ? answer: 45 .
+q: what is the capital of kentucky ? a: frankfort .
+question: what is 2 plus 11 ? answer: 13 .
+q: what is 4 plus 17 ? a: 21 .
+question: what is the speed of light in vacuum ? answer: 300000 kilometers per second .
+question: what is 8 minus 8 ? answer: 0 .
+q: what is 2 plus 8 ? a: 10 .
+question: what is 3 times 14 ? answer: 42 .
+question: who developed the theory of relativity ? answer: albert einstein .
+q: what is 5 plus 22 ? a: 27 .
+q: what does sram stand for ? a: static random access memory .
+question: what is 2 times 15 ? answer: 30 .
+q: what is 14 times 2 ? a: 28 .
+q: what is 15 times 3 ? a: 45 .
+question: what is 20 plus 24 ? answer: 44 .
+q: what is 6 times 7 ? a: 42 .
+question: how many days are in one year ? answer: 365 days .
+q: what is 9 plus 22 ? a: 31 .
+question: what is 5 plus 10 ? answer: 15 .
+q: what animal says hiss ? a: snake .
+question: what sound does a cow make ? answer: moo .
+question: what is the chemical symbol for nitrogen ? answer: n .
+q: what is 5 times 8 ? a: 40 .
+q: what is 11 times 8 ? a: 88 .
+question: what is 22 plus 8 ? answer: 30 .
+q: what is the tallest building in the world ? a: burj khalifa in dubai .
+q: where is the eiffel tower located ? a: paris in france .
+question: what is 6 plus 7 ? answer: 13 .
+question: what is 1 plus 4 ? answer: 5 .
+q: what is 8 plus 15 ? a: 23 .
+question: what is the capital of norway ? answer: oslo .
+question: what is 15 minus 14 ? answer: 1 .
+question: what is 4 plus 2 ? answer: 6 .
+question: what is 15 times 8 ? answer: 120 .
+q: what is 19 minus 5 ? a: 14 .
+question: what is 10 plus 10 ? answer: 20 .
+question: what is 2 plus 9 ? answer: 11 .
+question: what is 22 plus 6 ? answer: 28 .
+question: what is 9 times 7 ? answer: 63 .
+question: what is 4 plus 21 ? answer: 25 .
+q: what is 10 times 14 ? a: 140 .
+q: what is 11 plus 3 ? a: 14 .
+q: what is 19 minus 12 ? a: 7 .
+q: what is 7 times 14 ? a: 98 .
+q: what sound does a pig make ? a: oink .
+question: what is 5 plus 21 ? answer: 26 .
+question: what is 2 plus 3 ? answer: 5 .
+question: what is 14 minus 5 ? answer: 9 .
+question: what is 2 times 12 ? answer: 24 .
+q: what is 18 plus 19 ? a: 37 .
+question: what is the capital of france ? answer: paris .
+question: what is 4 times 3 ? answer: 12 .
+question: what is 4 minus 4 ? answer: 0 .
+question: what is 3 times 5 ? answer: 15 .
+question: what is the chemical symbol for tin ? answer: sn .
+q: what is 7 times 15 ? a: 105 .
+q: what is 6 times 4 ? a: 24 .
+q: what is 12 minus 4 ? a: 8 .
+question: what is 11 plus 23 ? answer: 34 .
+q: what is 17 plus 9 ? a: 26 .
+q: what is 10 plus 5 ? a: 15 .
+q: what is 9 plus 3 ? a: 12 .
+q: what is 19 plus 19 ? a: 38 .
+question: what is 1 plus 20 ? answer: 21 .
+question: what is 15 times 12 ? answer: 180 .
+question: what is 12 minus 1 ? answer: 11 .
+q: what is 3 plus 23 ? a: 26 .
+question: what is 18 minus 7 ? answer: 11 .
+q: what is 5 plus 10 ? a: 15 .
+q: what is 8 minus 3 ? a: 5 .
+q: what is 12 times 1 ? a: 12 .
+q: what is 10 times 3 ? a: 30 .
+q: what is 12 plus 18 ? a: 30 .
+question: what is 17 plus 15 ? answer: 32 .
+question: what is 4 plus 18 ? answer: 22 .
+question: what is 7 times 13 ? answer: 91 .
+question: what is 11 times 8 ? answer: 88 .
+question: what is 23 plus 20 ? answer: 43 .
+question: what is 7 times 11 ? answer: 77 .
+question: what is 13 times 9 ? answer: 117 .
+question: what is 15 plus 3 ? answer: 18 .
+q: what is 25 plus 6 ? a: 31 .
+q: what continent is north of africa ? a: europe .
+question: what is 17 plus 18 ? answer: 35 .
+q: what is 14 times 13 ? a: 182 .
+question: what element has the chemical symbol be ? answer: beryllium .
+q: what is 10 minus 4 ? a: 6 .
+q: what is 20 plus 22 ? a: 42 .
+question: what is 4 plus 17 ? answer: 21 .
+q: what is 3 plus 8 ? a: 11 .
+question: what is 19 plus 25 ? answer: 44 .
+q: what is 1 plus 21 ? a: 22 .
+q: what is 16 plus 8 ? a: 24 .
+question: what is 11 times 9 ? answer: 99 .
+q: what is 10 minus 1 ? a: 9 .
+question: what does sram stand for ? answer: static random access memory .
+question: what is 15 minus 8 ? answer: 7 .
+question: what is 18 minus 14 ? answer: 4 .
+q: what is 13 plus 5 ? a: 18 .
+question: what is 18 minus 3 ? answer: 15 .
+q: what is 8 plus 22 ? a: 30 .
+question: what is 12 times 14 ? answer: 168 .
+q: what is 7 plus 9 ? a: 16 .
+question: what is 14 plus 7 ? answer: 21 .
+q: what is 4 times 12 ? a: 48 .
+question: what is 5 plus 18 ? answer: 23 .
+q: what is 10 plus 20 ? a: 30 .
+q: what is the capital of colorado ? a: denver .
+q: what is 17 plus 25 ? a: 42 .
+question: what is 14 minus 10 ? answer: 4 .
+question: what is 15 minus 9 ? answer: 6 .
+question: what is the capital of south carolina ? answer: columbia .
+question: what is 13 minus 11 ? answer: 2 .
+question: what is 8 plus 21 ? answer: 29 .
+q: what is 2 plus 22 ? a: 24 .
+question: what element has the chemical symbol fe ? answer: iron .
+question: what element has the chemical symbol mg ? answer: magnesium .
+question: what is 12 plus 24 ? answer: 36 .
+question: what is 23 plus 1 ? answer: 24 .
+question: what is 24 plus 12 ? answer: 36 .
+question: what is 13 plus 22 ? answer: 35 .
+question: what is 23 plus 6 ? answer: 29 .
+q: what is 17 plus 23 ? a: 40 .
+question: what is 25 plus 5 ? answer: 30 .
+q: what is 6 plus 20 ? a: 26 .
+question: what is 22 plus 14 ? answer: 36 .
+q: what is 9 minus 5 ? a: 4 .
+q: what is 10 plus 13 ? a: 23 .
+question: what is 13 plus 25 ? answer: 38 .
+q: what is 19 plus 22 ? a: 41 .
+q: what is 2 times 6 ? a: 12 .
+q: what is 17 minus 10 ? a: 7 .
+q: what is 2 times 3 ? a: 6 .
+question: what is the capital of louisiana ? answer: baton rouge .
+question: what is the capital of russia ? answer: moscow .
+q: what is the chemical symbol for copper ? a: cu .
+q: what is 15 times 4 ? a: 60 .
+question: what is 1 or 1 ? answer: 1 .
+q: what is 1 xor 1 ? a: 0 .
+question: what is the capital of ireland ? answer: dublin .
+q: what is 15 plus 4 ? a: 19 .
+q: what is 9 plus 8 ? a: 17 .
+q: what is 3 times 9 ? a: 27 .
+question: what is 10 times 14 ? answer: 140 .
+question: what is 4 plus 10 ? answer: 14 .
+q: what is 22 plus 12 ? a: 34 .
+question: what is 4 times 10 ? answer: 40 .
+question: what is 16 plus 7 ? answer: 23 .
+question: what is 24 plus 5 ? answer: 29 .
+question: what is 15 plus 15 ? answer: 30 .
+q: what is 20 plus 9 ? a: 29 .
+question: what is the capital of pennsylvania ? answer: harrisburg .
+question: what is the capital of massachusetts ? answer: boston .
+question: what is 6 times 6 ? answer: 36 .
+q: what is 7 plus 24 ? a: 31 .
+question: what is 7 times 1 ? answer: 7 .
+q: what is 4 plus 7 ? a: 11 .
+q: what is the capital of arizona ? a: phoenix .
+q: what is 10 minus 5 ? a: 5 .
+question: what is 1 plus 7 ? answer: 8 .
+q: what element has the chemical symbol si ? a: silicon .
+q: what architecture does lpu use ? a: vliw and systolic mac lanes .
+question: what is 21 plus 4 ? answer: 25 .
+q: what is 8 minus 5 ? a: 3 .
+q: what is 20 minus 4 ? a: 16 .
+question: what is 11 plus 25 ? answer: 36 .
+q: what is 18 minus 4 ? a: 14 .
+question: what element has the chemical symbol si ? answer: silicon .
+question: where is the eiffel tower located ? answer: paris in france .
+q: what is 20 minus 11 ? a: 9 .
+question: who wrote romeo and juliet ? answer: william shakespeare .
+q: what is 24 plus 17 ? a: 41 .
+q: what element has the chemical symbol ne ? a: neon .
+question: what is 9 times 14 ? answer: 126 .
+question: what is the chemical symbol for hydrogen ? answer: h .
+q: what is 17 plus 21 ? a: 38 .
+question: what is 6 plus 10 ? answer: 16 .
+q: what is 17 minus 6 ? a: 11 .
+q: what is 24 plus 18 ? a: 42 .
+q: what is the capital of ireland ? a: dublin .
+question: what is 18 plus 14 ? answer: 32 .
+question: what is 8 plus 13 ? answer: 21 .
+question: what is 6 plus 19 ? answer: 25 .
+question: what is 16 plus 14 ? answer: 30 .
+q: what is 10 plus 12 ? a: 22 .
+question: what is 17 plus 17 ? answer: 34 .
+q: what is 23 plus 4 ? a: 27 .
+q: what is 14 times 6 ? a: 84 .
+question: what is the chemical symbol for argon ? answer: ar .
+q: what is 14 minus 14 ? a: 0 .
+question: what is 6 times 11 ? answer: 66 .
+question: what is 20 plus 2 ? answer: 22 .
+q: what is 19 plus 14 ? a: 33 .
+question: what is 10 minus 9 ? answer: 1 .
+question: what organs help humans breathe air ? answer: lungs .
+question: what is 10 times 5 ? answer: 50 .
+q: what is 4 plus 25 ? a: 29 .
+q: what is 5 minus 4 ? a: 1 .
+q: what is 10 times 11 ? a: 110 .
+q: what is 6 times 5 ? a: 30 .
+question: what planet is second from the sun ? answer: venus .
+q: what is 4 times 6 ? a: 24 .
+q: what is 13 plus 21 ? a: 34 .
+q: what is 15 minus 1 ? a: 14 .
+question: what is 4 plus 24 ? answer: 28 .
+q: what is 11 times 15 ? a: 165 .
+q: what is 10 plus 2 ? a: 12 .
+question: what is the chemical symbol for chlorine ? answer: cl .
+q: what is 13 minus 6 ? a: 7 .
+q: what is 20 plus 19 ? a: 39 .
+question: what is 13 times 4 ? answer: 52 .
+question: what is 2 times 14 ? answer: 28 .
+q: what is 22 plus 4 ? a: 26 .
+q: what is 2 plus 11 ? a: 13 .
+question: what is 0 or 1 ? answer: 1 .
+question: what is 10 plus 3 ? answer: 13 .
+question: what element has the chemical symbol n ? answer: nitrogen .
+q: what is the highest mountain in the world ? a: mount everest .
+q: what is 18 minus 7 ? a: 11 .
+question: what is 4 plus 15 ? answer: 19 .
+q: what is 17 plus 18 ? a: 35 .
+q: what is 20 minus 10 ? a: 10 .
+question: what is 13 minus 2 ? answer: 11 .
+question: what is 1 plus 10 ? answer: 11 .
+question: what is 7 plus 3 ? answer: 10 .
+q: what is not 1 ? a: 0 .
+q: what is 2 plus 2 ? a: 4 .
+q: what is the capital of new york ? a: albany .
+q: what is 7 times 4 ? a: 28 .
+question: what is 12 minus 4 ? answer: 8 .
+question: what is 2 plus 21 ? answer: 23 .
+q: what is 14 minus 12 ? a: 2 .
+q: what is 21 plus 18 ? a: 39 .
+q: what is 5 plus 4 ? a: 9 .
+question: what is 3 minus 1 ? answer: 2 .
+question: what is 2 times 3 ? answer: 6 .
+question: what is 10 plus 13 ? answer: 23 .
+question: what is 7 minus 5 ? answer: 2 .
+question: what is 5 plus 9 ? answer: 14 .
+question: what is 15 plus 5 ? answer: 20 .
+q: what is 20 plus 25 ? a: 45 .
+q: what is 6 plus 18 ? a: 24 .
+question: what is 18 plus 4 ? answer: 22 .
+q: what is the capital of egypt ? a: cairo .
+q: what is 8 plus 24 ? a: 32 .
+q: what is 15 plus 15 ? a: 30 .
+q: what is the capital of pennsylvania ? a: harrisburg .
+q: what is 13 times 5 ? a: 65 .
+question: what is 4 plus 22 ? answer: 26 .
+q: what is 13 minus 9 ? a: 4 .
+q: what is 10 plus 18 ? a: 28 .
+question: what is 19 plus 23 ? answer: 42 .
+q: what is 13 times 4 ? a: 52 .
+q: what is 18 minus 13 ? a: 5 .
+question: what is 18 minus 9 ? answer: 9 .
+q: who developed the theory of relativity ? a: albert einstein .
+question: what is the capital of vietnam ? answer: hanoi .
+q: what is 18 plus 16 ? a: 34 .
+question: what is 9 plus 13 ? answer: 22 .
+question: what is 11 plus 24 ? answer: 35 .
+q: what is 22 plus 1 ? a: 23 .
+q: what is 14 minus 8 ? a: 6 .
+q: what is 10 plus 24 ? a: 34 .
+q: what is 15 minus 14 ? a: 1 .
+q: what is 12 plus 20 ? a: 32 .
+question: what is 8 times 13 ? answer: 104 .
+question: what is 4 times 6 ? answer: 24 .
+q: what is 6 plus 22 ? a: 28 .
+q: what is 25 plus 12 ? a: 37 .
+question: what is 19 minus 1 ? answer: 18 .
+q: what sound does a rooster make ? a: crow .
+question: what is 23 plus 14 ? answer: 37 .
+question: what is 14 minus 13 ? answer: 1 .
+question: what is the largest ocean in the world ? answer: pacific ocean .
+q: what animal says baa ? a: sheep .
+question: what planet is fourth from the sun and known as red planet ? answer: mars .
+question: what is the capital of tennessee ? answer: nashville .
+question: what color do you get when you mix red and yellow ? answer: orange .
+question: what is 7 minus 4 ? answer: 3 .
+question: what state of matter is liquid water ? answer: liquid .
+q: what is 7 plus 20 ? a: 27 .
+question: what is the capital of michigan ? answer: lansing .
+q: what is 11 minus 2 ? a: 9 .
+q: what planet is fourth from the sun and known as red planet ? a: mars .
+question: what is 23 plus 13 ? answer: 36 .
+question: what is 11 plus 11 ? answer: 22 .
+question: where are the great pyramids located ? answer: giza in egypt .
+question: what planet is seventh from the sun ? answer: uranus .
+question: what is 13 plus 5 ? answer: 18 .
+q: what is 24 plus 24 ? a: 48 .
+question: what is 19 minus 7 ? answer: 12 .
+q: what is 2 plus 9 ? a: 11 .
+q: what is 12 times 10 ? a: 120 .
+q: what is 25 plus 21 ? a: 46 .
+q: what is the chemical symbol for neon ? a: ne .
+q: what is 6 minus 6 ? a: 0 .
+q: what is 6 plus 17 ? a: 23 .
+question: what is 24 plus 1 ? answer: 25 .
+q: what is 5 plus 1 ? a: 6 .
+q: what is 14 plus 22 ? a: 36 .
+q: what is 19 plus 15 ? a: 34 .
+q: what is 13 plus 18 ? a: 31 .
+question: what is 17 plus 5 ? answer: 22 .
+question: what is 19 plus 14 ? answer: 33 .
+question: what is 1 and 0 ? answer: 0 .
+q: what is 13 times 10 ? a: 130 .
+question: what is 16 minus 8 ? answer: 8 .
+q: what animal says meow ? a: cat .
+q: what is 1 plus 23 ? a: 24 .
+question: what is 22 plus 15 ? answer: 37 .
+question: what is 9 times 6 ? answer: 54 .
+q: what is 20 plus 10 ? a: 30 .
+question: what is 5 plus 8 ? answer: 13 .
+question: what sound does a frog make ? answer: croak .
+question: what is 18 minus 5 ? answer: 13 .
+question: what is 12 minus 3 ? answer: 9 .
+q: what is 20 plus 15 ? a: 35 .
+question: what is 19 minus 14 ? answer: 5 .
+q: what is 14 plus 6 ? a: 20 .
+question: what is 9 minus 2 ? answer: 7 .
+question: what is 11 times 13 ? answer: 143 .
+question: what is 9 times 9 ? answer: 81 .
+q: what is 17 plus 4 ? a: 21 .
+question: what is 13 plus 2 ? answer: 15 .
+q: what is 17 minus 13 ? a: 4 .
+q: what is 12 plus 3 ? a: 15 .
+question: what is 1 plus 5 ? answer: 6 .
+q: what organ controls thoughts and memory ? a: brain .
+question: what is 2 times 6 ? answer: 12 .
+q: what is 14 times 7 ? a: 98 .
+q: what is 16 minus 10 ? a: 6 .
+q: what is 2 times 14 ? a: 28 .
+question: what is 2 plus 18 ? answer: 20 .
+q: what is 5 minus 3 ? a: 2 .
+question: what is 12 plus 7 ? answer: 19 .
+q: what element has the chemical symbol h ? a: hydrogen .
+question: what is 13 minus 3 ? answer: 10 .
+question: what is 25 plus 22 ? answer: 47 .
+question: what is 20 plus 16 ? answer: 36 .
+q: what is 6 times 2 ? a: 12 .
+q: what is 22 plus 20 ? a: 42 .
+question: what is 11 plus 2 ? answer: 13 .
+question: what is 25 plus 1 ? answer: 26 .
+question: what is 16 minus 6 ? answer: 10 .
+question: what is 6 times 5 ? answer: 30 .
+question: what is 19 minus 11 ? answer: 8 .
+question: what element has the chemical symbol s ? answer: sulfur .
+question: what is 9 plus 21 ? answer: 30 .
+q: what is 20 minus 15 ? a: 5 .
+question: what is 3 plus 9 ? answer: 12 .
+q: what is 3 plus 13 ? a: 16 .
+question: what is 24 plus 11 ? answer: 35 .
+question: what is 20 plus 11 ? answer: 31 .
+q: what is 4 plus 19 ? a: 23 .
+q: what is 9 times 1 ? a: 9 .
+q: what is 18 plus 18 ? a: 36 .
+q: what is 23 plus 19 ? a: 42 .
+question: what is 10 plus 9 ? answer: 19 .
+q: what is 19 plus 13 ? a: 32 .
+q: what is 1 plus 11 ? a: 12 .
+q: what is 14 plus 19 ? a: 33 .
+q: what is 17 plus 12 ? a: 29 .
+q: what is the capital of massachusetts ? a: boston .
+question: what is 18 minus 11 ? answer: 7 .
+question: what is 3 plus 1 ? answer: 4 .
+q: what is 12 times 13 ? a: 156 .
+q: what is 19 plus 5 ? a: 24 .
+q: what is the capital of england ? a: london .
+q: what is the capital of washington ? a: olympia .
+question: what is 8 times 15 ? answer: 120 .
+q: who wrote romeo and juliet ? a: william shakespeare .
+question: what is 2 times 5 ? answer: 10 .
+question: what is 16 minus 1 ? answer: 15 .
+q: what is 23 plus 3 ? a: 26 .
+q: what is 1 plus 5 ? a: 6 .
+q: what is the chemical symbol for gold ? a: au .
+question: what is 5 times 2 ? answer: 10 .
+q: what is 20 minus 17 ? a: 3 .
+question: what is 7 plus 24 ? answer: 31 .
+q: what is the capital of louisiana ? a: baton rouge .
+q: what is 7 times 6 ? a: 42 .
+q: what is 11 plus 16 ? a: 27 .
+question: what is 6 times 9 ? answer: 54 .
+question: what is 13 times 10 ? answer: 130 .
+question: what animal says hiss ? answer: snake .
+q: what is 2 plus 5 ? a: 7 .
+question: what is 3 times 1 ? answer: 3 .
+question: what is 19 minus 9 ? answer: 10 .
+question: what is 15 minus 15 ? answer: 0 .
+q: what is 9 plus 7 ? a: 16 .
+q: what is 8 times 5 ? a: 40 .
+question: what is 17 plus 10 ? answer: 27 .
+q: what is 16 minus 8 ? a: 8 .
+question: what is 9 plus 22 ? answer: 31 .
+question: what is 20 plus 7 ? answer: 27 .
+q: what is 10 plus 22 ? a: 32 .
+question: what is 12 plus 17 ? answer: 29 .
+question: what is 12 times 8 ? answer: 96 .
+question: what is 25 plus 25 ? answer: 50 .
+question: what is 5 times 11 ? answer: 55 .
+q: what is 1 minus 1 ? a: 0 .
+q: what is 23 plus 8 ? a: 31 .
+question: what is 9 times 2 ? answer: 18 .
+question: what is 8 times 2 ? answer: 16 .
+q: what is 6 plus 16 ? a: 22 .
+question: what is 5 plus 4 ? answer: 9 .
+question: what state of matter is steam ? answer: gas .
+question: what is 20 plus 19 ? answer: 39 .
+q: what is 12 times 11 ? a: 132 .
+question: what is 8 plus 1 ? answer: 9 .
+question: what is 8 plus 17 ? answer: 25 .
+question: what is 24 plus 6 ? answer: 30 .
+question: what is 14 plus 24 ? answer: 38 .
+q: what is 2 plus 4 ? a: 6 .
+question: what is 20 minus 13 ? answer: 7 .
+question: what is the chemical symbol for sulfur ? answer: s .
+q: what is 20 plus 21 ? a: 41 .
+q: what is 20 minus 16 ? a: 4 .
+question: what is the highest mountain in the world ? answer: mount everest .
+question: what is 15 plus 8 ? answer: 23 .
+question: what is 12 plus 14 ? answer: 26 .
+q: what is 23 plus 7 ? a: 30 .
+q: what is 7 plus 4 ? a: 11 .
+question: what is 8 plus 10 ? answer: 18 .
+question: what is 3 times 15 ? answer: 45 .
+question: what is 21 plus 6 ? answer: 27 .
+q: what ocean is near india ? a: indian ocean .
+question: what is 8 plus 8 ? answer: 16 .
+q: what is the capital of minnesota ? a: saint paul .
+question: what is the chemical symbol for lead ? answer: pb .
+q: what is the tallest land animal ? a: giraffe .
+question: what is 1 plus 17 ? answer: 18 .
+question: what element has the chemical symbol p ? answer: phosphorus .
+q: what is 3 times 12 ? a: 36 .
+q: what is 9 plus 12 ? a: 21 .
+question: what is 10 plus 5 ? answer: 15 .
+question: what is 3 times 7 ? answer: 21 .
+question: what is 16 minus 4 ? answer: 12 .
+q: what is 24 plus 9 ? a: 33 .
+question: what is 7 times 15 ? answer: 105 .
+q: what planet is second from the sun ? a: venus .
+question: what is 22 plus 19 ? answer: 41 .
+question: what is the capital of illinois ? answer: springfield .
+q: what is 11 plus 25 ? a: 36 .
+question: what is 18 plus 6 ? answer: 24 .
+q: what is 3 plus 2 ? a: 5 .
+q: what is 18 plus 11 ? a: 29 .
+question: what is 2 plus 14 ? answer: 16 .
+question: what is 18 minus 17 ? answer: 1 .
+q: what is 18 plus 13 ? a: 31 .
+question: what is 25 plus 14 ? answer: 39 .
+question: what is 8 minus 5 ? answer: 3 .
+q: what is 9 plus 21 ? a: 30 .
+question: what is 19 plus 21 ? answer: 40 .
+question: what is 6 plus 23 ? answer: 29 .
+question: what is 19 plus 2 ? answer: 21 .
+q: what is 9 minus 3 ? a: 6 .
+question: what is 13 plus 3 ? answer: 16 .
+q: what is 0 or 0 ? a: 0 .
+question: what is 3 times 9 ? answer: 27 .
+question: what is the chemical symbol for uranium ? answer: u .
+q: what is the capital of finland ? a: helsinki .
+question: what is the capital of colorado ? answer: denver .
+q: what is the capital of wisconsin ? a: madison .
+question: what is 1 times 13 ? answer: 13 .
+question: what is 20 minus 4 ? answer: 16 .
+q: what is 7 times 8 ? a: 56 .
+question: what is 14 times 8 ? answer: 112 .
+q: what is 6 plus 5 ? a: 11 .
+question: what is 9 plus 1 ? answer: 10 .
+question: what is 1 plus 25 ? answer: 26 .
+q: what is 25 plus 23 ? a: 48 .
+q: what is 3 plus 24 ? a: 27 .
+question: what is 9 plus 5 ? answer: 14 .
+q: what element has the chemical symbol f ? a: fluorine .
+question: what is the capital of utah ? answer: salt lake city .
+question: what is 16 plus 9 ? answer: 25 .
+q: what is 14 times 9 ? a: 126 .
+question: what is the capital of missouri ? answer: jefferson city .
+question: what is 20 minus 19 ? answer: 1 .
+q: what is 2 times 12 ? a: 24 .
+question: what is 9 times 4 ? answer: 36 .
+question: what is 18 plus 5 ? answer: 23 .
+q: what is the speed of light in vacuum ? a: 300000 kilometers per second .
+question: what is 2 times 10 ? answer: 20 .
+q: what is 18 minus 11 ? a: 7 .
+q: what is 13 minus 4 ? a: 9 .
+q: what is 7 minus 4 ? a: 3 .
+question: what is 25 plus 13 ? answer: 38 .
+q: what is 18 plus 3 ? a: 21 .
+q: what is 22 plus 13 ? a: 35 .
+question: what is 8 plus 18 ? answer: 26 .
+q: what does ram stand for ? a: random access memory .
+question: what is 18 minus 18 ? answer: 0 .
+question: what is 17 plus 6 ? answer: 23 .
+q: what is 11 minus 6 ? a: 5 .
+question: what is 6 times 15 ? answer: 90 .
+question: what is 14 times 11 ? answer: 154 .
+q: what is 2 times 4 ? a: 8 .
+q: what is 17 plus 20 ? a: 37 .
+q: what is 1 and 0 ? a: 0 .
+question: what is 20 plus 15 ? answer: 35 .
+q: what is 14 times 10 ? a: 140 .
+q: what is 20 plus 24 ? a: 44 .
+question: what is 10 minus 2 ? answer: 8 .
+question: what is 1 plus 12 ? answer: 13 .
+q: what is 6 plus 11 ? a: 17 .
+q: what is 15 times 1 ? a: 15 .
+q: what is 16 plus 18 ? a: 34 .
+question: what is 23 plus 23 ? answer: 46 .
+q: what is 3 minus 2 ? a: 1 .
+question: what is 8 times 14 ? answer: 112 .
+q: what is 13 times 2 ? a: 26 .
+question: what is 9 plus 11 ? answer: 20 .
+question: what is 22 plus 7 ? answer: 29 .
+question: what is 13 minus 10 ? answer: 3 .
+question: what is 23 plus 24 ? answer: 47 .
+question: what is 11 plus 12 ? answer: 23 .
+q: what is the capital of poland ? a: warsaw .
+q: what is 11 times 4 ? a: 44 .
+question: what is 9 times 8 ? answer: 72 .
+question: what is 23 plus 9 ? answer: 32 .
+question: what is 17 plus 9 ? answer: 26 .
+question: what is 13 times 11 ? answer: 143 .
+q: what is 1 times 5 ? a: 5 .
+q: what planet is third from the sun ? a: earth .
+question: what is the capital of portugal ? answer: lisbon .
+question: what is 2 minus 1 ? answer: 1 .
+question: what is 15 times 1 ? answer: 15 .
+question: what is 7 plus 11 ? answer: 18 .
+q: what is the chemical symbol for lithium ? a: li .
+q: what is 4 times 15 ? a: 60 .
+q: what is 8 plus 21 ? a: 29 .
+q: what is 13 plus 16 ? a: 29 .
+question: what is 14 plus 22 ? answer: 36 .
+q: what is 25 plus 10 ? a: 35 .
+question: what is 11 plus 22 ? answer: 33 .
+q: what is 12 times 2 ? a: 24 .
+q: what is 4 plus 20 ? a: 24 .
+q: what is 0 and 1 ? a: 0 .
+question: what is 20 plus 4 ? answer: 24 .
+q: what is 16 minus 9 ? a: 7 .
+question: what is 15 plus 10 ? answer: 25 .
+question: what is 21 plus 2 ? answer: 23 .
+q: what is 8 plus 9 ? a: 17 .
+question: what is 6 times 7 ? answer: 42 .
+q: what is 8 times 12 ? a: 96 .
+question: what is 10 plus 24 ? answer: 34 .
+question: what is 2 times 4 ? answer: 8 .
+question: what is 15 plus 23 ? answer: 38 .
+q: what is 7 plus 2 ? a: 9 .
+q: how many days are in one week ? a: 7 days .
+q: what is 12 plus 16 ? a: 28 .
+question: what is 10 plus 7 ? answer: 17 .
+q: what is 9 minus 6 ? a: 3 .
+q: what is 18 plus 2 ? a: 20 .
+question: what is 5 minus 4 ? answer: 1 .
+q: what sound does a snake make ? a: hiss .
+q: what is 17 minus 14 ? a: 3 .
+question: what is 4 times 15 ? answer: 60 .
+question: what is 8 plus 22 ? answer: 30 .
+q: what is 13 times 1 ? a: 13 .
+q: what is 13 minus 11 ? a: 2 .
+q: what is 24 plus 16 ? a: 40 .
+question: what is 16 plus 25 ? answer: 41 .
+q: what is 20 plus 18 ? a: 38 .
+q: what is 9 times 3 ? a: 27 .
+q: what is 13 plus 2 ? a: 15 .
+question: what is 12 plus 25 ? answer: 37 .
+question: what is 7 plus 23 ? answer: 30 .
+question: what is 20 minus 18 ? answer: 2 .
+q: what is 13 plus 17 ? a: 30 .
+q: what is 2 plus 24 ? a: 26 .
+q: what is 7 times 13 ? a: 91 .
+question: what is 18 minus 8 ? answer: 10 .
+question: what is 16 plus 10 ? answer: 26 .
+question: what is 24 plus 22 ? answer: 46 .
+question: what is 17 plus 11 ? answer: 28 .
+q: what is the largest continent ? a: asia .
+q: what is 18 minus 17 ? a: 1 .
+q: what is 17 plus 1 ? a: 18 .
+question: what is 4 plus 25 ? answer: 29 .
+q: what is 24 plus 11 ? a: 35 .
+q: what is 23 plus 20 ? a: 43 .
+question: what is 6 times 4 ? answer: 24 .
+q: what is 19 minus 11 ? a: 8 .
+question: what is 10 times 2 ? answer: 20 .
+question: what is 13 plus 18 ? answer: 31 .
+q: what is 3 times 11 ? a: 33 .
+q: what is the chemical symbol for oxygen ? a: o .
+q: what is 1 or 0 ? a: 1 .
+question: what is 2 plus 23 ? answer: 25 .
+question: what is 14 times 1 ? answer: 14 .
+question: what is 17 plus 20 ? answer: 37 .
+question: what is the capital of finland ? answer: helsinki .
+question: what is 3 plus 18 ? answer: 21 .
+question: what is 11 times 10 ? answer: 110 .
+question: what does lpu stand for ? answer: language processing unit .
+question: what is 11 plus 20 ? answer: 31 .
+q: what is 5 plus 25 ? a: 30 .
+question: what is 18 plus 22 ? answer: 40 .
+q: what is 21 plus 25 ? a: 46 .
+q: what is 23 plus 22 ? a: 45 .
+question: what is 10 times 13 ? answer: 130 .
+question: what is 5 plus 12 ? answer: 17 .
+q: what is 16 minus 2 ? a: 14 .
+q: what is 9 times 12 ? a: 108 .
+q: what is 9 plus 25 ? a: 34 .
+question: what is 1 plus 24 ? answer: 25 .
+question: what is the capital of south korea ? answer: seoul .
+q: what is 19 minus 13 ? a: 6 .
+q: what is 6 times 11 ? a: 66 .
+q: what is 14 plus 15 ? a: 29 .
+question: what is 14 plus 2 ? answer: 16 .
+question: what animal has a long trunk ? answer: elephant .
+question: what is 15 times 10 ? answer: 150 .
+question: what is 4 times 14 ? answer: 56 .
+question: what is 19 plus 18 ? answer: 37 .
+q: what is 3 times 8 ? a: 24 .
+question: what is 8 times 1 ? answer: 8 .
+q: what is 11 times 3 ? a: 33 .
+question: what is 11 times 4 ? answer: 44 .
+q: what is the capital of mexico ? a: mexico city .
+q: what is 10 times 5 ? a: 50 .
+q: what is 17 plus 5 ? a: 22 .
+question: what is 6 times 2 ? answer: 12 .
+question: what is 10 plus 19 ? answer: 29 .
+question: what is 18 minus 2 ? answer: 16 .
+question: what is 9 plus 24 ? answer: 33 .
+question: what is 16 minus 10 ? answer: 6 .
+q: what is 0 xor 1 ? a: 1 .
+question: what is 7 minus 2 ? answer: 5 .
+q: what is 1 plus 17 ? a: 18 .
+q: who invented the light bulb ? a: thomas edison .
+question: what is 8 plus 16 ? answer: 24 .
+q: what is 6 plus 15 ? a: 21 .
+question: what is 18 plus 25 ? answer: 43 .
+q: what is the capital of japan ? a: tokyo .
+question: what is the famous clock tower in london ? answer: big ben .
+question: what is 6 plus 12 ? answer: 18 .
+question: what is 14 times 6 ? answer: 84 .
+question: what is 5 plus 17 ? answer: 22 .
+question: what is 8 plus 5 ? answer: 13 .
+q: what is 9 times 15 ? a: 135 .
+question: what is 19 minus 10 ? answer: 9 .
+question: what element has the chemical symbol ni ? answer: nickel .
+q: what is the chemical symbol for helium ? a: he .
+question: what is 9 minus 5 ? answer: 4 .
+q: what is 18 plus 10 ? a: 28 .
+question: what is 20 minus 9 ? answer: 11 .
+question: what is 23 plus 4 ? answer: 27 .
+q: what is 7 plus 14 ? a: 21 .
+q: what is 7 times 12 ? a: 84 .
+q: what is 13 plus 6 ? a: 19 .
+question: what is 18 plus 12 ? answer: 30 .
+question: what element has the chemical symbol li ? answer: lithium .
+question: what is 4 times 9 ? answer: 36 .
+question: what is 9 times 1 ? answer: 9 .
+question: what is 16 plus 1 ? answer: 17 .
+question: what is 2 plus 19 ? answer: 21 .
+question: what is 7 plus 18 ? answer: 25 .
+question: what is 20 plus 12 ? answer: 32 .
+q: what is 9 times 8 ? a: 72 .
+q: what is 23 plus 5 ? a: 28 .
+q: what is 14 times 14 ? a: 196 .
+question: what is 6 times 13 ? answer: 78 .
+q: what is 11 minus 4 ? a: 7 .
+question: what is 15 times 9 ? answer: 135 .
+question: what is 3 plus 5 ? answer: 8 .
+question: what is 9 plus 17 ? answer: 26 .
+q: what is 6 plus 1 ? a: 7 .
+q: what is 3 plus 6 ? a: 9 .
+q: what is 1 plus 10 ? a: 11 .
+q: what is 9 minus 1 ? a: 8 .
+question: what is 19 minus 4 ? answer: 15 .
+question: what is 21 plus 11 ? answer: 32 .
+q: what is 1 times 2 ? a: 2 .
+question: what is 19 plus 8 ? answer: 27 .
+q: what is 8 times 8 ? a: 64 .
+q: what animal says woof ? a: dog .
+question: what is the second largest ocean ? answer: atlantic ocean .
+question: what is 4 plus 4 ? answer: 8 .
+q: what is 7 plus 5 ? a: 12 .
+q: what is 4 plus 6 ? a: 10 .
+question: what is 14 plus 21 ? answer: 35 .
+question: what is 14 plus 19 ? answer: 33 .
+question: what is 7 plus 12 ? answer: 19 .
+question: what is 13 plus 14 ? answer: 27 .
+q: what is 8 plus 11 ? a: 19 .
+q: what is 21 plus 6 ? a: 27 .
+question: what is 2 plus 22 ? answer: 24 .
+question: what is 14 times 2 ? answer: 28 .
+question: what is 7 times 12 ? answer: 84 .
+q: what is 13 times 11 ? a: 143 .
+question: what is 16 plus 17 ? answer: 33 .
+q: what is 8 times 13 ? a: 104 .
+q: what is 2 minus 2 ? a: 0 .
+q: what is 17 plus 8 ? a: 25 .
+q: what is 25 plus 18 ? a: 43 .
+q: what is 9 plus 13 ? a: 22 .
+question: what is 9 plus 3 ? answer: 12 .
+question: what is 18 plus 2 ? answer: 20 .
+q: what is 7 plus 7 ? a: 14 .
+question: what element has the chemical symbol ar ? answer: argon .
+q: what is 19 minus 7 ? a: 12 .
+q: what is the capital of russia ? a: moscow .
+q: what sound does a cow make ? a: moo .
+q: what is 7 plus 21 ? a: 28 .
+q: what is 8 times 4 ? a: 32 .
+question: what is 11 minus 4 ? answer: 7 .
+question: what is 20 minus 8 ? answer: 12 .
+question: what is the capital of turkey ? answer: ankara .
+question: what is 13 plus 21 ? answer: 34 .
+q: what is 11 times 2 ? a: 22 .
+q: what is 13 minus 8 ? a: 5 .
+question: what is the capital of maryland ? answer: annapolis .
+q: what is the capital of ohio ? a: columbus .
+question: what is 13 minus 12 ? answer: 1 .
+q: what is 7 plus 23 ? a: 30 .
+q: what is the chemical symbol for argon ? a: ar .
+q: what is 7 times 2 ? a: 14 .
+q: what is the capital of denmark ? a: copenhagen .
+question: what is the capital of austria ? answer: vienna .
+question: what is 11 times 5 ? answer: 55 .
+question: what is 1 times 8 ? answer: 8 .
+question: what is 9 minus 1 ? answer: 8 .
+question: what is 3 plus 6 ? answer: 9 .
+q: what is 16 plus 22 ? a: 38 .
+question: what is 24 plus 18 ? answer: 42 .
+q: what is 9 plus 11 ? a: 20 .
+q: what is 11 minus 7 ? a: 4 .
+question: what is 21 plus 18 ? answer: 39 .
+q: what sound does a lion make ? a: roar .
+question: what is 17 minus 16 ? answer: 1 .
+q: what star is at the center of our solar system ? a: the sun .
+q: what element has the chemical symbol cu ? a: copper .
+question: what does rom stand for ? answer: read only memory .
+question: what is 4 times 12 ? answer: 48 .
+question: what element has the chemical symbol al ? answer: aluminum .
+question: what is 20 minus 10 ? answer: 10 .
+q: what is 1 plus 3 ? a: 4 .
+question: what is 4 plus 6 ? answer: 10 .
+question: what is 3 times 4 ? answer: 12 .
+q: what is 11 plus 4 ? a: 15 .
+q: what is 14 minus 5 ? a: 9 .
+q: what is 9 minus 2 ? a: 7 .
+q: what is 5 plus 3 ? a: 8 .
+question: what is 14 plus 10 ? answer: 24 .
+question: what is 8 plus 15 ? answer: 23 .
+q: what is 5 times 15 ? a: 75 .
+q: what is 15 times 11 ? a: 165 .
+q: what element has the chemical symbol c ? a: carbon .
+question: what is 7 plus 1 ? answer: 8 .
+question: what element has the chemical symbol ag ? answer: silver .
+q: what is 4 plus 11 ? a: 15 .
+question: what is 4 plus 12 ? answer: 16 .
+q: what is 18 minus 15 ? a: 3 .
+question: what is 10 plus 15 ? answer: 25 .
+q: what is 10 minus 10 ? a: 0 .
+q: what color do you get when you mix blue and yellow ? a: green .
+question: what is 14 minus 14 ? answer: 0 .
+q: what is 4 times 3 ? a: 12 .
+question: what is 15 plus 12 ? answer: 27 .
+question: what is 17 plus 4 ? answer: 21 .
+question: what is 7 plus 8 ? answer: 15 .
+q: what is the capital of netherlands ? a: amsterdam .
+q: what is 19 minus 6 ? a: 13 .
+q: what is the chemical symbol for aluminum ? a: al .
+q: what is the capital of texas ? a: austin .
+question: what element has the chemical symbol na ? answer: sodium .
+q: what is 7 times 7 ? a: 49 .
+question: what is 1 plus 2 ? answer: 3 .
+question: what is 11 plus 16 ? answer: 27 .
+q: what is 15 plus 5 ? a: 20 .
+q: what is 14 plus 3 ? a: 17 .
+question: what is 16 plus 3 ? answer: 19 .
+q: what is 2 times 7 ? a: 14 .
+question: what planet has famous rings around it ? answer: saturn .
+question: what is the capital of new york ? answer: albany .
+question: what is 4 plus 9 ? answer: 13 .
+q: what is 17 minus 9 ? a: 8 .
+question: what is the chemical symbol for silicon ? answer: si .
+q: what is the capital of connecticut ? a: hartford .
+question: what is 19 plus 5 ? answer: 24 .
+question: what is 7 plus 14 ? answer: 21 .
+q: what is 1 plus 15 ? a: 16 .
+q: what is 19 minus 19 ? a: 0 .
+q: what is 6 plus 7 ? a: 13 .
+q: what is 15 times 15 ? a: 225 .
+question: what is 16 plus 24 ? answer: 40 .
+q: what is 11 plus 15 ? a: 26 .
+question: what is 14 times 13 ? answer: 182 .
+q: what is 3 plus 14 ? a: 17 .
+q: what is 11 plus 20 ? a: 31 .
+q: what is 19 plus 12 ? a: 31 .
+question: what is 11 times 3 ? answer: 33 .
+question: what is 3 plus 22 ? answer: 25 .
+question: what is 23 plus 22 ? answer: 45 .
+q: what is 23 plus 9 ? a: 32 .
+question: what is 16 minus 9 ? answer: 7 .
+question: what is 14 plus 14 ? answer: 28 .
+question: what is 17 minus 6 ? answer: 11 .
+question: what is the largest river by water volume ? answer: amazon river .
+q: what is 4 plus 4 ? a: 8 .
+question: what is 2 plus 13 ? answer: 15 .
+q: what is 5 plus 8 ? a: 13 .
+q: what is 15 minus 5 ? a: 10 .
+question: what is 6 minus 4 ? answer: 2 .
+question: what is 7 times 5 ? answer: 35 .
+q: what is 16 minus 16 ? a: 0 .
+question: how many minutes are in one hour ? answer: 60 minutes .
+question: what is 4 plus 20 ? answer: 24 .
+q: what is 8 plus 25 ? a: 33 .
+question: what is the chemical symbol for mercury ? answer: hg .
+question: what is 19 plus 12 ? answer: 31 .
+q: what is 25 plus 1 ? a: 26 .
+q: what is 7 minus 7 ? a: 0 .
+question: what is 14 plus 6 ? answer: 20 .
+q: what is the chemical symbol for chlorine ? a: cl .
+question: what is 14 times 9 ? answer: 126 .
+question: what animal says moo ? answer: cow .
+q: what is 19 plus 21 ? a: 40 .
+q: what is the capital of sweden ? a: stockholm .
+question: what is 6 plus 22 ? answer: 28 .
+q: what force pulls objects toward earth ? a: gravity .
+q: what is 7 plus 18 ? a: 25 .
+q: what is the chemical symbol for uranium ? a: u .
+q: what is the freezing point of water in celsius ? a: 0 degrees .
+q: what is 17 plus 22 ? a: 39 .
+question: what is 5 times 8 ? answer: 40 .
+question: what is the capital of canada ? answer: ottawa .
+question: what is 13 minus 9 ? answer: 4 .
+q: what is 2 times 1 ? a: 2 .
+q: what is 1 xor 0 ? a: 1 .
+question: what is 9 plus 25 ? answer: 34 .
+question: what element has the chemical symbol k ? answer: potassium .
+q: what is 17 plus 10 ? a: 27 .
+q: what is 2 plus 7 ? a: 9 .
+q: how many sides does a pentagon have ? a: 5 sides .
+q: what is the capital of france ? a: paris .
+q: what is 18 plus 1 ? a: 19 .
+question: what is 3 minus 2 ? answer: 1 .
+q: what state of matter is ice ? a: solid .
+question: what is 10 minus 7 ? answer: 3 .
+question: what is 22 plus 25 ? answer: 47 .
+question: what is 12 minus 6 ? answer: 6 .
+q: what is 9 times 7 ? a: 63 .
+question: what is 10 plus 21 ? answer: 31 .
+question: what is 14 plus 4 ? answer: 18 .
+q: what is 10 minus 3 ? a: 7 .
+q: what is 9 plus 23 ? a: 32 .
+question: what is 2 plus 24 ? answer: 26 .
+q: what is 9 minus 8 ? a: 1 .
+question: what is 24 plus 9 ? answer: 33 .
+q: what is the capital of oregon ? a: salem .
+question: what is 8 minus 3 ? answer: 5 .
+question: what color is the sky on a clear day ? answer: blue .
+question: what is 11 times 15 ? answer: 165 .
+q: what does dram stand for ? a: dynamic random access memory .
+q: what element has the chemical symbol zn ? a: zinc .
+q: what is 17 plus 16 ? a: 33 .
+q: what is 12 plus 14 ? a: 26 .
+q: what is 5 times 2 ? a: 10 .
+question: what element has the chemical symbol he ? answer: helium .
+q: what is 6 plus 8 ? a: 14 .
+q: what is the capital of south korea ? a: seoul .
+question: what is 17 plus 14 ? answer: 31 .
+q: what is 1 plus 18 ? a: 19 .
+q: what is 12 minus 10 ? a: 2 .
+question: what is 13 plus 6 ? answer: 19 .
+question: what is 7 times 2 ? answer: 14 .
+question: what is 12 minus 2 ? answer: 10 .
+q: what element has the chemical symbol b ? a: boron .
+q: what is the capital of spain ? a: madrid .
+q: what sound does a duck make ? a: quack .
+question: what is 6 plus 24 ? answer: 30 .
+q: what is 2 plus 21 ? a: 23 .
+question: what is 19 minus 18 ? answer: 1 .
+q: what is 3 times 5 ? a: 15 .
+q: what is 3 plus 21 ? a: 24 .
+q: what is 25 plus 25 ? a: 50 .
+q: what is 18 minus 2 ? a: 16 .
+q: what is 1 plus 8 ? a: 9 .
+question: what is 9 plus 9 ? answer: 18 .
+q: what continent is south pole on ? a: antarctica .
+question: what process do plants use to make food from sunlight ? answer: photosynthesis .
+question: what is 15 times 2 ? answer: 30 .
+question: what is 1 times 3 ? answer: 3 .
+question: what is 7 times 8 ? answer: 56 .
+question: what is 6 times 10 ? answer: 60 .
+q: what is 17 minus 1 ? a: 16 .
+question: what is 6 times 1 ? answer: 6 .
+q: what is 1 times 7 ? a: 7 .
+question: what is 7 plus 2 ? answer: 9 .
+q: what is 21 plus 23 ? a: 44 .
+question: what is 8 plus 12 ? answer: 20 .
+q: what is 13 plus 11 ? a: 24 .
+question: what is 14 plus 9 ? answer: 23 .
+question: what is 7 minus 6 ? answer: 1 .
+q: what is 24 plus 8 ? a: 32 .
+q: what is 4 plus 23 ? a: 27 .
+question: what is 15 plus 1 ? answer: 16 .
+q: what is 17 plus 2 ? a: 19 .
+q: what is 4 plus 5 ? a: 9 .
+question: what is the chemical symbol for iron ? answer: fe .
+question: what is 14 plus 8 ? answer: 22 .
+q: what is 13 plus 3 ? a: 16 .
+q: what is 25 plus 24 ? a: 49 .
+q: what is the chemical symbol for sodium ? a: na .
+q: what is 15 minus 9 ? a: 6 .
+question: what is 12 times 7 ? answer: 84 .
+question: what is 16 plus 22 ? answer: 38 .
+question: what is 13 times 8 ? answer: 104 .
+question: what element has the chemical symbol o ? answer: oxygen .
+q: what is 15 minus 6 ? a: 9 .
+q: what is 20 plus 1 ? a: 21 .
+question: what is 4 plus 5 ? answer: 9 .
+q: what is 9 times 4 ? a: 36 .
+question: what is 9 plus 16 ? answer: 25 .
+question: what is 5 times 5 ? answer: 25 .
+q: what element has the chemical symbol he ? a: helium .
+question: what is 2 plus 4 ? answer: 6 .
+q: what is 17 plus 19 ? a: 36 .
+q: what is the chemical symbol for beryllium ? a: be .
+question: what is 22 plus 21 ? answer: 43 .
+question: what is 1 xor 1 ? answer: 0 .
+question: what is 20 plus 10 ? answer: 30 .
+question: what is the capital of spain ? answer: madrid .
+q: what is 21 plus 4 ? a: 25 .
+question: what gas do humans breathe in to live ? answer: oxygen .
+q: what is 8 plus 23 ? a: 31 .
+question: what is 16 minus 13 ? answer: 3 .
+question: what is 6 plus 11 ? answer: 17 .
+question: what is 4 plus 3 ? answer: 7 .
+q: what is 14 plus 24 ? a: 38 .
+q: what is 4 plus 2 ? a: 6 .
+q: what is the boiling point of water in celsius ? a: 100 degrees .
+question: what is 23 plus 11 ? answer: 34 .
+q: what element has the chemical symbol au ? a: gold .
+q: what is 15 minus 15 ? a: 0 .
+question: what is 10 minus 1 ? answer: 9 .
+q: what is 11 times 6 ? a: 66 .
+q: what is 14 plus 11 ? a: 25 .
+q: what is 25 plus 20 ? a: 45 .
+question: what is 13 times 3 ? answer: 39 .
+q: what is 15 minus 7 ? a: 8 .
+question: what is 3 times 13 ? answer: 39 .
+q: what is 6 times 6 ? a: 36 .
+question: what is 22 plus 10 ? answer: 32 .
+question: what is 3 times 3 ? answer: 9 .
+question: what is 4 plus 8 ? answer: 12 .
+question: what is 5 plus 14 ? answer: 19 .
+question: what is 16 plus 19 ? answer: 35 .
+question: what is 14 plus 13 ? answer: 27 .
+q: what is 1 plus 12 ? a: 13 .
+q: what is 10 plus 25 ? a: 35 .
+q: what is 20 minus 7 ? a: 13 .
+q: what is 16 plus 11 ? a: 27 .
+question: what is 10 plus 17 ? answer: 27 .
+q: what is 5 plus 6 ? a: 11 .
+question: what is 20 plus 8 ? answer: 28 .
+question: what is 19 plus 7 ? answer: 26 .
+q: what is 11 plus 2 ? a: 13 .
+q: what is 5 plus 11 ? a: 16 .
+q: what is 3 plus 1 ? a: 4 .
+q: what is 0 or 1 ? a: 1 .
+q: what is 7 plus 8 ? a: 15 .
+q: what is 15 minus 13 ? a: 2 .
+q: what is 10 times 10 ? a: 100 .
+q: what is 5 plus 9 ? a: 14 .
+q: what is 1 times 14 ? a: 14 .
+question: what is 10 minus 10 ? answer: 0 .
+question: what is 20 plus 13 ? answer: 33 .
+q: what is 11 plus 9 ? a: 20 .
+question: what is 10 plus 8 ? answer: 18 .
+question: what is 16 plus 15 ? answer: 31 .
+q: what element has the chemical symbol k ? a: potassium .
+q: what is the capital of united states ? a: washington dc .
+q: what is 13 plus 10 ? a: 23 .
+question: what is 20 minus 16 ? answer: 4 .
+q: what is 4 times 7 ? a: 28 .
+question: what is 21 plus 3 ? answer: 24 .
+question: what element has the chemical symbol ne ? answer: neon .
+question: what is 10 times 7 ? answer: 70 .
+question: what is 14 plus 11 ? answer: 25 .
+question: what is 22 plus 16 ? answer: 38 .
+q: what is 8 minus 1 ? a: 7 .
+question: what ocean is near india ? answer: indian ocean .
+q: what is 9 minus 9 ? a: 0 .
+q: what is 0 xor 0 ? a: 0 .
+q: what is 7 times 9 ? a: 63 .
+q: what is 3 times 15 ? a: 45 .
+question: what is 20 plus 3 ? answer: 23 .
+question: what is 5 plus 1 ? answer: 6 .
+q: what is 10 times 8 ? a: 80 .
+question: what is 12 plus 18 ? answer: 30 .
+q: what is 18 plus 21 ? a: 39 .
+q: what is 25 plus 17 ? a: 42 .
+q: what is 5 minus 1 ? a: 4 .
+q: what is 11 plus 17 ? a: 28 .
+q: what is 16 plus 12 ? a: 28 .
+q: what is 9 plus 4 ? a: 13 .
+question: what is 20 minus 7 ? answer: 13 .
+question: what is 13 plus 24 ? answer: 37 .
+question: what is 11 plus 15 ? answer: 26 .
+question: what is 18 plus 18 ? answer: 36 .
+question: what is 14 minus 12 ? answer: 2 .
+question: what is 23 plus 25 ? answer: 48 .
+question: what is 23 plus 21 ? answer: 44 .
+q: what galaxy do we live in ? a: milky way galaxy .
+q: what is 12 plus 11 ? a: 23 .
+q: what is 7 times 5 ? a: 35 .
+question: what is 13 minus 7 ? answer: 6 .
+question: what sound does a cat make ? answer: meow .
+question: what is 22 plus 12 ? answer: 34 .
+question: what is 12 plus 6 ? answer: 18 .
+q: what is 1 times 11 ? a: 11 .
+q: what is 9 plus 6 ? a: 15 .
+q: what is 1 and 1 ? a: 1 .
+q: what is 11 times 13 ? a: 143 .
+question: what is 22 plus 22 ? answer: 44 .
+question: what is 5 plus 6 ? answer: 11 .
+q: what is 5 plus 5 ? a: 10 .
+question: what is 19 plus 6 ? answer: 25 .
+question: what is 14 minus 8 ? answer: 6 .
+question: what is 15 minus 7 ? answer: 8 .
+q: what is 12 times 15 ? a: 180 .
+question: what is 5 times 3 ? answer: 15 .
+question: what is 15 plus 16 ? answer: 31 .
+q: what is 6 plus 2 ? a: 8 .
+q: what is 17 plus 14 ? a: 31 .
+q: what is 17 minus 5 ? a: 12 .
+q: what is 14 minus 7 ? a: 7 .
+question: what is 15 plus 2 ? answer: 17 .
+q: what is 3 times 4 ? a: 12 .
+question: what is 6 minus 2 ? answer: 4 .
+q: what is 23 plus 12 ? a: 35 .
+q: what is 21 plus 13 ? a: 34 .
+question: who invented the light bulb ? answer: thomas edison .
+question: what gas do humans breathe out ? answer: carbon dioxide .
+q: what is the capital of switzerland ? a: bern .
+q: what is 4 times 10 ? a: 40 .
+q: what is 23 plus 10 ? a: 33 .
+q: what is 1 times 8 ? a: 8 .
+q: what planet is seventh from the sun ? a: uranus .
+q: what is 2 plus 17 ? a: 19 .
+question: what is 13 plus 13 ? answer: 26 .
+question: what is 25 plus 4 ? answer: 29 .
+q: what is 3 times 14 ? a: 42 .
+q: what is 22 plus 6 ? a: 28 .
+q: what is 5 minus 5 ? a: 0 .
+question: how many sides does a hexagon have ? answer: 6 sides .
+question: what is 12 plus 4 ? answer: 16 .
+question: what is 5 times 1 ? answer: 5 .
+question: what is 8 times 4 ? answer: 32 .
+q: what is 7 minus 6 ? a: 1 .
+q: what is 25 plus 7 ? a: 32 .
+question: what is 18 minus 6 ? answer: 12 .
+question: what is 18 plus 11 ? answer: 29 .
+q: what is 22 plus 19 ? a: 41 .
+question: what is 5 minus 2 ? answer: 3 .
+q: what color is fresh snow ? a: white .
+q: what is 12 plus 15 ? a: 27 .
+q: what is 1 times 10 ? a: 10 .
+question: what is the tallest building in the world ? answer: burj khalifa in dubai .
+q: what element has the chemical symbol na ? a: sodium .
+q: what is 19 minus 16 ? a: 3 .
+question: what is 16 plus 11 ? answer: 27 .
+question: what is 10 plus 12 ? answer: 22 .
+question: what is 1 times 7 ? answer: 7 .
+q: what is 16 minus 12 ? a: 4 .
+q: what animal says crow ? a: rooster .
+question: what is 6 plus 14 ? answer: 20 .
+q: what state of matter is liquid water ? a: liquid .
+question: what is 1 plus 11 ? answer: 12 .
+question: what is 17 minus 11 ? answer: 6 .
+question: what is 14 times 4 ? answer: 56 .
+q: what is 13 plus 7 ? a: 20 .
+question: what is 16 minus 7 ? answer: 9 .
+question: what is 2 plus 8 ? answer: 10 .
+q: what is 18 minus 1 ? a: 17 .
+q: what is 2 times 15 ? a: 30 .
+question: what is 5 plus 20 ? answer: 25 .
+question: what is 24 plus 4 ? answer: 28 .
+question: what is 18 minus 15 ? answer: 3 .
+question: what is 2 plus 16 ? answer: 18 .
+question: what is 5 plus 11 ? answer: 16 .
+q: what is 8 plus 6 ? a: 14 .
+q: what is 18 plus 9 ? a: 27 .
+question: what is 16 minus 14 ? answer: 2 .
+question: what is 5 times 10 ? answer: 50 .
+question: what is 21 plus 21 ? answer: 42 .
+q: what is 16 plus 1 ? a: 17 .
+q: what is 3 plus 17 ? a: 20 .
+q: what does rom stand for ? a: read only memory .
+q: what is the capital of tennessee ? a: nashville .
+question: what is 16 minus 3 ? answer: 13 .
+q: what is 3 times 6 ? a: 18 .
+q: what is 4 plus 12 ? a: 16 .
+q: what is 10 times 12 ? a: 120 .
+question: what is 20 minus 15 ? answer: 5 .
+question: what is 10 times 10 ? answer: 100 .
+question: what is 10 plus 6 ? answer: 16 .
+question: what is the capital of united states ? answer: washington dc .
+question: what is the tallest land animal ? answer: giraffe .
+q: what organ pumps blood in human body ? a: heart .
+q: what is the chemical symbol for fluorine ? a: f .
+q: what is 13 times 8 ? a: 104 .
+q: what is 1 times 13 ? a: 13 .
+q: what is 18 plus 25 ? a: 43 .
+q: what is 7 minus 3 ? a: 4 .
+q: what is 9 times 10 ? a: 90 .
+q: what is 16 plus 14 ? a: 30 .
+q: what is 6 plus 19 ? a: 25 .
+q: what is 13 times 13 ? a: 169 .
+q: what is the largest planet in our solar system ? a: jupiter .
+q: what is 22 plus 17 ? a: 39 .
+q: what is 12 plus 12 ? a: 24 .
+q: what is 3 times 13 ? a: 39 .
+q: what is 1 plus 24 ? a: 25 .
+question: what is 19 plus 13 ? answer: 32 .
+q: what is 6 plus 23 ? a: 29 .
+q: what is 12 times 9 ? a: 108 .
+q: what element has the chemical symbol be ? a: beryllium .
+q: what is 13 plus 25 ? a: 38 .
+question: what is 13 minus 1 ? answer: 12 .
+question: what is 11 plus 3 ? answer: 14 .
+question: what is 17 plus 13 ? answer: 30 .
+q: what is 10 plus 16 ? a: 26 .
+question: what is 2 plus 1 ? answer: 3 .
+question: what is 7 plus 16 ? answer: 23 .
+q: what element has the chemical symbol cl ? a: chlorine .
+question: what is 15 plus 25 ? answer: 40 .
+q: what is 15 plus 8 ? a: 23 .
+q: what is 12 plus 25 ? a: 37 .
+question: what is 19 minus 19 ? answer: 0 .
+question: what is 12 plus 16 ? answer: 28 .
+q: what is 2 plus 14 ? a: 16 .
+question: what is 22 plus 4 ? answer: 26 .
+q: what is 22 plus 25 ? a: 47 .
+q: what is 8 times 9 ? a: 72 .
+q: what is 20 minus 14 ? a: 6 .
+q: what is 9 plus 19 ? a: 28 .
+q: what is 22 plus 11 ? a: 33 .
+question: what is 19 plus 22 ? answer: 41 .
+q: what is 3 times 2 ? a: 6 .
+q: what is 14 times 4 ? a: 56 .
+q: what is 18 plus 20 ? a: 38 .
+q: what is 13 minus 10 ? a: 3 .
+q: what is 12 minus 3 ? a: 9 .
+q: what is 5 plus 13 ? a: 18 .
+question: what is 20 minus 6 ? answer: 14 .
+q: what is 16 plus 10 ? a: 26 .
+q: what is 11 plus 11 ? a: 22 .
+question: what is 12 times 5 ? answer: 60 .
+q: what element has the chemical symbol o ? a: oxygen .
+question: what is 21 plus 5 ? answer: 26 .
+q: what is 17 plus 24 ? a: 41 .
+question: what is 1 plus 23 ? answer: 24 .
+q: what is 4 minus 4 ? a: 0 .
+q: how many sides does a hexagon have ? a: 6 sides .
+q: what is 12 plus 6 ? a: 18 .
+question: what is 12 plus 13 ? answer: 25 .
+question: what is 9 minus 7 ? answer: 2 .
+question: what is 11 plus 1 ? answer: 12 .
+q: what is 24 plus 19 ? a: 43 .
+q: what element has the chemical symbol p ? a: phosphorus .
+question: what is the capital of denmark ? answer: copenhagen .
+question: what is 11 times 6 ? answer: 66 .
+q: what is the capital of florida ? a: tallahassee .
+question: where is the statue of liberty ? answer: new york city .
+question: what is 4 minus 2 ? answer: 2 .
+question: what color is a ripe banana ? answer: yellow .
+q: what color is grass ? a: green .
+question: what element has the chemical symbol u ? answer: uranium .
+q: what is 18 plus 8 ? a: 26 .
+question: what is 13 plus 19 ? answer: 32 .
+question: what is 3 plus 10 ? answer: 13 .
+q: what is the capital of california ? a: sacramento .
+question: what is 6 minus 1 ? answer: 5 .
+question: what is 7 times 10 ? answer: 70 .
+q: what is 21 plus 21 ? a: 42 .
+q: what is not 0 ? a: 1 .
+q: what is 19 plus 24 ? a: 43 .
+q: what is 15 plus 21 ? a: 36 .
+q: what is the chemical symbol for mercury ? a: hg .
+question: what is 18 plus 17 ? answer: 35 .
+q: what is 21 plus 9 ? a: 30 .
+q: what element has the chemical symbol ca ? a: calcium .
+question: what is 7 times 7 ? answer: 49 .
+question: what is 8 plus 7 ? answer: 15 .
+question: what is 12 plus 12 ? answer: 24 .
+question: what is 16 minus 5 ? answer: 11 .
+q: what is 24 plus 14 ? a: 38 .
+question: what is the capital of argentina ? answer: buenos aires .
+q: what is 10 plus 14 ? a: 24 .
+question: what is 5 plus 22 ? answer: 27 .
+q: what is 25 plus 11 ? a: 36 .
+q: what is 7 plus 1 ? a: 8 .
+question: what is 16 plus 5 ? answer: 21 .
+question: what is 1 plus 14 ? answer: 15 .
+question: what is 8 plus 14 ? answer: 22 .
+question: what is 17 plus 22 ? answer: 39 .
+q: what is 1 times 6 ? a: 6 .
+question: what is 5 times 13 ? answer: 65 .
+q: what is 10 times 1 ? a: 10 .
+question: what is 6 plus 18 ? answer: 24 .
+question: what star is at the center of our solar system ? answer: the sun .
+q: what is 15 plus 25 ? a: 40 .
+question: what is 14 minus 11 ? answer: 3 .
+question: what is 12 plus 21 ? answer: 33 .
+q: what is 16 minus 4 ? a: 12 .
+question: what is 8 minus 2 ? answer: 6 .
+q: what is 14 plus 18 ? a: 32 .
+question: what is 25 plus 17 ? answer: 42 .
+q: what is 11 plus 7 ? a: 18 .
+q: what is 18 plus 4 ? a: 22 .
+question: what is 19 plus 19 ? answer: 38 .
+question: what is 14 plus 3 ? answer: 17 .
+question: what is 9 times 15 ? answer: 135 .
+q: what is 16 plus 24 ? a: 40 .
+q: what is 2 plus 6 ? a: 8 .
+q: what is 3 plus 20 ? a: 23 .
+q: what is 16 plus 15 ? a: 31 .
+q: what is 2 minus 1 ? a: 1 .
+q: what is 19 plus 7 ? a: 26 .
+q: what is 11 plus 10 ? a: 21 .
+question: what is 13 plus 7 ? answer: 20 .
+q: what is 19 minus 8 ? a: 11 .
+q: what is 16 plus 13 ? a: 29 .
+q: what is 14 plus 9 ? a: 23 .
+question: what is 22 plus 18 ? answer: 40 .
+q: what is 3 times 1 ? a: 3 .
+q: what is 13 times 6 ? a: 78 .
+question: what is 19 plus 9 ? answer: 28 .
+question: what is 15 minus 10 ? answer: 5 .
+q: what animal says oink ? a: pig .
+q: what is 24 plus 6 ? a: 30 .
+q: what is 11 times 5 ? a: 55 .
+q: what is 24 plus 15 ? a: 39 .
+question: what is 24 plus 15 ? answer: 39 .
+q: what is 9 plus 5 ? a: 14 .
+question: what is 9 plus 14 ? answer: 23 .
+q: what is 25 plus 15 ? a: 40 .
+q: what is the chemical symbol for potassium ? a: k .
+q: what is 14 plus 7 ? a: 21 .
+q: what is 1 plus 13 ? a: 14 .
+question: what is 9 minus 6 ? answer: 3 .
+q: what is 20 plus 11 ? a: 31 .
+question: what is 4 plus 1 ? answer: 5 .
+q: what is 1 or 1 ? a: 1 .
+q: what is 14 times 11 ? a: 154 .
+question: what is the capital of brazil ? answer: brasilia .
+q: what is 20 minus 13 ? a: 7 .
+question: what is 1 plus 6 ? answer: 7 .
+q: what is 12 plus 8 ? a: 20 .
+question: what is 19 minus 12 ? answer: 7 .
+q: what is 15 times 7 ? a: 105 .
+question: how many sides does a triangle have ? answer: 3 sides .
+q: what is 13 times 3 ? a: 39 .
+question: what is 12 times 4 ? answer: 48 .
+question: what is 5 plus 15 ? answer: 20 .
+q: what is the chemical symbol for nitrogen ? a: n .
+q: what is 9 plus 9 ? a: 18 .
+q: what element has the chemical symbol pb ? a: lead .
+q: what is 25 plus 4 ? a: 29 .
+q: what is 10 plus 4 ? a: 14 .
+q: what is 12 plus 1 ? a: 13 .
+question: what is the capital of belgium ? answer: brussels .
+q: what is 6 minus 5 ? a: 1 .
+q: what is 22 plus 8 ? a: 30 .
+question: what is 10 plus 20 ? answer: 30 .
+question: what is 9 minus 9 ? answer: 0 .
+question: what is 11 plus 7 ? answer: 18 .
+q: what is 3 times 10 ? a: 30 .
+question: what is 1 times 15 ? answer: 15 .
+question: what is 16 plus 8 ? answer: 24 .
+question: what is 23 plus 18 ? answer: 41 .
+question: what is 22 plus 9 ? answer: 31 .
+question: what is 6 plus 21 ? answer: 27 .
+question: what is 19 plus 15 ? answer: 34 .
+question: what is 20 plus 22 ? answer: 42 .
+q: what is 8 plus 5 ? a: 13 .
+q: what is 10 times 6 ? a: 60 .
+question: what is the capital of china ? answer: beijing .
+q: what is 21 plus 10 ? a: 31 .
+q: what is 23 plus 21 ? a: 44 .
+q: what is 11 times 1 ? a: 11 .
+question: what is 13 plus 4 ? answer: 17 .
+question: what is 11 minus 10 ? answer: 1 .
+q: what is 18 minus 9 ? a: 9 .
+q: what is 15 minus 2 ? a: 13 .
+q: what is 1 plus 6 ? a: 7 .
+q: what is 19 plus 23 ? a: 42 .
+q: what is 18 minus 10 ? a: 8 .
+q: what is 6 plus 9 ? a: 15 .
+question: what is the capital of ohio ? answer: columbus .
+question: what is 8 times 10 ? answer: 80 .
+question: what is not 1 ? answer: 0 .
+question: what is 20 plus 5 ? answer: 25 .
+q: what is 4 minus 2 ? a: 2 .
+q: what is 16 minus 3 ? a: 13 .
+question: what is 22 plus 1 ? answer: 23 .
+question: what is 3 plus 25 ? answer: 28 .
+question: what is 19 plus 3 ? answer: 22 .
+q: what is 6 times 8 ? a: 48 .
+question: what element has the chemical symbol b ? answer: boron .
+q: what is 11 times 14 ? a: 154 .
+q: what is 20 minus 1 ? a: 19 .
+q: what is 12 times 7 ? a: 84 .
+question: what is 17 minus 14 ? answer: 3 .
+q: what is 21 plus 15 ? a: 36 .
+q: what is 23 plus 16 ? a: 39 .
+q: what animal is known as king of the jungle ? a: lion .
+question: what is 17 minus 1 ? answer: 16 .
+question: what is 17 plus 24 ? answer: 41 .
+q: what is 22 plus 15 ? a: 37 .
+q: what is 16 plus 19 ? a: 35 .
+question: what is 22 plus 11 ? answer: 33 .
+q: what is 7 plus 6 ? a: 13 .
+q: what is 8 plus 12 ? a: 20 .
+question: what element has the chemical symbol f ? answer: fluorine .
+q: what gas do humans breathe in to live ? a: oxygen .
+q: what is 7 minus 2 ? a: 5 .
+q: what is the capital of maryland ? a: annapolis .
+question: what is the largest continent ? answer: asia .
+q: what is 2 times 8 ? a: 16 .
+q: what is 4 plus 24 ? a: 28 .
+question: what is 21 plus 15 ? answer: 36 .
+question: what is 19 minus 5 ? answer: 14 .
+question: what is 20 plus 23 ? answer: 43 .
+q: what is 17 minus 17 ? a: 0 .
+question: what is 15 minus 5 ? answer: 10 .
+q: what is 8 times 10 ? a: 80 .
+q: what is the smallest continent ? a: australia .
+question: what sound does a snake make ? answer: hiss .
+q: what is 25 plus 9 ? a: 34 .
+question: what is 4 times 11 ? answer: 44 .
+q: what is 6 times 14 ? a: 84 .
+question: what is 8 plus 25 ? answer: 33 .
+question: what bird can fly backward ? answer: hummingbird .
+q: what is 20 minus 9 ? a: 11 .
+question: what is 8 minus 4 ? answer: 4 .
+q: what is 19 minus 3 ? a: 16 .
+q: what is 6 minus 3 ? a: 3 .
+q: what is the chemical symbol for silicon ? a: si .
+q: what is 13 plus 15 ? a: 28 .
+question: what color is fresh snow ? answer: white .
+question: what is 15 times 3 ? answer: 45 .
+q: what is 15 plus 10 ? a: 25 .
+q: what is 20 plus 3 ? a: 23 .
+question: what is 14 times 10 ? answer: 140 .
+q: what is 4 minus 1 ? a: 3 .
+q: what is 2 plus 20 ? a: 22 .
+q: what is 20 plus 8 ? a: 28 .
+question: what is 5 times 15 ? answer: 75 .
+question: what chip is on the de1-soc board ? answer: intel cyclone v .
+q: what is 1 times 1 ? a: 1 .
+question: what sound does a bee make ? answer: buzz .
+q: what is 4 plus 18 ? a: 22 .
+question: what is 17 plus 1 ? answer: 18 .
+q: what is 25 plus 13 ? a: 38 .
+q: what is 4 plus 1 ? a: 5 .
+question: what is 18 plus 23 ? answer: 41 .
+q: what is 12 plus 19 ? a: 31 .
+q: what is 21 plus 2 ? a: 23 .
+question: what is 19 plus 4 ? answer: 23 .
+q: what is 17 minus 12 ? a: 5 .
+question: what is 17 minus 12 ? answer: 5 .
+q: what is 22 plus 2 ? a: 24 .
+question: what is 5 plus 5 ? answer: 10 .
+q: what is 11 plus 5 ? a: 16 .
+question: what is 13 plus 1 ? answer: 14 .
+question: what is the capital of sweden ? answer: stockholm .
+q: what is 6 plus 24 ? a: 30 .
+question: what is 12 plus 20 ? answer: 32 .
+question: what is 18 plus 1 ? answer: 19 .
+question: what is 24 plus 13 ? answer: 37 .
+q: what is 14 plus 21 ? a: 35 .
+q: what is 19 minus 15 ? a: 4 .
+question: what is the capital of arizona ? answer: phoenix .
+q: what is 1 times 9 ? a: 9 .
+q: what is 2 plus 19 ? a: 21 .
+question: what is 12 minus 8 ? answer: 4 .
+q: what is 18 plus 12 ? a: 30 .
+question: what is 20 minus 3 ? answer: 17 .
+question: what is 9 plus 8 ? answer: 17 .
+question: what is 10 times 6 ? answer: 60 .
+q: what is 8 plus 1 ? a: 9 .
+question: how many sides does an octagon have ? answer: 8 sides .
+question: what is 19 plus 1 ? answer: 20 .
+question: what is 2 times 8 ? answer: 16 .
+question: what is 1 times 4 ? answer: 4 .
+q: what is 22 plus 16 ? a: 38 .
+q: what is 21 plus 24 ? a: 45 .
+question: what is 18 plus 19 ? answer: 37 .
+question: what is 9 plus 4 ? answer: 13 .
+question: what is 25 plus 2 ? answer: 27 .
+question: what is 14 minus 3 ? answer: 11 .
+question: what is 2 plus 12 ? answer: 14 .
+q: what is 20 minus 3 ? a: 17 .
+question: what is the chemical symbol for potassium ? answer: k .
+q: what is 1 plus 14 ? a: 15 .
+question: what is 1 plus 22 ? answer: 23 .
+question: what is 19 minus 6 ? answer: 13 .
+question: what is 5 times 4 ? answer: 20 .
+question: where is the burj khalifa located ? answer: dubai in united arab emirates .
+q: what is 2 times 2 ? a: 4 .
+question: what is the capital of oklahoma ? answer: oklahoma city .
+q: what is 8 plus 17 ? a: 25 .
+question: what is 8 times 3 ? answer: 24 .
+q: what is 6 times 15 ? a: 90 .
+question: what is 25 plus 23 ? answer: 48 .
+q: what is 14 plus 20 ? a: 34 .
+q: what color is a strawberry ? a: red .
+question: what is 12 minus 11 ? answer: 1 .
+q: what is 12 minus 2 ? a: 10 .
+q: what is 14 plus 8 ? a: 22 .
+q: what is the famous clock tower in london ? a: big ben .
+q: what chip is on the de1-soc board ? a: intel cyclone v .
+q: what is 19 minus 18 ? a: 1 .
+q: what is 25 plus 2 ? a: 27 .
+q: what is 17 plus 17 ? a: 34 .
+q: what is 12 plus 17 ? a: 29 .
+q: what is 23 plus 6 ? a: 29 .
+q: what is 18 minus 5 ? a: 13 .
+q: what is 15 plus 7 ? a: 22 .
+question: what is 5 minus 1 ? answer: 4 .
+q: what is 21 plus 1 ? a: 22 .
+q: what is 4 plus 22 ? a: 26 .
+question: what is 3 plus 20 ? answer: 23 .
+q: what is 12 times 6 ? a: 72 .
+q: what is 3 plus 5 ? a: 8 .
+question: what is 8 plus 23 ? answer: 31 .
+question: what planet is third from the sun ? answer: earth .
+question: what is 8 times 11 ? answer: 88 .
+question: what is 24 plus 7 ? answer: 31 .
+question: what is 11 minus 8 ? answer: 3 .
+question: what is 9 plus 10 ? answer: 19 .
+q: what bird can fly backward ? a: hummingbird .
+question: what is 9 plus 7 ? answer: 16 .
+question: what is 14 times 15 ? answer: 210 .
+q: what is the capital of oklahoma ? a: oklahoma city .
+question: what is 17 minus 2 ? answer: 15 .
+question: what is 18 minus 1 ? answer: 17 .
+question: what is 15 plus 24 ? answer: 39 .
+q: what is 4 times 13 ? a: 52 .
+question: what is 22 plus 17 ? answer: 39 .
+q: what is 19 minus 4 ? a: 15 .
+question: what is 20 plus 6 ? answer: 26 .
+question: what is 12 times 10 ? answer: 120 .
+question: what is 12 plus 23 ? answer: 35 .
+question: what is 3 plus 17 ? answer: 20 .
+question: what is 25 plus 24 ? answer: 49 .
+q: what is the capital of brazil ? a: brasilia .
+q: what is the chemical symbol for silver ? a: ag .
+q: what is the capital of austria ? a: vienna .
+q: what is 15 plus 1 ? a: 16 .
+q: what is 22 plus 21 ? a: 43 .
+question: what is 6 minus 6 ? answer: 0 .
+question: what is 15 times 11 ? answer: 165 .
+q: what is 3 minus 3 ? a: 0 .
+question: what is 25 plus 9 ? answer: 34 .
+q: what is 10 minus 2 ? a: 8 .
+question: what is 20 minus 1 ? answer: 19 .
+question: what is 0 xor 0 ? answer: 0 .
+question: what animal says roar ? answer: lion .
+q: what animal says roar ? a: lion .
+q: what is 3 plus 25 ? a: 28 .
+q: what is 12 times 4 ? a: 48 .
+question: what is 8 plus 24 ? answer: 32 .
+question: what color do you get when you mix blue and yellow ? answer: green .
+q: what is 16 plus 16 ? a: 32 .
+q: what is 18 minus 12 ? a: 6 .
+q: what is 6 minus 4 ? a: 2 .
+q: what is 13 minus 5 ? a: 8 .
+q: what is 5 times 1 ? a: 5 .
+q: what is 5 plus 23 ? a: 28 .
+question: what is 11 plus 8 ? answer: 19 .
+q: what is the largest ocean in the world ? a: pacific ocean .
+q: what is 2 plus 23 ? a: 25 .
+q: what is 10 times 13 ? a: 130 .
+q: what is 10 plus 23 ? a: 33 .
+q: what australian animal carries baby in pouch ? a: kangaroo .
+q: what is 18 plus 14 ? a: 32 .
+q: what is 1 plus 19 ? a: 20 .
+question: what element has the chemical symbol cu ? answer: copper .
+question: what is 8 times 9 ? answer: 72 .
+q: what is 13 times 7 ? a: 91 .
+q: what is 16 plus 4 ? a: 20 .
+q: what is the chemical symbol for zinc ? a: zn .
+q: what is 17 plus 3 ? a: 20 .
+question: what is 22 plus 3 ? answer: 25 .
+question: what is the chemical symbol for boron ? answer: b .
+q: what is the capital of illinois ? a: springfield .
+question: what is 9 times 10 ? answer: 90 .
+question: what is 10 times 8 ? answer: 80 .
+question: what is 15 plus 20 ? answer: 35 .
+question: what is 0 or 0 ? answer: 0 .
+question: what is 4 times 2 ? answer: 8 .
+question: what is the smallest continent ? answer: australia .
+question: what element has the chemical symbol zn ? answer: zinc .
+question: what is 24 plus 10 ? answer: 34 .
+question: what is the chemical symbol for carbon ? answer: c .
+question: what is 21 plus 14 ? answer: 35 .
+q: what is 18 plus 22 ? a: 40 .
+question: what is the chemical symbol for aluminum ? answer: al .
+q: what is the chemical symbol for carbon ? a: c .
+q: what is 9 times 13 ? a: 117 .
+question: what is 17 minus 7 ? answer: 10 .
+question: what is 4 plus 7 ? answer: 11 .
+question: what is 18 minus 12 ? answer: 6 .
+question: what is 15 minus 1 ? answer: 14 .
+question: what is 23 plus 2 ? answer: 25 .
+question: what is 8 plus 4 ? answer: 12 .
+question: what is the capital of netherlands ? answer: amsterdam .
+q: what is 12 minus 11 ? a: 1 .
+question: what is 15 minus 12 ? answer: 3 .
+question: what is 15 times 7 ? answer: 105 .
+question: what is 6 plus 16 ? answer: 22 .
+question: what element has the chemical symbol au ? answer: gold .
+q: what is 18 plus 17 ? a: 35 .
+q: what is 20 minus 12 ? a: 8 .
+question: what is 14 minus 1 ? answer: 13 .
+question: what is 1 times 11 ? answer: 11 .
+question: what is 6 plus 17 ? answer: 23 .
+question: what is 3 plus 24 ? answer: 27 .
+question: what is 24 plus 3 ? answer: 27 .
+q: what is 5 times 7 ? a: 35 .
+q: what is 17 plus 7 ? a: 24 .
+question: what is 10 times 11 ? answer: 110 .
+q: what is 9 minus 7 ? a: 2 .
+q: what bird cannot fly and lives in cold ice ? a: penguin .
+question: what is 2 times 13 ? answer: 26 .
+q: what is 18 minus 14 ? a: 4 .
+q: what is 12 minus 7 ? a: 5 .
+question: what is 6 plus 8 ? answer: 14 .
+question: what is 2 plus 17 ? answer: 19 .
+question: what is 3 plus 13 ? answer: 16 .
+question: what is 9 plus 12 ? answer: 21 .
+q: what is 17 minus 16 ? a: 1 .
+question: what is 3 times 10 ? answer: 30 .
+question: what is 12 plus 22 ? answer: 34 .
+question: what organ controls thoughts and memory ? answer: brain .
+q: what is 21 plus 3 ? a: 24 .
+question: what is 10 minus 8 ? answer: 2 .
+q: what is 10 minus 8 ? a: 2 .
+q: what is 14 plus 1 ? a: 15 .
+q: what is the capital of australia ? a: canberra .
+q: what is 15 times 5 ? a: 75 .
+q: what is 19 plus 25 ? a: 44 .
+q: what is 8 plus 7 ? a: 15 .
+q: what element has the chemical symbol n ? a: nitrogen .
+q: what is 11 minus 10 ? a: 1 .
+q: where is the taj mahal located ? a: agra in india .
+question: what is 17 plus 3 ? answer: 20 .
+question: what is 15 times 13 ? answer: 195 .
+q: what is 6 plus 13 ? a: 19 .
+q: what is 15 minus 11 ? a: 4 .
+question: what is 3 plus 16 ? answer: 19 .
+question: what is 2 plus 6 ? answer: 8 .
+question: what is 15 plus 11 ? answer: 26 .
+q: what is 4 minus 3 ? a: 1 .
+question: what is 11 minus 7 ? answer: 4 .
+q: what is 21 plus 11 ? a: 32 .
+q: what is 4 plus 16 ? a: 20 .
+q: what is 15 times 12 ? a: 180 .
+q: what is 25 plus 5 ? a: 30 .
+question: what is the chemical symbol for fluorine ? answer: f .
+question: what color is a strawberry ? answer: red .
+q: what is 15 times 13 ? a: 195 .
+question: what is 18 plus 10 ? answer: 28 .
+q: what is the capital of portugal ? a: lisbon .
+question: what bird cannot fly and lives in cold ice ? answer: penguin .
+q: what is 14 plus 14 ? a: 28 .
+q: what is the longest river in the world ? a: nile river .
+question: what is 13 plus 17 ? answer: 30 .
+q: what is 3 plus 9 ? a: 12 .
+question: what is 11 minus 1 ? answer: 10 .
+q: what is 14 minus 6 ? a: 8 .
+q: what is 10 plus 17 ? a: 27 .
+question: what is the chemical symbol for oxygen ? answer: o .
+q: what is 6 minus 2 ? a: 4 .
+question: what is 8 plus 20 ? answer: 28 .
+question: what element has the chemical symbol hg ? answer: mercury .
+question: what is 25 plus 8 ? answer: 33 .
+q: what is 25 plus 16 ? a: 41 .
+q: what is 11 minus 5 ? a: 6 .
+q: what is 20 minus 20 ? a: 0 .
+question: what is 20 minus 5 ? answer: 15 .
+question: what is 9 times 3 ? answer: 27 .
+question: what is 20 minus 12 ? answer: 8 .
+q: what is 16 minus 6 ? a: 10 .
+q: what is 13 plus 12 ? a: 25 .
+question: what is 8 minus 1 ? answer: 7 .
+question: what is 24 plus 19 ? answer: 43 .
+q: what is 16 plus 9 ? a: 25 .
+q: what is the largest mammal in the world ? a: blue whale .
+q: what is 24 plus 20 ? a: 44 .
+q: what color do you get when you mix red and yellow ? a: orange .
+q: what is 4 times 8 ? a: 32 .
+q: what is 8 plus 14 ? a: 22 .
+q: what is the capital of georgia ? a: atlanta .
+question: what is 20 plus 18 ? answer: 38 .
+question: how many sides does a square have ? answer: 4 sides .
+q: what element has the chemical symbol mg ? a: magnesium .
+question: what animal says woof ? answer: dog .
+question: what is 6 plus 20 ? answer: 26 .
+question: what is 12 times 12 ? answer: 144 .
+q: what is 8 plus 19 ? a: 27 .
+question: what is 25 plus 20 ? answer: 45 .
+question: what is 20 plus 25 ? answer: 45 .
+q: what is 1 plus 2 ? a: 3 .
+question: what is 11 minus 6 ? answer: 5 .
+question: what is 11 plus 19 ? answer: 30 .
+question: what is 13 minus 5 ? answer: 8 .
+question: what is 6 plus 25 ? answer: 31 .
+q: what is 15 plus 9 ? a: 24 .
+question: what is 23 plus 12 ? answer: 35 .
+q: what is 4 times 5 ? a: 20 .
+q: what is 15 plus 16 ? a: 31 .
+question: what is 11 plus 21 ? answer: 32 .
+question: what is the capital of kentucky ? answer: frankfort .
+question: what is 3 times 12 ? answer: 36 .
+question: what is the chemical symbol for beryllium ? answer: be .
+question: what is the chemical symbol for nickel ? answer: ni .
+q: what is 4 times 11 ? a: 44 .
+question: what is 9 minus 3 ? answer: 6 .
+question: what is 14 minus 2 ? answer: 12 .
+q: what is 20 plus 5 ? a: 25 .
+question: what is 7 times 4 ? answer: 28 .
+q: what is 20 plus 12 ? a: 32 .
+question: what is 12 times 9 ? answer: 108 .
+question: what is 1 plus 16 ? answer: 17 .
+q: what is 21 plus 5 ? a: 26 .
+question: what is 20 minus 2 ? answer: 18 .
+question: what frequency does de1-soc clock run at ? answer: 50 megahertz .
+question: what is 4 minus 3 ? answer: 1 .
+q: what is 23 plus 15 ? a: 38 .
+question: what continent is north of africa ? answer: europe .
+q: what is 13 plus 9 ? a: 22 .
+q: what is 8 plus 10 ? a: 18 .
+q: what is 20 minus 19 ? a: 1 .
+question: what is 14 minus 7 ? answer: 7 .
+question: what is 0 xor 1 ? answer: 1 .
+q: what is 15 plus 2 ? a: 17 .
+question: what is 7 plus 7 ? answer: 14 .
+question: what is 5 plus 16 ? answer: 21 .
+q: what is 24 plus 21 ? a: 45 .
+q: what is 4 times 14 ? a: 56 .
+question: what is 13 minus 6 ? answer: 7 .
+q: what is 8 times 6 ? a: 48 .
+question: what is 7 times 6 ? answer: 42 .
+question: what is 4 minus 1 ? answer: 3 .
+q: what is 18 minus 3 ? a: 15 .
+q: what is 6 times 9 ? a: 54 .
+q: what is 23 plus 11 ? a: 34 .
+q: what is the capital of south carolina ? a: columbia .
+question: what is the capital of oregon ? answer: salem .
+question: what is 10 minus 4 ? answer: 6 .
+q: what is 18 plus 7 ? a: 25 .
+question: what sound does a pig make ? answer: oink .
+question: what is 13 plus 16 ? answer: 29 .
+question: what is 9 plus 2 ? answer: 11 .
+question: what is 19 minus 13 ? answer: 6 .
+question: what is 13 plus 12 ? answer: 25 .
+question: what is 3 plus 12 ? answer: 15 .
+q: what is 22 plus 22 ? a: 44 .
+q: what is 7 plus 19 ? a: 26 .
+q: what is 8 times 3 ? a: 24 .
+question: what is 11 times 2 ? answer: 22 .
+question: what is 1 plus 13 ? answer: 14 .
+q: what is 21 plus 20 ? a: 41 .
+question: where is the taj mahal located ? answer: agra in india .
+q: what is 9 times 14 ? a: 126 .
+q: what is 20 plus 13 ? a: 33 .
+q: what is 17 plus 11 ? a: 28 .
+q: what is 1 times 15 ? a: 15 .
+question: what sound does a lion make ? answer: roar .
+question: what is 7 plus 17 ? answer: 24 .
+question: what is 18 plus 21 ? answer: 39 .
+question: what element has the chemical symbol ca ? answer: calcium .
+question: what is the chemical symbol for lithium ? answer: li .
+question: what is 12 plus 15 ? answer: 27 .
+question: what is 13 minus 13 ? answer: 0 .
+question: what is 10 times 1 ? answer: 10 .
+q: what is 1 times 12 ? a: 12 .
+q: what is 8 times 7 ? a: 56 .
+q: what is 11 plus 23 ? a: 34 .
+question: what is 11 plus 17 ? answer: 28 .
+q: what is 6 plus 10 ? a: 16 .
+question: what is the largest mammal in the world ? answer: blue whale .
+q: what is 23 plus 13 ? a: 36 .
+question: what is 13 times 1 ? answer: 13 .
+q: how many hours are in one day ? a: 24 hours .
+question: what is 3 plus 15 ? answer: 18 .
+q: who was the first president of the united states ? a: george washington .
+question: who painted the mona lisa ? answer: leonardo da vinci .
+q: what is 10 plus 19 ? a: 29 .
+question: what is 21 plus 19 ? answer: 40 .
+q: what is 24 plus 5 ? a: 29 .
+question: what is 7 times 9 ? answer: 63 .
+question: what is 25 plus 10 ? answer: 35 .
+question: how many sides does a pentagon have ? answer: 5 sides .
+q: what is 17 plus 6 ? a: 23 .
+q: what is 2 plus 16 ? a: 18 .
+question: what is 21 plus 8 ? answer: 29 .
+question: what is 23 plus 17 ? answer: 40 .
+question: what is 16 plus 23 ? answer: 39 .
+question: what is 7 times 14 ? answer: 98 .
+question: what is the fastest land animal ? answer: cheetah .
+q: what is 19 plus 3 ? a: 22 .
+question: what is 4 times 4 ? answer: 16 .
+question: what is 12 plus 5 ? answer: 17 .
+question: what is 21 plus 13 ? answer: 34 .
+question: what is 3 times 8 ? answer: 24 .
+question: what is the capital of north carolina ? answer: raleigh .
+question: what is 21 plus 22 ? answer: 43 .
