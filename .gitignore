@@ -21,3 +21,5 @@ results.xml
 lpu_driver
 .vscode
 .agents
+input.txt
+model/stories260k/
