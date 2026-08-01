@@ -3,19 +3,21 @@ Fine-tuning microGPT to accurately generate exact target names:
 satvik, surya, saksham, yash, evan, xander, aymaan, michael, arjun
 """
 
-import os
 import math
 import random
+from pathlib import Path
 
 random.seed(42)
 
 # Load dataset
-if not os.path.exists('input.txt'):
+input_path = Path(__file__).resolve().parents[1] / 'output' / 'microgpt_names.txt'
+if not input_path.exists():
     import urllib.request
     names_url = 'https://raw.githubusercontent.com/karpathy/makemore/988aa59/names.txt'
-    urllib.request.urlretrieve(names_url, 'input.txt')
+    input_path.parent.mkdir(parents=True, exist_ok=True)
+    urllib.request.urlretrieve(names_url, input_path)
 
-general_docs = [line.strip().lower() for line in open('input.txt') if line.strip()]
+general_docs = [line.strip().lower() for line in input_path.open() if line.strip()]
 random.shuffle(general_docs)
 
 # Target names requested by user
