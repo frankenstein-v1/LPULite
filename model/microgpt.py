@@ -6,22 +6,67 @@ Everything else is just efficiency.
 @karpathy
 """
 
-import os       # os.path.exists
+import argparse
+import json
 import math     # math.log, math.exp
 import random   # random.seed, random.choices, random.gauss, random.shuffle
-random.seed(42) # Let there be order among chaos
+from datetime import datetime, timezone
+from pathlib import Path
+
+MODEL_DIR = Path(__file__).resolve().parent
+DEFAULT_CHECKPOINT = MODEL_DIR / 'artifacts' / 'microgpt_weights.json'
+DEFAULT_INT8_CHECKPOINT = MODEL_DIR / 'artifacts' / 'microgpt_weights_int8.json'
+DEFAULT_TARGET_NAMES = 'saksham,satvik,surya,michael,evan,xander,aymaan,yash,kenny'
+
+parser = argparse.ArgumentParser(description='Train the dependency-free MicroGPT name model.')
+parser.add_argument('--steps', type=int, default=1000, help='number of Adam training steps (default: 1000)')
+parser.add_argument('--checkpoint', type=Path, default=DEFAULT_CHECKPOINT, help='output JSON checkpoint path')
+parser.add_argument(
+    '--int8-checkpoint',
+    type=Path,
+    default=DEFAULT_INT8_CHECKPOINT,
+    help='output LPU block-scaled INT8 checkpoint path',
+)
+parser.add_argument('--samples', type=int, default=20, help='number of names to sample after training')
+parser.add_argument(
+    '--target-names',
+    default=DEFAULT_TARGET_NAMES,
+    help='comma-separated names to emphasize during training',
+)
+parser.add_argument(
+    '--target-sampling-rate',
+    type=float,
+    default=0.6,
+    help='probability of selecting an emphasized name each step (default: 0.6)',
+)
+args = parser.parse_args()
+if args.steps < 1:
+    parser.error('--steps must be at least 1')
+if args.samples < 0:
+    parser.error('--samples cannot be negative')
+if not 0.0 <= args.target_sampling_rate <= 1.0:
+    parser.error('--target-sampling-rate must be between 0 and 1')
+
+target_names = [name.strip().lower() for name in args.target_names.split(',') if name.strip()]
+if args.target_sampling_rate > 0.0 and not target_names:
+    parser.error('--target-names must contain at least one name when target sampling is enabled')
+
+seed = 42
+random.seed(seed) # Let there be order among chaos
 
 # Let there be a Dataset `docs`: list[str] of documents (e.g. a list of names)
-if not os.path.exists('input.txt'):
+input_path = MODEL_DIR / 'output' / 'microgpt_names.txt'
+if not input_path.exists():
     import urllib.request
     names_url = 'https://raw.githubusercontent.com/karpathy/makemore/988aa59/names.txt'
-    urllib.request.urlretrieve(names_url, 'input.txt')
-docs = [line.strip() for line in open('input.txt') if line.strip()]
+    input_path.parent.mkdir(parents=True, exist_ok=True)
+    urllib.request.urlretrieve(names_url, input_path)
+docs = [line.strip() for line in input_path.open() if line.strip()]
 random.shuffle(docs)
 print(f"num docs: {len(docs)}")
 
 # Let there be a Tokenizer to translate strings to sequences of integers ("tokens") and back
-uchars = sorted(set(''.join(docs))) # unique characters in the dataset become token ids 0..n-1
+uchars = sorted(set(''.join(docs + target_names))) # unique characters in the dataset become token ids 0..n-1
 BOS = len(uchars) # token id for a special Beginning of Sequence (BOS) token
 vocab_size = len(uchars) + 1 # total number of unique tokens, +1 is for BOS
 print(f"vocab size: {vocab_size}")
@@ -92,7 +137,29 @@ print(f"num params: {len(params)}")
 # Define the model architecture: a function mapping tokens and parameters to logits over what comes next
 # Follow GPT-2, blessed among the GPTs, with minor differences: layernorm -> rmsnorm, no biases, GeLU -> ReLU
 def linear(x, w):
-    return [sum(wi * xi for wi, xi in zip(wo, x)) for wo in w]
+    return [sum(wi * xi for wi, xi in zip(fake_quantize_lpu_row(wo), x)) for wo in w]
+
+def quantize_lpu_block(values):
+    """Quantize up to eight floats as LPU int8 lanes plus a shared 2**scale."""
+    absmax = max((abs(value.data if isinstance(value, Value) else value) for value in values), default=0.0)
+    scale_exp = 0 if absmax == 0.0 else math.ceil(math.log2(absmax / 127.0))
+    scale_exp = max(-128, min(127, scale_exp))
+    inverse_scale = math.ldexp(1.0, -scale_exp)
+    lanes = []
+    for value in values:
+        raw = value.data if isinstance(value, Value) else value
+        lanes.append(max(-127, min(127, round(raw * inverse_scale))))
+    return lanes, scale_exp
+
+def fake_quantize_lpu_row(row):
+    """Use LPU values in the forward pass while passing gradients to shadow weights."""
+    result = []
+    for start in range(0, len(row), 8):
+        block = row[start:start + 8]
+        lanes, scale_exp = quantize_lpu_block(block)
+        scale = math.ldexp(1.0, scale_exp)
+        result.extend(value + (lane * scale - value.data) for value, lane in zip(block, lanes))
+    return result
 
 def softmax(logits):
     max_val = max(val.data for val in logits)
@@ -106,8 +173,8 @@ def rmsnorm(x):
     return [xi * scale for xi in x]
 
 def gpt(token_id, pos_id, keys, values):
-    tok_emb = state_dict['wte'][token_id] # token embedding
-    pos_emb = state_dict['wpe'][pos_id] # position embedding
+    tok_emb = fake_quantize_lpu_row(state_dict['wte'][token_id]) # token embedding
+    pos_emb = fake_quantize_lpu_row(state_dict['wpe'][pos_id]) # position embedding
     x = [t + p for t, p in zip(tok_emb, pos_emb)] # joint token and position embedding
     x = rmsnorm(x) # note: not redundant due to backward pass via the residual connection
 
@@ -149,11 +216,14 @@ m = [0.0] * len(params) # first moment buffer
 v = [0.0] * len(params) # second moment buffer
 
 # Repeat in sequence
-num_steps = 1000 # number of training steps
+num_steps = args.steps
 for step in range(num_steps):
 
     # Take single document, tokenize it, surround it with BOS special token on both sides
-    doc = docs[step % len(docs)]
+    if target_names and random.random() < args.target_sampling_rate:
+        doc = random.choice(target_names)
+    else:
+        doc = docs[step % len(docs)]
     tokens = [BOS] + [uchars.index(ch) for ch in doc] + [BOS]
     n = min(block_size, len(tokens) - 1)
 
@@ -184,10 +254,105 @@ for step in range(num_steps):
     if (step + 1) % 50 == 0 or step == 0 or step == num_steps - 1:
         print(f"step {step+1:4d} / {num_steps:4d} | loss {loss.data:.4f}", flush=True)
 
+# Save plain numeric matrices plus enough metadata to validate or load them in
+# another implementation. JSON keeps this tiny reference model dependency-free.
+checkpoint = {
+    'format': 'tinylpu.microgpt.weights',
+    'format_version': 1,
+    'created_utc': datetime.now(timezone.utc).isoformat(),
+    'config': {
+        'n_layer': n_layer,
+        'n_embd': n_embd,
+        'block_size': block_size,
+        'n_head': n_head,
+        'vocab_size': vocab_size,
+    },
+    'tokenizer': {
+        'characters': uchars,
+        'bos_token_id': BOS,
+    },
+    'training': {
+        'seed': seed,
+        'steps': num_steps,
+        'final_loss': loss.data,
+        'learning_rate': learning_rate,
+        'beta1': beta1,
+        'beta2': beta2,
+        'dataset': str(input_path.relative_to(MODEL_DIR.parent)),
+        'num_documents': len(docs),
+        'target_names': target_names,
+        'target_sampling_rate': args.target_sampling_rate,
+        'quantization_aware': True,
+        'forward_weight_format': 'lpu_block_scaled_int8',
+    },
+    'state_dict': {
+        name: [[value.data for value in row] for row in matrix]
+        for name, matrix in state_dict.items()
+    },
+}
+checkpoint_path = args.checkpoint.expanduser().resolve()
+checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+temporary_path = checkpoint_path.with_suffix(checkpoint_path.suffix + '.tmp')
+temporary_path.write_text(json.dumps(checkpoint, indent=2) + '\n', encoding='utf-8')
+temporary_path.replace(checkpoint_path)
+print(f"saved checkpoint: {checkpoint_path}", flush=True)
+
+def export_lpu_matrix(matrix):
+    lane_rows = []
+    scale_rows = []
+    packed_rows = []
+    for row in matrix:
+        row_lanes = []
+        row_scales = []
+        row_words = []
+        for start in range(0, len(row), 8):
+            lanes, scale_exp = quantize_lpu_block(row[start:start + 8])
+            padded_lanes = lanes + [0] * (8 - len(lanes))
+            packed = sum((lane & 0xff) << (8 * idx) for idx, lane in enumerate(padded_lanes))
+            packed |= (scale_exp & 0xff) << 64
+            row_lanes.extend(lanes)
+            row_scales.append(scale_exp)
+            row_words.append(f'0x{packed:018x}')
+        lane_rows.append(row_lanes)
+        scale_rows.append(row_scales)
+        packed_rows.append(row_words)
+    return {
+        'shape': [len(matrix), len(matrix[0]) if matrix else 0],
+        'lanes': lane_rows,
+        'scale_exponents': scale_rows,
+        'packed_72bit_rows': packed_rows,
+    }
+
+lpu_checkpoint = {
+    'format': 'tinylpu.microgpt.lpu_int8',
+    'format_version': 1,
+    'created_utc': checkpoint['created_utc'],
+    'numeric_contract': {
+        'lane_format': 'signed_int8',
+        'lane_range': [-127, 127],
+        'lanes_per_block': 8,
+        'scale_format': 'signed_int8_power_of_two_exponent',
+        'dequantization': 'real_value = lane * 2**scale_exponent',
+        'packed_row_bits': 72,
+        'packed_layout': 'lane0 bits [7:0] through lane7 bits [63:56], scale bits [71:64]',
+        'accumulator_format': 'signed_int32',
+    },
+    'config': checkpoint['config'],
+    'tokenizer': checkpoint['tokenizer'],
+    'training': checkpoint['training'],
+    'state_dict': {name: export_lpu_matrix(matrix) for name, matrix in state_dict.items()},
+}
+int8_checkpoint_path = args.int8_checkpoint.expanduser().resolve()
+int8_checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+int8_temporary_path = int8_checkpoint_path.with_suffix(int8_checkpoint_path.suffix + '.tmp')
+int8_temporary_path.write_text(json.dumps(lpu_checkpoint, indent=2) + '\n', encoding='utf-8')
+int8_temporary_path.replace(int8_checkpoint_path)
+print(f"saved LPU INT8 checkpoint: {int8_checkpoint_path}", flush=True)
+
 # Inference: may the model babble back to us
 temperature = 0.5 # in (0, 1], control the "creativity" of generated text, low to high
 print("\n--- inference (new, hallucinated names) ---")
-for sample_idx in range(20):
+for sample_idx in range(args.samples):
     keys, values = [[] for _ in range(n_layer)], [[] for _ in range(n_layer)]
     token_id = BOS
     sample = []
@@ -199,3 +364,23 @@ for sample_idx in range(20):
             break
         sample.append(uchars[token_id])
     print(f"sample {sample_idx+1:2d}: {''.join(sample)}")
+
+if target_names:
+    print("\n--- emphasized-name prefix evaluation ---")
+    char_to_id = {char: idx for idx, char in enumerate(uchars)}
+    for target_name in target_names:
+        prefix = target_name[:min(3, max(1, len(target_name) - 1))]
+        keys, values = [[] for _ in range(n_layer)], [[] for _ in range(n_layer)]
+        prefix_ids = [BOS] + [char_to_id[char] for char in prefix]
+        for pos_id, token_id in enumerate(prefix_ids):
+            logits = gpt(token_id, pos_id, keys, values)
+        generated = list(prefix)
+        for pos_id in range(len(prefix_ids), block_size):
+            token_id = max(range(vocab_size), key=lambda idx: logits[idx].data)
+            if token_id == BOS:
+                break
+            generated.append(uchars[token_id])
+            logits = gpt(token_id, pos_id, keys, values)
+        prediction = ''.join(generated)
+        status = 'exact' if prediction == target_name else 'learned target, non-exact completion'
+        print(f"{prefix!r} -> {prediction!r} ({status}; target={target_name!r})")

@@ -22,4 +22,5 @@ lpu_driver
 .vscode
 .agents
 input.txt
+model/output/microgpt_names.txt
 model/stories260k/
