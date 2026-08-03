@@ -7,7 +7,11 @@ module lpu_de1_soc_wrapper (
     output logic avs_readdatavalid
 );
     localparam logic [1:0] MEM0 = 2'd0, MEM1 = 2'd1, IMEM = 2'd2;
-    logic run_enable, ext_en, ext_write;
+    localparam logic [15:0] CTRL_RUN = 16'hc000;
+    localparam logic [15:0] CTRL_PC_LOAD = 16'hc004;
+    localparam logic [15:0] CTRL_CYCLES = 16'hc008;
+    logic run_enable, pc_load_en, ext_en, ext_write;
+    logic [31:0] pc_load_value, cycle_counter;
     logic [1:0] ext_target;
     logic [31:0] ext_addr;
     logic [95:0] ext_wdata, ext_rdata, assembly;
@@ -17,13 +21,18 @@ module lpu_de1_soc_wrapper (
     assign avs_readdatavalid = avs_read;
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            run_enable <= 1'b0; ext_en <= 1'b0; ext_write <= 1'b0;
+            run_enable <= 1'b0; pc_load_en <= 1'b0; pc_load_value <= '0; ext_en <= 1'b0; ext_write <= 1'b0;
             ext_target <= '0; ext_addr <= '0; ext_wdata <= '0; assembly <= '0;
             avs_readdata <= '0;
         end else begin
             ext_en <= 1'b0;
+            pc_load_en <= 1'b0;
             if (avs_write) begin
-                if (avs_address == 16'hc000) run_enable <= avs_writedata[0];
+                if (avs_address == CTRL_RUN) run_enable <= avs_writedata[0];
+                else if (avs_address == CTRL_PC_LOAD) begin
+                    pc_load_value <= avs_writedata;
+                    pc_load_en <= 1'b1;
+                end
                 else begin
                     if (avs_address < 16'h4000) begin word_index = avs_address[13:2]; ext_target <= IMEM; end
                     else if (avs_address < 16'h8000) begin word_index = (avs_address - 16'h4000) >> 2; ext_target <= MEM0; end
@@ -40,7 +49,8 @@ module lpu_de1_soc_wrapper (
                 end
             end
             if (avs_read) begin
-                if (avs_address == 16'hc000) avs_readdata <= {31'b0, run_enable};
+                if (avs_address == CTRL_RUN) avs_readdata <= {31'b0, run_enable};
+                else if (avs_address == CTRL_CYCLES) avs_readdata <= cycle_counter;
                 else begin
                     if (avs_address < 16'h4000) begin word_index = avs_address[13:2]; ext_target <= IMEM; end
                     else if (avs_address < 16'h8000) begin word_index = (avs_address - 16'h4000) >> 2; ext_target <= MEM0; end
@@ -56,8 +66,8 @@ module lpu_de1_soc_wrapper (
     end
     lpu u_lpu (
         .clk(clk), .rst_n(rst_n), .run_en(run_enable),
-        .pc_load_en(1'b0), .pc_load_value(32'd0),
+        .pc_load_en(pc_load_en), .pc_load_value(pc_load_value),
         .ext_en(ext_en), .ext_write(ext_write), .ext_target(ext_target),
-        .ext_addr(ext_addr), .ext_wdata(ext_wdata), .ext_rdata(ext_rdata), .cycle_counter()
+        .ext_addr(ext_addr), .ext_wdata(ext_wdata), .ext_rdata(ext_rdata), .cycle_counter(cycle_counter)
     );
 endmodule
