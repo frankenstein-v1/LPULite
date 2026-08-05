@@ -5,7 +5,7 @@ from pathlib import Path
 
 
 parser = argparse.ArgumentParser(description="Generate controlled stories10k dataset")
-parser.add_argument("--out-dir", type=Path, default=Path("model") / "stories10k")
+parser.add_argument("--out-dir", type=Path, default=Path("model") / "datasets" / "stories10k")
 parser.add_argument("--vocab-size", type=int, default=128)
 args = parser.parse_args()
 

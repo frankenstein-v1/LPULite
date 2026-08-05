@@ -2,7 +2,7 @@
 `include "lpu_pkg.sv"
 
 module lpu #(
-    parameter int RMSNORM_CHUNKS = 8,
+    parameter int RMSNORM_CHUNKS = 2,
     parameter int SOFTMAX_CHUNKS = 16,
     parameter int DATA_MEM_DEPTH = MEM_DEPTH
 ) (

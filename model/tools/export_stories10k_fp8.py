@@ -11,8 +11,8 @@ from pathlib import Path
 from typing import Any
 
 
-DEFAULT_INPUT = Path("model/stories10k/stories10k_weights_export.json")
-DEFAULT_OUTPUT = Path("model/stories10k/stories10k_weights_fp8_packed.json")
+DEFAULT_INPUT = Path("model/datasets/stories10k/stories10k_weights_export.json")
+DEFAULT_OUTPUT = Path("model/datasets/stories10k/stories10k_weights_fp8_packed.json")
 LANES = 8
 ROW_BITS = 72
 LANE_FORMAT = "fp8_e5m2"

@@ -13,8 +13,8 @@ import subprocess
 from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
-WEIGHTS_PATH = ROOT_DIR / "model" / "stories10k" / "stories10k_weights_export.json"
-VOCAB_PATH = ROOT_DIR / "model" / "stories10k" / "vocab.json"
+WEIGHTS_PATH = ROOT_DIR / "model" / "datasets" / "stories10k" / "stories10k_weights_export.json"
+VOCAB_PATH = ROOT_DIR / "model" / "datasets" / "stories10k" / "vocab.json"
 SYSTEM_CONSOLE = Path("C:/altera_lite/25.1std/quartus/sopc_builder/bin/system-console.exe")
 
 if str(ROOT_DIR / "model" / "tools") not in sys.path:

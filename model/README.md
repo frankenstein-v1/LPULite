@@ -9,8 +9,7 @@ This directory contains all model-facing code and data.
 - `tools/` — VLIW compilation, weight packing, and hardware export
 - `tests/` — tokenizer, inference, and RTL-backed model tests
 - `artifacts/` — compact reference checkpoints/exports
-- `output/` — default tiny-model dataset and vocabulary
-- `stories10k/`, `stories288k/`, `qa_facts/` — named model datasets
+- `datasets/` — model datasets (`tiny_lm/`, `stories10k/`, `stories288k/`, `qa_facts/`)
 
 ## Basic workflow
 

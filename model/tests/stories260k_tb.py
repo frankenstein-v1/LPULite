@@ -11,7 +11,7 @@ from pathlib import Path
 MODEL_DIR = Path(__file__).resolve().parents[1]
 ROOT_DIR = MODEL_DIR.parent
 WEIGHTS_PATH = MODEL_DIR / "artifacts" / "tiny_lm_weights_export.json"
-VOCAB_PATH = MODEL_DIR / "output" / "vocab.json"
+VOCAB_PATH = MODEL_DIR / "datasets" / "tiny_lm" / "vocab.json"
 
 if str(MODEL_DIR) not in sys.path:
     sys.path.append(str(MODEL_DIR))

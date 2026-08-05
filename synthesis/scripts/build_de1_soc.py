@@ -289,7 +289,10 @@ module lpu_de1_soc_wrapper (
             end
         end
     end
-    lpu u_lpu (
+    lpu #(
+        .RMSNORM_CHUNKS(2),
+        .SOFTMAX_CHUNKS(16)
+    ) u_lpu (
         .clk(clk), .rst_n(rst_n), .run_en(run_enable),
         .pc_load_en(pc_load_en), .pc_load_value(pc_load_value),
         .ext_en(ext_en), .ext_write(ext_write), .ext_target(ext_target),
