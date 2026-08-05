@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-with open(Path(__file__).resolve().parents[1] / "output" / "vocab.json", "r", encoding="utf-8") as f:
+with open(Path(__file__).resolve().parents[1] / "datasets" / "tiny_lm" / "vocab.json", "r", encoding="utf-8") as f:
     vocab = json.load(f)
 
 def token_id(name, fallback=0):

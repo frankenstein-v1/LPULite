@@ -5,7 +5,7 @@ import argparse
 
 parser = argparse.ArgumentParser(description="Tiny LPU LM Dataset Generator")
 parser.add_argument("--vocab-size", type=int, default=256, help="Target vocabulary size (default: 256)")
-parser.add_argument("--out-dir", type=Path, default=Path(__file__).resolve().parents[1] / "output", help="Output directory for dataset and vocab")
+parser.add_argument("--out-dir", type=Path, default=Path(__file__).resolve().parents[1] / "datasets" / "tiny_lm", help="Output directory for dataset and vocab")
 args = parser.parse_args()
 
 TARGET_VOCAB_SIZE = args.vocab_size
@@ -16,7 +16,7 @@ TARGET_VOCAB_SIZE = args.vocab_size
 # Creates:
 #   output/dataset_train.txt
 #   output/dataset_val.txt
-#   model/output/vocab.json
+#   model/datasets/tiny_lm/vocab.json
 #
 # Goal:
 #   Generate a small text dataset for a tiny causal LM.

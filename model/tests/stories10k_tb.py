@@ -10,8 +10,8 @@ from pathlib import Path
 
 MODEL_DIR = Path(__file__).resolve().parents[1]
 ROOT_DIR = MODEL_DIR.parent
-WEIGHTS_PATH = MODEL_DIR / "stories10k" / "stories10k_weights_export.json"
-VOCAB_PATH = MODEL_DIR / "stories10k" / "vocab.json"
+WEIGHTS_PATH = MODEL_DIR / "datasets" / "stories10k" / "stories10k_weights_export.json"
+VOCAB_PATH = MODEL_DIR / "datasets" / "stories10k" / "vocab.json"
 
 if str(ROOT_DIR) not in sys.path:
     sys.path.append(str(ROOT_DIR))

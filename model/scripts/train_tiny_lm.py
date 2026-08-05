@@ -14,7 +14,7 @@ import torch.nn.functional as F
 # Default settings / configuration constants
 SEED = 42
 MODEL_DIR = Path(__file__).resolve().parents[1]
-DATA_DIR = MODEL_DIR / "output"
+DATA_DIR = MODEL_DIR / "datasets" / "tiny_lm"
 
 TRAIN_PATH = DATA_DIR / "dataset_train.txt"
 VAL_PATH = DATA_DIR / "dataset_val.txt"
@@ -550,17 +550,17 @@ if __name__ == "__main__":
     LR = args.lr if args.lr is not None else preset_config["lr"]
     PATIENCE = args.patience if args.patience is not None else preset_config["patience"]
     if args.preset == "qa476k_lpu":
-        default_data_dir = Path("model") / "qa_facts"
-        default_model_path = Path("model") / "qa_facts" / "qa476k_model.pt"
-        default_export_path = Path("model") / "qa_facts" / "qa476k_weights_export.json"
+        default_data_dir = Path("model") / "datasets" / "qa_facts"
+        default_model_path = Path("model") / "datasets" / "qa_facts" / "qa476k_model.pt"
+        default_export_path = Path("model") / "datasets" / "qa_facts" / "qa476k_weights_export.json"
     elif args.preset == "stories288k_lpu":
-        default_data_dir = Path("model") / "stories288k"
-        default_model_path = Path("model") / "stories288k" / "stories288k_model.pt"
-        default_export_path = Path("model") / "stories288k" / "stories288k_weights_export.json"
+        default_data_dir = Path("model") / "datasets" / "stories288k"
+        default_model_path = Path("model") / "datasets" / "stories288k" / "stories288k_model.pt"
+        default_export_path = Path("model") / "datasets" / "stories288k" / "stories288k_weights_export.json"
     elif args.preset == "stories10k":
-        default_data_dir = Path("model") / "stories10k"
-        default_model_path = Path("model") / "stories10k" / "stories10k_model.pt"
-        default_export_path = Path("model") / "stories10k" / "stories10k_weights_export.json"
+        default_data_dir = Path("model") / "datasets" / "stories10k"
+        default_model_path = Path("model") / "datasets" / "stories10k" / "stories10k_model.pt"
+        default_export_path = Path("model") / "datasets" / "stories10k" / "stories10k_weights_export.json"
     else:
         default_data_dir = DATA_DIR
         default_model_path = MODEL_PATH

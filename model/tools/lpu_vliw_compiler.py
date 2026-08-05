@@ -46,6 +46,8 @@ def build_instruction(
     vxm_data_sel=0,
     vxm_operand_sel=0,
     vxm_layernorm_en=0,
+    vxm_rope_en=0,
+    vxm_residual_op=0,
 ) -> int:
     """Pack instruction fields into a 96-bit integer for ICU IMEM."""
     word = 0
@@ -77,6 +79,8 @@ def build_instruction(
     word = _set_field(word, vxm_data_sel, 70, 1)
     word = _set_field(word, vxm_operand_sel, 71, 3)
     word = _set_field(word, vxm_layernorm_en, 74, 1)
+    word = _set_field(word, vxm_rope_en, 75, 1)
+    word = _set_field(word, vxm_residual_op, 76, 3)
     return word
 
 def compile_stories10k_vliw_program() -> list[int]:

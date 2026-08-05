@@ -4,7 +4,7 @@ import random
 from pathlib import Path
 
 parser = argparse.ArgumentParser(description="Generate 2000+ QA & Fact dataset for 476k GPT LPU model")
-parser.add_argument("--out-dir", type=Path, default=Path("model") / "qa_facts")
+parser.add_argument("--out-dir", type=Path, default=Path("model") / "datasets" / "qa_facts")
 parser.add_argument("--vocab-size", type=int, default=512)
 args = parser.parse_args()
 
