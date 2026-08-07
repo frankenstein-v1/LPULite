@@ -37,18 +37,29 @@ logic signed [MAC_PRODUCT_W-1:0] product_wire [mxm_size-1:0][mxm_size-1:0];
 logic signed [MAC_ACC_W-1:0]     mac_accum_wire [mxm_size-1:0][mxm_size-1:0];
 logic signed [MAC_SCALE_W-1:0]   mac_acc_scale_wire [mxm_size-1:0][mxm_size-1:0];
 
-//wire that holds the input vector that came in from the wb bus
-logic signed [7:0] mxm_input_ingress_reg [mxm_size-1:0];
-logic signed [MAC_SCALE_W-1:0] mxm_input_scale_reg;
+// Compatibility mirrors for existing debug/testbench hierarchy references.
+wire signed [7:0] mxm_input_ingress_reg [mxm_size-1:0];
 
 //this input register contains valid data
 logic mxm_input_ingress_loaded;
 
 //wire that holds weight vector that came in from wb bus
-logic signed [7:0] mxm_wght_ingress_reg [mxm_size-1:0];
+wire signed [7:0] mxm_wght_ingress_reg [mxm_size-1:0];
 
 //this wght register holds valid data
 logic mxm_wght_ingress_loaded;
+
+// Ping-pong ingress banks. The active bank feeds the MAC array while the
+// inactive bank can accept the next westbound row.
+logic signed [7:0] mxm_input_bank [0:1][mxm_size-1:0];
+logic signed [MAC_SCALE_W-1:0] mxm_input_scale_bank [0:1];
+logic                           mxm_input_active_bank;
+logic                           mxm_input_pending;
+
+logic signed [7:0] mxm_wght_bank [0:1][mxm_size-1:0];
+logic signed [MAC_SCALE_W-1:0] mxm_wght_scale_bank [0:1];
+logic                           mxm_wght_active_bank;
+logic                           mxm_wght_pending;
 
 //input feed is what drives the data instead of the register wire, to give more flexibility so we can choose the source of the feed 
 logic signed [7:0] mxm_input_feed [mxm_size-1:0];
@@ -78,6 +89,21 @@ logic mxm_ingress_is_input;
 
 logic mxm_ingress_is_wght;
 
+// Preserve the legacy hierarchy-visible names without storing a third copy.
+// While a row is pending, expose the staging bank; otherwise expose the bank
+// currently feeding the MAC array.
+genvar debug_idx;
+generate
+    for (debug_idx = 0; debug_idx < mxm_size; debug_idx++) begin : ingress_debug_aliases
+        assign mxm_input_ingress_reg[debug_idx] = mxm_input_pending
+            ? mxm_input_bank[~mxm_input_active_bank][debug_idx]
+            : mxm_input_bank[mxm_input_active_bank][debug_idx];
+        assign mxm_wght_ingress_reg[debug_idx] = mxm_wght_pending
+            ? mxm_wght_bank[~mxm_wght_active_bank][debug_idx]
+            : mxm_wght_bank[mxm_wght_active_bank][debug_idx];
+    end
+endgenerate
+
 function automatic logic signed [MAC_OPERAND_W-1:0] extend_operand(
     input logic [7:0] operand,
     input logic       operand_is_signed
@@ -103,23 +129,41 @@ always_ff @(posedge clk or posedge rst) begin
     if (rst) begin 
         mxm_input_ingress_loaded <= 1'b0;
         mxm_wght_ingress_loaded <= 1'b0;
+        mxm_input_active_bank <= 1'b0;
+        mxm_wght_active_bank <= 1'b0;
+        mxm_input_pending <= 1'b0;
+        mxm_wght_pending <= 1'b0;
 
         for (int idx = 0; idx < mxm_size; idx++) begin 
-            mxm_input_ingress_reg[idx] <= '0;
-            mxm_wght_ingress_reg[idx] <= '0;
+            mxm_input_bank[0][idx] <= '0;
+            mxm_input_bank[1][idx] <= '0;
+            mxm_wght_bank[0][idx] <= '0;
+            mxm_wght_bank[1][idx] <= '0;
         end
-        mxm_input_scale_reg <= '0;
+        mxm_input_scale_bank[0] <= '0;
+        mxm_input_scale_bank[1] <= '0;
+        mxm_wght_scale_bank[0] <= '0;
+        mxm_wght_scale_bank[1] <= '0;
     end else if (mxm_clear) begin
         mxm_input_ingress_loaded <= 1'b0;
         mxm_wght_ingress_loaded <= 1'b0;
+        mxm_input_active_bank <= 1'b0;
+        mxm_wght_active_bank <= 1'b0;
+        mxm_input_pending <= 1'b0;
+        mxm_wght_pending <= 1'b0;
 
 
         //
         for (int idx = 0; idx < mxm_size; idx++) begin 
-            mxm_input_ingress_reg[idx] <= '0;
-            mxm_wght_ingress_reg[idx] <= '0;
+            mxm_input_bank[0][idx] <= '0;
+            mxm_input_bank[1][idx] <= '0;
+            mxm_wght_bank[0][idx] <= '0;
+            mxm_wght_bank[1][idx] <= '0;
         end 
-        mxm_input_scale_reg <= '0;
+        mxm_input_scale_bank[0] <= '0;
+        mxm_input_scale_bank[1] <= '0;
+        mxm_wght_scale_bank[0] <= '0;
+        mxm_wght_scale_bank[1] <= '0;
     end 
 
     //if the mxm_West_capture 
@@ -128,21 +172,33 @@ always_ff @(posedge clk or posedge rst) begin
         //if the select bits are for input buffer  
         if (mxm_ingress_is_input) begin 
             for (int idx = 0; idx < mxm_size; idx++) begin
-                mxm_input_ingress_reg[idx] <= westbound_payload[8*idx +: 8];//registers 0-3 in this case will hold the data in increments of 8 starting from 0
+                mxm_input_bank[~mxm_input_active_bank][idx] <= westbound_payload[8*idx +: 8];
             end 
             //once loaded the register loaded should be 1
             mxm_input_ingress_loaded <= 1'b1;
-            mxm_input_scale_reg <= mxm_input_scale_i;
+            mxm_input_scale_bank[~mxm_input_active_bank] <= mxm_input_scale_i;
+            mxm_input_pending <= 1'b1;
         end 
 
         else if (mxm_ingress_is_wght) begin 
             for (int idx = 0; idx < mxm_size; idx++) begin 
                 //howevver in this case of weight register being used, same thing the data coming in is 32 bits because 4 MACs and 8 bit, so each reg is 8 bits
-                mxm_wght_ingress_reg[idx] <= westbound_payload[8*idx +: 8];
+                mxm_wght_bank[~mxm_wght_active_bank][idx] <= westbound_payload[8*idx +: 8];
             end 
             //once loaded the register loaded should be 1
             mxm_wght_ingress_loaded <= 1'b1;
+            mxm_wght_scale_bank[~mxm_wght_active_bank] <= mxm_wght_scale_i;
+            mxm_wght_pending <= 1'b1;
         end 
+    end else if (mxm_start) begin
+        if (mxm_input_pending) begin
+            mxm_input_active_bank <= ~mxm_input_active_bank;
+            mxm_input_pending <= 1'b0;
+        end
+        if (mxm_wght_pending) begin
+            mxm_wght_active_bank <= ~mxm_wght_active_bank;
+            mxm_wght_pending <= 1'b0;
+        end
     end 
 end 
 
@@ -150,17 +206,13 @@ always @* begin
     for (int idx = 0; idx < mxm_size; idx++) begin 
         // Use the current bus word immediately on a capture cycle so the ingress
         // path and the MAC weight-load pulse stay aligned.
-        if (mxm_west_capture && mxm_ingress_is_input)
-            mxm_input_feed[idx] = westbound_payload[8*idx +: 8];
-        else if (mxm_input_ingress_loaded)//if register is loaded, the inputs should be used from there
-            mxm_input_feed[idx] = mxm_input_ingress_reg[idx];
+        if (mxm_input_ingress_loaded)
+            mxm_input_feed[idx] = mxm_input_bank[mxm_input_active_bank][idx];
         else
             mxm_input_feed[idx] = mxm_input_in[idx]; //otherwise use the external input
 
-        if (mxm_west_capture && mxm_ingress_is_wght)
-            mxm_wght_feed[idx] = westbound_payload[8*idx +: 8];
-        else if (mxm_wght_ingress_loaded)
-            mxm_wght_feed[idx] = mxm_wght_ingress_reg[idx];
+        if (mxm_wght_ingress_loaded)
+            mxm_wght_feed[idx] = mxm_wght_bank[mxm_wght_active_bank][idx];
         else
             mxm_wght_feed[idx] = wght_val[idx];
     end 
@@ -178,14 +230,8 @@ end
 always @* begin 
     mxm_wght_load_feed = '0;
 
-    if (mxm_west_capture && mxm_ingress_is_wght) begin 
-        for (int idx = 0; idx < mxm_size; idx++) begin 
-            mxm_wght_load_feed[idx] = 1'b1;
-        end 
-    end else begin
-        for (int idx = 0; idx < mxm_size; idx++) begin
-            mxm_wght_load_feed[idx] = wght_load[idx];
-        end
+    for (int idx = 0; idx < mxm_size; idx++) begin
+        mxm_wght_load_feed[idx] = wght_load[idx];
     end 
 end 
 
@@ -208,12 +254,19 @@ always_ff @(posedge clk or posedge rst) begin
         end
 
         for (int idx = 0; idx < mxm_size; idx++) begin
-            if (mxm_wght_load_feed[idx]) begin
+            if (mxm_start && mxm_wght_pending) begin
+                mxm_wght_reg[idx] <= extend_operand(
+                    mxm_wght_bank[~mxm_wght_active_bank][idx],
+                    mxm_wght_is_signed
+                );
+            end else if (mxm_wght_load_feed[idx]) begin
                 mxm_wght_reg[idx] <= extend_operand(mxm_wght_feed[idx], mxm_wght_is_signed);
             end
         end
 
-        if (|mxm_wght_load_feed) begin
+        if (mxm_start && mxm_wght_pending) begin
+            mxm_wght_scale_reg <= mxm_wght_scale_bank[~mxm_wght_active_bank];
+        end else if (|mxm_wght_load_feed) begin
             mxm_wght_scale_reg <= mxm_wght_scale_i;
         end
     end
@@ -238,7 +291,7 @@ generate
                 .en(mxm_mac_en_feed[c]),
                 .input_i(mxm_input_mac_feed[r]),
                 .weight_i(mxm_wght_mac_feed[c]),
-                .input_scale_i(mxm_input_ingress_loaded ? mxm_input_scale_reg : mxm_input_scale_i),
+                .input_scale_i(mxm_input_ingress_loaded ? mxm_input_scale_bank[mxm_input_active_bank] : mxm_input_scale_i),
                 .weight_scale_i(mxm_wght_scale_reg),
                 .acc_o(mac_accum_wire[r][c]),
                 .acc_scale_o(mac_acc_scale_wire[r][c]),
