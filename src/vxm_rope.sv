@@ -34,10 +34,17 @@ module vxm_rope #(
             logic signed [7:0]        c_val;
             logic signed [7:0]        s_val;
 
+`ifdef TINYLPU_VXM_LOGIC_MULT
+            (* multstyle = "logic" *) logic signed [LANE_W+8-1:0] prod0;
+            (* multstyle = "logic" *) logic signed [LANE_W+8-1:0] prod1;
+            (* multstyle = "logic" *) logic signed [LANE_W+8-1:0] prod2;
+            (* multstyle = "logic" *) logic signed [LANE_W+8-1:0] prod3;
+`else
             logic signed [LANE_W+8-1:0] prod0;
             logic signed [LANE_W+8-1:0] prod1;
             logic signed [LANE_W+8-1:0] prod2;
             logic signed [LANE_W+8-1:0] prod3;
+`endif
 
             logic signed [LANE_W+8-1:0] res_even_full;
             logic signed [LANE_W+8-1:0] res_odd_full;

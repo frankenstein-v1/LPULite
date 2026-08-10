@@ -32,7 +32,11 @@ module mac #(
     output logic signed [PRODUCT_W-1:0] product_o
 );
 
+`ifdef TINYLPU_MXM_MAC_LOGIC_MULT
+    (* multstyle = "logic" *) logic signed [PRODUCT_W-1:0] product;
+`else
     logic signed [PRODUCT_W-1:0] product;
+`endif
     logic signed [ACC_W-1:0]     product_ext;
 
     assign product = $signed(input_i) * $signed(weight_i);
@@ -77,6 +81,11 @@ module int_mac (
     logic              weight_is_signed_reg;
     logic signed [8:0] input_ext;
     logic signed [8:0] weight_ext;
+`ifdef TINYLPU_MXM_MAC_LOGIC_MULT
+    (* multstyle = "logic" *) logic signed [19:0] product_next;
+`else
+    logic signed [19:0] product_next;
+`endif
 
     assign input_ext = input_is_signed
         ? $signed({input_in[7], input_in})
@@ -85,6 +94,8 @@ module int_mac (
     assign weight_ext = weight_is_signed_reg
         ? $signed({weight_reg[7], weight_reg})
         : $signed({1'b0, weight_reg});
+
+    assign product_next = weight_ext * input_ext;
 
     always_ff @(posedge clk or posedge rst) begin
         if (rst) begin
@@ -96,7 +107,7 @@ module int_mac (
             weight_is_signed_reg <= weight_is_signed;
             product <= 20'sd0;
         end else if (en) begin
-            product <= weight_ext * input_ext;
+            product <= product_next;
         end else begin
             product <= 20'sd0;
         end

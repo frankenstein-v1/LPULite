@@ -7,23 +7,72 @@ module lpu_de1_soc_wrapper (
     output logic avs_readdatavalid
 );
     localparam logic [1:0] MEM0 = 2'd0, MEM1 = 2'd1, IMEM = 2'd2;
-    logic run_enable, ext_en, ext_write;
+    localparam logic [15:0] CTRL_RUN = 16'hc000;
+    localparam logic [15:0] CTRL_PC_LOAD = 16'hc004;
+    localparam logic [15:0] CTRL_CYCLES = 16'hc008;
+    localparam logic [15:0] CTRL_RUN_CYCLES = 16'hc00c;
+    logic run_enable, pc_load_en, ext_en, ext_write;
+    logic [31:0] pc_load_value, cycle_counter, run_cycles_remaining;
     logic [1:0] ext_target;
     logic [31:0] ext_addr;
     logic [95:0] ext_wdata, ext_rdata, assembly;
+    logic read_pending, read_is_mem;
+    logic [1:0] read_lane;
+    logic [31:0] read_data_pending;
     integer word_index, row_index, lane_index;
 
-    assign avs_waitrequest = 1'b0;
-    assign avs_readdatavalid = avs_read;
+    assign avs_waitrequest = read_pending;
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            run_enable <= 1'b0; ext_en <= 1'b0; ext_write <= 1'b0;
+            run_enable <= 1'b0; pc_load_en <= 1'b0; pc_load_value <= '0; ext_en <= 1'b0; ext_write <= 1'b0;
+            run_cycles_remaining <= '0;
             ext_target <= '0; ext_addr <= '0; ext_wdata <= '0; assembly <= '0;
             avs_readdata <= '0;
+            avs_readdatavalid <= 1'b0;
+            read_pending <= 1'b0;
+            read_is_mem <= 1'b0;
+            read_lane <= '0;
+            read_data_pending <= '0;
         end else begin
             ext_en <= 1'b0;
-            if (avs_write) begin
-                if (avs_address == 16'hc000) run_enable <= avs_writedata[0];
+            ext_write <= 1'b0;
+            pc_load_en <= 1'b0;
+            avs_readdatavalid <= 1'b0;
+
+            if (run_cycles_remaining != 32'd0) begin
+                if (run_cycles_remaining == 32'd1) begin
+                    run_cycles_remaining <= 32'd0;
+                    run_enable <= 1'b0;
+                end else begin
+                    run_cycles_remaining <= run_cycles_remaining - 32'd1;
+                end
+            end
+
+            if (read_pending) begin
+                read_pending <= 1'b0;
+                avs_readdatavalid <= 1'b1;
+                if (read_is_mem) begin
+                    case (read_lane)
+                        2'd0: avs_readdata <= ext_rdata[31:0];
+                        2'd1: avs_readdata <= ext_rdata[63:32];
+                        default: avs_readdata <= ext_rdata[95:64];
+                    endcase
+                end else begin
+                    avs_readdata <= read_data_pending;
+                end
+            end else if (avs_write) begin
+                if (avs_address == CTRL_RUN) begin
+                    run_enable <= avs_writedata[0];
+                    run_cycles_remaining <= 32'd0;
+                end
+                else if (avs_address == CTRL_PC_LOAD) begin
+                    pc_load_value <= avs_writedata;
+                    pc_load_en <= 1'b1;
+                end
+                else if (avs_address == CTRL_RUN_CYCLES) begin
+                    run_cycles_remaining <= avs_writedata;
+                    run_enable <= (avs_writedata != 32'd0);
+                end
                 else begin
                     if (avs_address < 16'h4000) begin word_index = avs_address[13:2]; ext_target <= IMEM; end
                     else if (avs_address < 16'h8000) begin word_index = (avs_address - 16'h4000) >> 2; ext_target <= MEM0; end
@@ -38,26 +87,37 @@ module lpu_de1_soc_wrapper (
                         end
                     endcase
                 end
-            end
-            if (avs_read) begin
-                if (avs_address == 16'hc000) avs_readdata <= {31'b0, run_enable};
+            end else if (avs_read) begin
+                read_pending <= 1'b1;
+                if (avs_address == CTRL_RUN) begin
+                    read_is_mem <= 1'b0;
+                    read_data_pending <= {31'b0, run_enable};
+                end else if (avs_address == CTRL_CYCLES) begin
+                    read_is_mem <= 1'b0;
+                    read_data_pending <= cycle_counter;
+                end else if (avs_address == CTRL_RUN_CYCLES) begin
+                    read_is_mem <= 1'b0;
+                    read_data_pending <= run_cycles_remaining;
+                end
                 else begin
                     if (avs_address < 16'h4000) begin word_index = avs_address[13:2]; ext_target <= IMEM; end
                     else if (avs_address < 16'h8000) begin word_index = (avs_address - 16'h4000) >> 2; ext_target <= MEM0; end
                     else begin word_index = (avs_address - 16'h8000) >> 2; ext_target <= MEM1; end
                     row_index = word_index / 3; lane_index = word_index % 3;
                     ext_en <= 1'b1; ext_write <= 1'b0; ext_addr <= row_index;
-                    case (lane_index) 0: avs_readdata <= ext_rdata[31:0];
-                      1: avs_readdata <= ext_rdata[63:32];
-                      default: avs_readdata <= ext_rdata[95:64]; endcase
+                    read_is_mem <= 1'b1;
+                    read_lane <= lane_index[1:0];
                 end
             end
         end
     end
-    lpu u_lpu (
+    lpu #(
+        .RMSNORM_CHUNKS(2),
+        .SOFTMAX_CHUNKS(16)
+    ) u_lpu (
         .clk(clk), .rst_n(rst_n), .run_en(run_enable),
-        .pc_load_en(1'b0), .pc_load_value(32'd0),
+        .pc_load_en(pc_load_en), .pc_load_value(pc_load_value),
         .ext_en(ext_en), .ext_write(ext_write), .ext_target(ext_target),
-        .ext_addr(ext_addr), .ext_wdata(ext_wdata), .ext_rdata(ext_rdata), .cycle_counter()
+        .ext_addr(ext_addr), .ext_wdata(ext_wdata), .ext_rdata(ext_rdata), .cycle_counter(cycle_counter)
     );
 endmodule

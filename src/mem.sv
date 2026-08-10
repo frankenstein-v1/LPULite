@@ -59,36 +59,94 @@ module mem #(
     // The actual behavioral SRAM vault. Width defaults to one fixed8 row.
     logic [DATA_W-1:0] sram_array [0:DEPTH-1];
 
-    // Keep writes in a reset-free, single-port process so ASIC synthesis can
-    // infer a memory instead of expanding the array into resettable flops.
+`ifdef TINYLPU_FPGA_ALTSYNCRAM
+    logic [ADDR_W-1:0] ram_addr_a;
+    logic [DATA_W-1:0] ram_data_a;
+    logic [DATA_W-1:0] ram_q_a;
+    logic [DATA_W-1:0] ram_q_b;
+    logic              ram_wren_a;
+    logic              read_en_q;
+    logic              ext_read_en_q;
+
+    assign ram_addr_a = ext_write_en ? ext_addr : addr;
+    assign ram_data_a = ext_write_en ? ext_data_in : stream_in;
+    assign ram_wren_a = write_en || ext_write_en;
+
+    always_ff @(posedge clk) begin
+        read_en_q     <= read_en;
+        ext_read_en_q <= ext_read_en;
+    end
+
+    assign stream_out   = read_en_q ? ram_q_a : '0;
+    assign ext_data_out = ext_read_en_q ? ram_q_b : '0;
+
+    altsyncram #(
+        .operation_mode("BIDIR_DUAL_PORT"),
+        .intended_device_family("Cyclone V"),
+        .width_a(DATA_W),
+        .widthad_a(ADDR_W),
+        .numwords_a(DEPTH),
+        .width_b(DATA_W),
+        .widthad_b(ADDR_W),
+        .numwords_b(DEPTH),
+        .outdata_reg_a("CLOCK0"),
+        .outdata_reg_b("CLOCK0"),
+        .address_reg_b("CLOCK0"),
+        .indata_reg_b("CLOCK0"),
+        .wrcontrol_wraddress_reg_b("CLOCK0"),
+        .lpm_type("altsyncram"),
+        .read_during_write_mode_mixed_ports("DONT_CARE"),
+        .power_up_uninitialized("FALSE")
+    ) u_fpga_ram (
+        .clock0(clk),
+        .address_a(ram_addr_a),
+        .data_a(ram_data_a),
+        .wren_a(ram_wren_a),
+        .q_a(ram_q_a),
+        .address_b(ext_addr),
+        .data_b(ext_data_in),
+        .wren_b(1'b0),
+        .q_b(ram_q_b),
+        .aclr0(1'b0),
+        .aclr1(1'b0),
+        .addressstall_a(1'b0),
+        .addressstall_b(1'b0),
+        .byteena_a(1'b1),
+        .byteena_b(1'b1),
+        .clock1(1'b1),
+        .clocken0(1'b1),
+        .clocken1(1'b1),
+        .clocken2(1'b1),
+        .clocken3(1'b1),
+        .eccstatus()
+    );
+`else
+    // Keep reads synchronous so FPGA synthesis can infer block RAM instead of
+    // expanding the array into registers. The integrated LPU routes HPS/JTAG
+    // reads through row_out; ext_data_out remains as a synchronous debug
+    // readback port for older testbenches.
     always_ff @(posedge clk) begin
         if (write_en) begin
             sram_array[addr] <= stream_in;
         end else if (ext_write_en) begin
             sram_array[ext_addr] <= ext_data_in;
         end
-    end
 
-    // SRAM contents are intentionally not reset. Only the registered read
-    // outputs are reset; this matches normal compiled-SRAM behavior.
-    always_ff @(posedge clk or negedge rst_n) begin
-        if (!rst_n) begin
-            stream_out   <= '0;
-            ext_data_out <= '0;
+        if (read_en) begin
+            stream_out <= sram_array[addr];
         end else begin
-            if (read_en) begin
-                stream_out <= sram_array[addr];
-            end else begin
-                stream_out <= '0;
-            end
-
-            if (ext_read_en) begin
-                ext_data_out <= sram_array[ext_addr];
-            end else begin
-                ext_data_out <= '0;
-            end
+            stream_out <= '0;
         end
     end
+
+    always_ff @(posedge clk) begin
+        if (ext_read_en) begin
+            ext_data_out <= sram_array[ext_addr];
+        end else begin
+            ext_data_out <= '0;
+        end
+    end
+`endif
 `endif
 
 endmodule

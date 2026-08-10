@@ -1,3 +1,5 @@
+// Archive copy of src/icu.sv before the DE1-SoC HPS FPGA build switched
+// IMEM to explicit Intel altsyncram block RAM.
 module icu #(
     // How many rows of code your chip's instruction memory can hold
     parameter INSTRUCTION_COUNT = 1024 
@@ -62,7 +64,7 @@ module icu #(
 `endif
 
     // 2. THE PROGRAM COUNTER (PC)
-    // A simple register that tracks what line of code we are on.
+    // A simple register that tracks what line of code is on.
     logic [31:0] pc;
     logic [95:0] current_instruction;
 
@@ -81,78 +83,17 @@ module icu #(
         .read2_data(current_instruction)
     );
 `else
-`ifdef TINYLPU_FPGA_ALTSYNCRAM
-    logic [95:0] imem_q_fetch;
-    logic [95:0] imem_q_ext;
-    logic        ext_imem_read_q;
-
-    always_ff @(posedge clk) begin
-        ext_imem_read_q <= ext_imem_en && !ext_imem_write;
-    end
-
-    assign current_instruction = imem_q_fetch;
-    assign ext_imem_rdata = ext_imem_read_q ? imem_q_ext : '0;
-
-    altsyncram #(
-        .operation_mode("BIDIR_DUAL_PORT"),
-        .intended_device_family("Cyclone V"),
-        .width_a(96),
-        .widthad_a($clog2(INSTRUCTION_COUNT)),
-        .numwords_a(INSTRUCTION_COUNT),
-        .width_b(96),
-        .widthad_b($clog2(INSTRUCTION_COUNT)),
-        .numwords_b(INSTRUCTION_COUNT),
-        .outdata_reg_a("CLOCK0"),
-        .outdata_reg_b("CLOCK0"),
-        .address_reg_b("CLOCK0"),
-        .indata_reg_b("CLOCK0"),
-        .wrcontrol_wraddress_reg_b("CLOCK0"),
-        .lpm_type("altsyncram"),
-        .read_during_write_mode_mixed_ports("DONT_CARE"),
-        .power_up_uninitialized("FALSE")
-    ) u_fpga_imem (
-        .clock0(clk),
-        .address_a(pc[$clog2(INSTRUCTION_COUNT)-1:0]),
-        .data_a(96'b0),
-        .wren_a(1'b0),
-        .q_a(imem_q_fetch),
-        .address_b(ext_imem_addr[$clog2(INSTRUCTION_COUNT)-1:0]),
-        .data_b(ext_imem_wdata),
-        .wren_b(ext_imem_en && ext_imem_write),
-        .q_b(imem_q_ext),
-        .aclr0(1'b0),
-        .aclr1(1'b0),
-        .addressstall_a(1'b0),
-        .addressstall_b(1'b0),
-        .byteena_a(1'b1),
-        .byteena_b(1'b1),
-        .clock1(1'b1),
-        .clocken0(1'b1),
-        .clocken1(1'b1),
-        .clocken2(1'b1),
-        .clocken3(1'b1),
-        .eccstatus()
-    );
-`else
     always_ff @(posedge clk) begin
         if (ext_imem_en && ext_imem_write) begin
             imem_array[ext_imem_addr] <= ext_imem_wdata;
         end
-
-        // 3. THE SLICER (The Dispatcher)
-        // Synchronous FPGA block RAM fetch.  After a PC load, the requested
-        // instruction is visible on the following cycle.
-        current_instruction <= imem_array[pc[9:0]];
     end
 
-    always_ff @(posedge clk) begin
-        if (ext_imem_en && !ext_imem_write) begin
-            ext_imem_rdata <= imem_array[ext_imem_addr];
-        end else begin
-            ext_imem_rdata <= '0;
-        end
-    end
-`endif
+    assign ext_imem_rdata = imem_array[ext_imem_addr];
+
+    // 3. THE SLICER (The Dispatcher)
+    // We grab the current 96-bit word sitting at the current PC address.
+    assign current_instruction = imem_array[pc];
 `endif
 
     always_ff @(posedge clk or negedge rst_n) begin
