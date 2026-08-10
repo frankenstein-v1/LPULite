@@ -4,7 +4,8 @@ module softmax #(
     parameter int LANES      = 8,
     parameter int LANE_W     = 32,
     parameter int MAX_CHUNKS = 64,
-    parameter logic signed [7:0] PROB_SCALE = -8'sd7
+    parameter logic signed [7:0] PROB_SCALE = -8'sd7,
+    parameter int RECIP_FRAC_BITS = 30
 ) (
     input  logic                    clk,
     input  logic                    rst_n,
@@ -25,9 +26,13 @@ module softmax #(
     localparam int ROW_W = LANES * LANE_W;
     localparam int IDX_W = (MAX_CHUNKS <= 1) ? 1 : $clog2(MAX_CHUNKS);
 
+    localparam int PROB_FRAC_BITS = -PROB_SCALE;
+    localparam int NORMALIZE_SHIFT = RECIP_FRAC_BITS - PROB_FRAC_BITS;
+
     typedef enum logic [1:0] {
         ST_CAPTURE,
         ST_SUM,
+        ST_RECIP_WAIT,
         ST_NORM
     } state_e;
 
@@ -40,6 +45,10 @@ module softmax #(
     logic signed [LANE_W-1:0] global_max;
     logic [31:0]      global_sum;
     logic             active_q;
+    logic             reciprocal_start;
+    logic             reciprocal_done;
+    logic [31:0]      reciprocal_q30;
+    logic [31:0]      reciprocal_quotient;
 
     logic [ROW_W-1:0] active_row;
     logic signed [7:0] active_scale;
@@ -82,17 +91,19 @@ module softmax #(
 
     function automatic logic [7:0] softmax_prob_u8(
         input logic [31:0] exp_value,
-        input logic [31:0] sum_value
+        input logic [31:0] reciprocal
     );
-        longint unsigned numerator;
-        longint unsigned quotient;
+        longint unsigned product;
+        longint unsigned rounded_product;
+        longint unsigned probability;
         begin
-            if (sum_value == 32'd0) begin
+            if (reciprocal == 32'd0) begin
                 softmax_prob_u8 = 8'd0;
             end else begin
-                numerator = ({32'd0, exp_value} << (-PROB_SCALE)) + {33'd0, sum_value[31:1]};
-                quotient = numerator / {32'd0, sum_value};
-                softmax_prob_u8 = (quotient > 64'd255) ? 8'd255 : quotient[7:0];
+                product = {32'd0, exp_value} * {32'd0, reciprocal};
+                rounded_product = product + (64'd1 << (NORMALIZE_SHIFT-1));
+                probability = rounded_product >> NORMALIZE_SHIFT;
+                softmax_prob_u8 = (probability > 64'd255) ? 8'd255 : probability[7:0];
             end
         end
     endfunction
@@ -118,7 +129,7 @@ module softmax #(
         for (int lane = 0; lane < LANES; lane++) begin
             exp_delta_q[lane] = aligned_row[lane] - global_max;
             chunk_sum = chunk_sum + exp_row[lane];
-            prob_u8[lane] = softmax_prob_u8(exp_row[lane], global_sum);
+            prob_u8[lane] = softmax_prob_u8(exp_row[lane], reciprocal_q30);
             y_out[lane*LANE_W +: LANE_W] = {{(LANE_W-8){1'b0}}, prob_u8[lane]};
         end
     end
@@ -135,6 +146,27 @@ module softmax #(
         end
     endgenerate
 
+    // Compute one Q2.30 reciprocal for the complete vector. Every lane shares
+    // global_sum, so normalization only needs one LUT lookup followed by
+    // parallel multiply/shift operations during ST_NORM.
+    assign reciprocal_start = (state_q == ST_SUM) &&
+                              (read_idx == IDX_W'(MAX_CHUNKS-1));
+
+    lut_softmax_div #(
+        .DW(32),
+        .ADDR_BITS(8),
+        .RECIP_FRAC_BITS(RECIP_FRAC_BITS)
+    ) reciprocal_inst (
+        .clk(clk),
+        .rst(~rst_n),
+        .start(reciprocal_start),
+        .dividend(32'd1 << RECIP_FRAC_BITS),
+        .divisor(global_sum),
+        .quotient(reciprocal_quotient),
+        .remainder(),
+        .done(reciprocal_done)
+    );
+
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             state_q    <= ST_CAPTURE;
@@ -142,6 +174,7 @@ module softmax #(
             read_idx   <= '0;
             global_max <= 32'sh8000_0000;
             global_sum <= 32'd0;
+            reciprocal_q30 <= 32'd0;
             active_q   <= 1'b0;
         end else begin
             unique case (state_q)
@@ -170,9 +203,16 @@ module softmax #(
                     global_sum <= global_sum + chunk_sum;
                     if (read_idx == IDX_W'(MAX_CHUNKS-1)) begin
                         read_idx <= '0;
-                        state_q  <= ST_NORM;
+                        state_q  <= ST_RECIP_WAIT;
                     end else begin
                         read_idx <= read_idx + 1'b1;
+                    end
+                end
+
+                ST_RECIP_WAIT: begin
+                    if (reciprocal_done) begin
+                        reciprocal_q30 <= reciprocal_quotient;
+                        state_q <= ST_NORM;
                     end
                 end
 
@@ -183,6 +223,7 @@ module softmax #(
                             write_idx  <= '0;
                             global_max <= 32'sh8000_0000;
                             global_sum <= 32'd0;
+                            reciprocal_q30 <= 32'd0;
                             active_q   <= 1'b0;
                             state_q    <= ST_CAPTURE;
                         end else begin
