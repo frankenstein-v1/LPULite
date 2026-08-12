@@ -1,0 +1,16 @@
+<sld_project_info>
+  <project>
+    <hash md5_digest_80b="f3c86cea8fdf1772d552"/>
+  </project>
+  <file_info>
+    <file device="5CSEMA5F31C6" path="tiny_lpu_de1_soc_hps.sof" usercode="0xFFFFFFFF"/>
+  </file_info>
+  <sld_infos>
+    <sld_info hpath="platform_designer_hps_system:u_qsys" name="u_qsys">
+      <assignment_values>
+        <assignment_value text="QSYS_NAME platform_designer_hps_system HAS_SOPCINFO 1 GENERATION_ID 1786309004"/>
+      </assignment_values>
+      <parameters/>
+    </sld_info>
+  </sld_infos>
+</sld_project_info>

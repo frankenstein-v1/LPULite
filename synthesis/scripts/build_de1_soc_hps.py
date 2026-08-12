@@ -91,13 +91,38 @@ TOP = """module de1_soc_hps_top (
     input  logic [0:0]  KEY,
     output logic [0:0]  LEDR
 );
+    // TinyLPU currently does not close timing at the board 50 MHz clock.
+    // TimeQuest reports an LPU fabric Fmax of ~11 MHz, so run the entire
+    // lightweight-HPS/LPU Platform Designer fabric at 50/8 = 6.25 MHz.
+    logic [2:0] qsys_clk_div;
+    logic       qsys_clk;
+
+    always_ff @(posedge CLOCK_50 or negedge KEY[0]) begin
+        if (!KEY[0]) begin
+            qsys_clk_div <= 3'd0;
+        end else begin
+            qsys_clk_div <= qsys_clk_div + 3'd1;
+        end
+    end
+
+    assign qsys_clk = qsys_clk_div[2];
+
     platform_designer_hps_system u_qsys (
-        .clk_clk       (CLOCK_50),
+        .clk_clk       (qsys_clk),
         .reset_reset_n (KEY[0])
     );
 
     assign LEDR[0] = KEY[0];
 endmodule
+"""
+
+
+TOP_SDC = """create_clock -name CLOCK_50 -period 20.000 [get_ports {CLOCK_50}]
+
+set qsys_clk_pins [get_pins -nowarn {*qsys_clk_div[2]*|q}]
+if {[llength $qsys_clk_pins] > 0} {
+    create_generated_clock -name QSYS_CLK -source [get_ports {CLOCK_50}] -divide_by 8 $qsys_clk_pins
+}
 """
 
 
@@ -180,6 +205,7 @@ def prepare_sources() -> None:
     # Reuse the current wrapper as the custom IP HDL so Platform Designer sees
     # the same ABI as the JTAG/runtime code.
     write(SYNTHESIS_RTL / "de1_soc_hps_top.sv", TOP)
+    write(SYNTHESIS_RTL / "de1_soc_hps_top.sdc", TOP_SDC)
     write(LPU_IP_DIR / "lpu_de1_soc_hw.tcl", LPU_HW_TCL)
     wrapper_text = (SYNTHESIS_RTL / "lpu_de1_soc_wrapper.sv").read_text(encoding="utf-8")
     write(LPU_IP_DIR / "lpu_de1_soc_wrapper.sv", wrapper_text)
@@ -220,6 +246,7 @@ PROJECT_REVISION = "{PROJECT}"
         "set_global_assignment -name VERILOG_MACRO TINYLPU_MXM_MAC_LOGIC_MULT",
         "set_global_assignment -name VERILOG_MACRO TINYLPU_VXM_LOGIC_MULT",
     ]
+    lines.append(f'set_global_assignment -name SDC_FILE "{qpath(SYNTHESIS_RTL / "de1_soc_hps_top.sdc")}"')
     for path in source_files():
         lines.append(f'set_global_assignment -name SYSTEMVERILOG_FILE "{qpath(path)}"')
     lines += [
@@ -241,6 +268,7 @@ PROJECT_REVISION = "{PROJECT}"
         "set_global_assignment -name PARTITION_COLOR 16764057 -section_id Top",
         "set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top",
         "set_global_assignment -name MAX_BALANCING_DSP_BLOCKS 87",
+        "set_global_assignment -name NUM_PARALLEL_PROCESSORS 2",
     ]
     write(PROJECT_DIR / f"{PROJECT}.qsf", "\n".join(lines) + "\n")
 

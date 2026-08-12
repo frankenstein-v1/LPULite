@@ -27,6 +27,7 @@ module quant #(
     logic signed [7:0] regular_lane_q [0:LANES-1];
     logic        [7:0] softmax_lane_q [0:LANES-1];
     logic [7:0]        regular_row_shift;
+    logic signed [7:0] regular_row_scale;
 
     logic signed [OUT_W-1:0] regular_word;
     logic        [OUT_W-1:0] softmax_word;
@@ -57,7 +58,7 @@ module quant #(
                 round_shift_signed = value;
             end else begin
                 rounding_step = $signed({{(LANE_W-1){1'b0}}, 1'b1}) <<< (shift_amount - 1);
-                adjusted_value = (value >= 0) ? (value + rounding_step) : (value - rounding_step);
+                adjusted_value = value + rounding_step;
                 round_shift_signed = adjusted_value >>> shift_amount;
             end
         end
@@ -116,6 +117,7 @@ module quant #(
         end
 
         regular_row_shift = row_shift_next[7:0];
+        regular_row_scale = $signed(row_shift_next[7:0]) - 8'sd8;
 
         for (int i = 0; i < LANES; i++) begin
             lane_in_val = ingress_data_reg[i*LANE_W +: LANE_W];
@@ -137,7 +139,7 @@ module quant #(
             end
             default: begin
                 mux_word = regular_word;
-                scale_word = {24'd0, regular_row_shift};
+                scale_word = {{24{regular_row_scale[7]}}, regular_row_scale};
             end
         endcase
     end

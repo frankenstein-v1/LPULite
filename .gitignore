@@ -1,5 +1,3 @@
-build/
-synthesis/build/
 sim_build/
 model/tests/sim_build*/
 model/**/__pycache__/

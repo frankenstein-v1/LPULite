@@ -6300,3 +6300,6 @@ set_global_assignment -entity "platform_designer_hps_system_hps_0_hps_io" -libra
 set_global_assignment -entity "platform_designer_hps_system_hps_0_hps_io" -library "platform_designer_hps_system" -name IP_TOOL_VERSION "25.1"
 set_global_assignment -entity "platform_designer_hps_system_hps_0_hps_io" -library "platform_designer_hps_system" -name IP_TOOL_ENV "Qsys"
 
+
+
+

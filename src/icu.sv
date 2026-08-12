@@ -91,7 +91,7 @@ module icu #(
     end
 
     assign current_instruction = imem_q_fetch;
-    assign ext_imem_rdata = ext_imem_read_q ? imem_q_ext : '0;
+    assign ext_imem_rdata = imem_q_ext;
 
     altsyncram #(
         .operation_mode("BIDIR_DUAL_PORT"),
@@ -148,8 +148,6 @@ module icu #(
     always_ff @(posedge clk) begin
         if (ext_imem_en && !ext_imem_write) begin
             ext_imem_rdata <= imem_array[ext_imem_addr];
-        end else begin
-            ext_imem_rdata <= '0;
         end
     end
 `endif

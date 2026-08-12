@@ -26,6 +26,7 @@ extern "C" {
 #define TINYLPU_CTRL_PC_LOAD   0xC004u
 #define TINYLPU_CTRL_CYCLES    0xC008u
 #define TINYLPU_CTRL_RUN_CYCLES 0xC00Cu
+#define TINYLPU_CTRL_SOFT_RESET 0xC010u
 
 #define TINYLPU_IMEM_ROWS      1024u
 #define TINYLPU_ROW_BYTES      12u
@@ -48,6 +49,7 @@ void tinylpu_mmio_close(tinylpu_mmio_t *dev);
 
 void tinylpu_write32(tinylpu_mmio_t *dev, uint32_t offset, uint32_t value);
 uint32_t tinylpu_read32(tinylpu_mmio_t *dev, uint32_t offset);
+void tinylpu_soft_reset(tinylpu_mmio_t *dev, uint32_t cycles, unsigned poll_us);
 
 void tinylpu_write_row(tinylpu_mmio_t *dev, uint32_t base_offset, uint32_t row, tinylpu_mmio_row_t value);
 tinylpu_mmio_row_t tinylpu_read_row(tinylpu_mmio_t *dev, uint32_t base_offset, uint32_t row);
@@ -55,7 +57,7 @@ void tinylpu_copy_row(tinylpu_mmio_t *dev, uint32_t src_base, uint32_t src_row, 
 
 void tinylpu_load_imem_page(tinylpu_mmio_t *dev, const tinylpu_mmio_row_t *program, size_t count);
 void tinylpu_run_page(tinylpu_mmio_t *dev, unsigned settle_us);
-void tinylpu_run_cycles(tinylpu_mmio_t *dev, uint32_t cycles, unsigned poll_us);
+uint32_t tinylpu_run_cycles(tinylpu_mmio_t *dev, uint32_t cycles, unsigned poll_us);
 
 #ifdef __cplusplus
 }

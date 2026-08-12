@@ -101,6 +101,7 @@ module rmsnorm #(
         logic [4:0]  idx;
         logic [31:0] raw_lut;
         logic [31:0] res;
+        logic [39:0] res_q8_8_adjusted;
         integer half_msb;
         begin
             if (ms_val == 64'd0) begin
@@ -118,7 +119,13 @@ module rmsnorm #(
                 res = raw_lut >> half_msb;
                 if (msb % 2 != 0)
                     res = (res * 32'd23170) >> 15;
-                compute_inv_sqrt = res;
+                // mean_square is computed from Q8.8 lanes, so it is Q16.16.
+                // The reciprocal square-root therefore needs an extra 2**8
+                // factor to return a Q1.15 gain for the original real values.
+                res_q8_8_adjusted = {8'd0, res} << 8;
+                compute_inv_sqrt = (res_q8_8_adjusted > 40'd2147483647)
+                    ? 32'd2147483647
+                    : res_q8_8_adjusted[31:0];
             end
         end
     endfunction
@@ -151,8 +158,11 @@ module rmsnorm #(
             if (g_lane == 32'd0)
                 g_lane = 32'sd128;
 
+            // x_lane is carried through VXM as Q8.8, inv_rms_q15_q is Q1.15,
+            // and gamma is Q1.7.  Keep the output in Q8.8 by removing both
+            // the reciprocal RMS fractional bits and the gamma fractional bits.
             prod = 64'(x_lane) * 64'($signed(inv_rms_q15_q)) * 64'(g_lane);
-            final_lane = prod >>> 15;
+            final_lane = prod >>> 22;
             normalized_row[lane*LANE_W +: LANE_W] = LANE_W'(final_lane);
         end
     end

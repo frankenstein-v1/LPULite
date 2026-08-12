@@ -75,6 +75,25 @@ uint32_t tinylpu_read32(tinylpu_mmio_t *dev, uint32_t offset) {
     return value;
 }
 
+void tinylpu_soft_reset(tinylpu_mmio_t *dev, uint32_t cycles, unsigned poll_us) {
+    if (cycles == 0u) {
+        cycles = 16u;
+    }
+    tinylpu_write32(dev, TINYLPU_CTRL_RUN, 0u);
+    tinylpu_write32(dev, TINYLPU_CTRL_RUN_CYCLES, 0u);
+    tinylpu_write32(dev, TINYLPU_CTRL_PC_LOAD, 0u);
+    tinylpu_write32(dev, TINYLPU_CTRL_SOFT_RESET, cycles);
+    for (unsigned guard = 0; guard < 100000u; ++guard) {
+        uint32_t remaining = tinylpu_read32(dev, TINYLPU_CTRL_SOFT_RESET);
+        if (remaining == 0u) {
+            break;
+        }
+        if (poll_us) {
+            usleep(poll_us);
+        }
+    }
+}
+
 void tinylpu_write_row(tinylpu_mmio_t *dev, uint32_t base_offset, uint32_t row, tinylpu_mmio_row_t value) {
     uint32_t addr = base_offset + row * TINYLPU_ROW_BYTES;
     tinylpu_write32(dev, addr + 0, value.w0);
@@ -125,7 +144,8 @@ void tinylpu_run_page(tinylpu_mmio_t *dev, unsigned settle_us) {
     tinylpu_write32(dev, TINYLPU_CTRL_RUN, 0);
 }
 
-void tinylpu_run_cycles(tinylpu_mmio_t *dev, uint32_t cycles, unsigned poll_us) {
+uint32_t tinylpu_run_cycles(tinylpu_mmio_t *dev, uint32_t cycles, unsigned poll_us) {
+    uint32_t before = tinylpu_read32(dev, TINYLPU_CTRL_CYCLES);
     tinylpu_write32(dev, TINYLPU_CTRL_PC_LOAD, 0);
     tinylpu_write32(dev, TINYLPU_CTRL_RUN_CYCLES, cycles);
 
@@ -139,4 +159,6 @@ void tinylpu_run_cycles(tinylpu_mmio_t *dev, uint32_t cycles, unsigned poll_us) 
             usleep(poll_us);
         }
     }
+    uint32_t after = tinylpu_read32(dev, TINYLPU_CTRL_CYCLES);
+    return after - before;
 }

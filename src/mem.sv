@@ -65,20 +65,17 @@ module mem #(
     logic [DATA_W-1:0] ram_q_a;
     logic [DATA_W-1:0] ram_q_b;
     logic              ram_wren_a;
-    logic              read_en_q;
-    logic              ext_read_en_q;
-
     assign ram_addr_a = ext_write_en ? ext_addr : addr;
     assign ram_data_a = ext_write_en ? ext_data_in : stream_in;
     assign ram_wren_a = write_en || ext_write_en;
 
-    always_ff @(posedge clk) begin
-        read_en_q     <= read_en;
-        ext_read_en_q <= ext_read_en;
-    end
-
-    assign stream_out   = read_en_q ? ram_q_a : '0;
-    assign ext_data_out = ext_read_en_q ? ram_q_b : '0;
+    // The block RAM outputs are registered.  Do not gate them back to zero
+    // with a delayed read-enable here: consumers already use explicit valid
+    // signals, and HPS/JTAG readback samples after the registered latency.
+    // Gating the q output can erase the data on the exact cycle the bridge
+    // returns it.
+    assign stream_out   = ram_q_a;
+    assign ext_data_out = ram_q_b;
 
     altsyncram #(
         .operation_mode("BIDIR_DUAL_PORT"),
@@ -134,16 +131,12 @@ module mem #(
 
         if (read_en) begin
             stream_out <= sram_array[addr];
-        end else begin
-            stream_out <= '0;
         end
     end
 
     always_ff @(posedge clk) begin
         if (ext_read_en) begin
             ext_data_out <= sram_array[ext_addr];
-        end else begin
-            ext_data_out <= '0;
         end
     end
 `endif

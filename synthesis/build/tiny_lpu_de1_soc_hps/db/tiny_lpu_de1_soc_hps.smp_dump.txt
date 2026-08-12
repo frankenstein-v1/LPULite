@@ -1,0 +1,25 @@
+
+State Machine - |de1_soc_hps_top|platform_designer_hps_system:u_qsys|lpu_de1_soc_wrapper:lpu_0|lpu:u_lpu|vxm:u_vxm|softmax:softmax_inst|state_q
+Name state_q.ST_NORM state_q.ST_RECIP_WAIT state_q.ST_SUM state_q.ST_CAPTURE 
+state_q.ST_CAPTURE 0 0 0 0 
+state_q.ST_SUM 0 0 1 1 
+state_q.ST_RECIP_WAIT 0 1 0 1 
+state_q.ST_NORM 1 0 0 1 
+
+State Machine - |de1_soc_hps_top|platform_designer_hps_system:u_qsys|lpu_de1_soc_wrapper:lpu_0|lpu:u_lpu|vxm:u_vxm|softmax:softmax_inst|lut_softmax_div:reciprocal_inst|state
+Name state.IDLE state.DONE_ST state.LOOKUP 
+state.IDLE 0 0 0 
+state.LOOKUP 1 0 1 
+state.DONE_ST 1 1 0 
+
+State Machine - |de1_soc_hps_top|platform_designer_hps_system:u_qsys|platform_designer_hps_system_mm_interconnect_0:mm_interconnect_0|altera_merlin_burst_adapter:lpu_0_avs_burst_adapter|altera_merlin_burst_adapter_13_1:altera_merlin_burst_adapter_13_1.burst_adapter|state
+Name state.ST_IDLE state.ST_UNCOMP_WR_SUBBURST state.ST_UNCOMP_TRANS state.ST_COMP_TRANS 
+state.ST_IDLE 0 0 0 0 
+state.ST_COMP_TRANS 1 0 0 1 
+state.ST_UNCOMP_TRANS 1 0 1 0 
+state.ST_UNCOMP_WR_SUBBURST 1 1 0 0 
+
+State Machine - |de1_soc_hps_top|platform_designer_hps_system:u_qsys|lpu_de1_soc_wrapper:lpu_0|lpu:u_lpu|vxm:u_vxm|rmsnorm:rmsnorm_inst|state_q
+Name state_q.ST_EMIT 
+state_q.ST_CAPTURE 0 
+state_q.ST_EMIT 1 

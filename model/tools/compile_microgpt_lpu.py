@@ -59,6 +59,18 @@ VXM_RES_LOAD = 2
 VXM_RES_ADD = 3
 VXM_RES_EMIT = 4
 
+# The DE1-SoC build uses Intel altsyncram block RAMs with registered outputs.
+# Holding memory reads for two VLIW cycles makes the schedule safe for both the
+# behavioral simulation RAM and the real FPGA RAM path: the second read keeps
+# mem*_valid asserted while the selected row is stable on the bus.
+MEM_READ_HOLD_CYCLES = 2
+
+# Intel block RAM read/write behavior around a freshly-written same address is
+# not the same as the simple behavioral array.  The schedule stages constants
+# such as RMS gamma through MEM0 and reads them immediately afterward, so leave
+# a couple of dead cycles after generated MEM0 writes before dependent reads.
+MEM_WRITE_SETTLE_CYCLES = 2
+
 
 def signed8(value: int) -> int:
     value &= 0xFF
@@ -208,8 +220,18 @@ class ScheduleEmitter:
         for _ in range(cycles):
             self.emit(note)
 
+    def mem0_read_hold(self, addr: int, note: str) -> None:
+        for cycle in range(MEM_READ_HOLD_CYCLES):
+            suffix = "" if cycle == 0 else f" hold {cycle}"
+            self.emit(f"{note}: read MEM0[{addr}]{suffix}", mem0_read_en=1, mem0_addr=addr)
+
+    def mem1_read_hold(self, addr: int, note: str) -> None:
+        for cycle in range(MEM_READ_HOLD_CYCLES):
+            suffix = "" if cycle == 0 else f" hold {cycle}"
+            self.emit(f"{note}: read MEM1[{addr}]{suffix}", mem1_read_en=1, mem1_addr=addr)
+
     def mem0_to_mxm(self, addr: int, mode: int, note: str) -> None:
-        self.emit(f"{note}: read MEM0[{addr}]", mem0_read_en=1, mem0_addr=addr)
+        self.mem0_read_hold(addr, note)
         self.emit(
             f"{note}: capture MEM0[{addr}]",
             westbound_sel=WB_MEM0,
@@ -218,7 +240,7 @@ class ScheduleEmitter:
         )
 
     def mem1_to_mxm(self, addr: int, mode: int, note: str) -> None:
-        self.emit(f"{note}: read MEM1[{addr}]", mem1_read_en=1, mem1_addr=addr)
+        self.mem1_read_hold(addr, note)
         self.emit(
             f"{note}: capture MEM1[{addr}]",
             westbound_sel=WB_MEM1,
@@ -227,13 +249,23 @@ class ScheduleEmitter:
         )
 
     def mem1_to_mem0(self, src: int, dst: int, note: str) -> None:
-        self.emit(f"{note}: read MEM1[{src}]", mem1_read_en=1, mem1_addr=src)
+        self.mem1_read_hold(src, note)
         self.emit(
             f"{note}: copy MEM1[{src}] to MEM0[{dst}]",
             westbound_sel=WB_MEM1,
             westbound_consumer_sel=WC_MEM0,
             mem0_write_en=1,
             mem0_addr=dst,
+        )
+        self.nop(MEM_WRITE_SETTLE_CYCLES, f"{note}: settle MEM0[{dst}] write")
+
+    def mem0_west_to_vxm(self, addr: int, operand: int, note: str) -> None:
+        self.mem0_read_hold(addr, f"{note}: west")
+        self.emit(
+            f"{note}: feed MEM0[{addr}] to VXM west",
+            westbound_sel=WB_MEM0,
+            westbound_consumer_sel=WC_VXM,
+            vxm_operand_sel=operand,
         )
 
     def mem0_east_to_vxm(
@@ -246,7 +278,7 @@ class ScheduleEmitter:
         vxm_ctrl: int = 0,
         hold_cycles: int = 0,
     ) -> None:
-        self.emit(f"{note}: read MEM0[{addr}] east", mem0_read_en=1, mem0_addr=addr)
+        self.mem0_read_hold(addr, f"{note}: east")
         self.emit(
             f"{note}: feed MEM0[{addr}] to VXM",
             eastbound_sel=EB_MEM0,
@@ -265,15 +297,23 @@ class ScheduleEmitter:
                 vxm_ctrl=vxm_ctrl,
             )
 
-    def drain_vxm_to_mem0(self, dst: int, note: str, wait_cycles: int = 8) -> None:
+    def drain_vxm_to_mem0(
+        self,
+        dst: int,
+        note: str,
+        wait_cycles: int = 8,
+        write_cycles: int = 1,
+    ) -> None:
         self.nop(wait_cycles, f"{note}: wait VXM")
-        self.emit(
-            f"{note}: write VXM to MEM0[{dst}]",
-            westbound_sel=WB_VXM,
-            westbound_consumer_sel=WC_MEM0,
-            mem0_write_en=1,
-            mem0_addr=dst,
-        )
+        for write_index in range(write_cycles):
+            self.emit(
+                f"{note}: write VXM to MEM0[{dst}]"
+                + (f" drain {write_index}" if write_cycles > 1 else ""),
+                westbound_sel=WB_VXM,
+                westbound_consumer_sel=WC_MEM0,
+                mem0_write_en=1,
+                mem0_addr=dst,
+            )
 
     def mxm_row0_to_vxm_to_mem0(
         self,
@@ -281,7 +321,7 @@ class ScheduleEmitter:
         note: str,
         vxm_ctrl: int = 0,
         rmsnorm: bool = False,
-        wait_cycles: int = 8,
+        wait_cycles: int = 16,
     ) -> None:
         self.emit(
             f"{note}: feed MXM row0 to VXM",
@@ -293,11 +333,11 @@ class ScheduleEmitter:
             vxm_ctrl=vxm_ctrl,
             vxm_layernorm_en=1 if rmsnorm else 0,
         )
-        self.drain_vxm_to_mem0(dst, note, wait_cycles)
+        self.drain_vxm_to_mem0(dst, note, wait_cycles, write_cycles=8)
 
     def broadcast_mem0_row(self, src: int, dst_base: int, note: str) -> None:
         for load_index in range(LANES):
-            self.emit(f"{note}: read MEM0[{src}] for SXM load {load_index}", mem0_read_en=1, mem0_addr=src)
+            self.mem0_read_hold(src, f"{note}: for SXM load {load_index}")
             self.emit(
                 f"{note}: SXM capture copy {load_index}",
                 westbound_sel=WB_MEM0,
@@ -318,13 +358,12 @@ class ScheduleEmitter:
     def add_rows_to_mem0(self, a: int, b: int, dst: int, note: str) -> None:
         self.mem0_east_to_vxm(a, VXM_OPERAND_DATA, f"{note}: load add lhs", VXM_RES_LOAD, hold_cycles=8)
         self.mem0_east_to_vxm(b, VXM_OPERAND_DATA, f"{note}: add rhs", VXM_RES_ADD, hold_cycles=8)
-        for _ in range(4):
-            self.emit(f"{note}: emit residual add", vxm_residual_op=VXM_RES_EMIT)
+        self.emit(f"{note}: emit residual add", vxm_residual_op=VXM_RES_EMIT)
         self.drain_vxm_to_mem0(dst, note)
 
     def rmsnorm_row_to_mem0(self, src: int, dst: int, gamma_addr: int, note: str) -> None:
         self.mem1_to_mem0(gamma_addr, Scratch.TMP0, f"{note}: stage gamma")
-        self.mem0_east_to_vxm(Scratch.TMP0, VXM_OPERAND_GAMMA, f"{note}: load gamma")
+        self.mem0_west_to_vxm(Scratch.TMP0, VXM_OPERAND_GAMMA, f"{note}: load gamma")
         self.mem0_east_to_vxm(src, VXM_OPERAND_DATA, f"{note}: rms row", rmsnorm=True, hold_cycles=10)
         self.drain_vxm_to_mem0(dst, note, wait_cycles=10)
 
@@ -338,15 +377,29 @@ class ScheduleEmitter:
         note: str,
     ) -> None:
         self.mem1_to_mem0(gamma_addr, Scratch.TMP0, f"{note}: stage gamma")
-        self.mem0_east_to_vxm(Scratch.TMP0, VXM_OPERAND_GAMMA, f"{note}: load gamma")
+        self.mem0_west_to_vxm(Scratch.TMP0, VXM_OPERAND_GAMMA, f"{note}: load gamma")
         self.mem0_east_to_vxm(src0, VXM_OPERAND_DATA, f"{note}: rms chunk 0", rmsnorm=True, hold_cycles=10)
         self.mem0_east_to_vxm(src1, VXM_OPERAND_DATA, f"{note}: rms chunk 1", rmsnorm=True, hold_cycles=10)
         self.drain_vxm_to_mem0(dst0, f"{note}: drain chunk 0", wait_cycles=12)
         self.drain_vxm_to_mem0(dst1, f"{note}: drain chunk 1", wait_cycles=8)
 
     def relu_row_to_mem0(self, src: int, dst: int, note: str) -> None:
-        self.mem0_east_to_vxm(src, VXM_OPERAND_DATA, f"{note}: relu", vxm_ctrl=0b0010)
-        self.drain_vxm_to_mem0(dst, note)
+        # The row is first queued inside LPU before VXM accepts it.  Keep the
+        # ReLU control asserted across that decoupling window so the data and
+        # operation cannot separate while the FIFO drains.
+        self.mem0_east_to_vxm(
+            src,
+            VXM_OPERAND_DATA,
+            f"{note}: relu",
+            vxm_ctrl=0b0010,
+            hold_cycles=8,
+        )
+        # ReLU traverses the complete VXM pipeline, residual pass-through, and
+        # output requantizer.  Eight cycles can select WB_VXM before the result
+        # reaches the output FIFO, leaving the old FC1 row in place and causing
+        # the delayed result to be written into the following row.  Use the same
+        # conservative retirement window as MXM-to-VXM requantization.
+        self.drain_vxm_to_mem0(dst, note, wait_cycles=16, write_cycles=8)
 
     def matvec_to_mem0(
         self,
@@ -373,7 +426,6 @@ class ScheduleEmitter:
                     f"{note}: W[:,{in_index}] block {out_block} -> MXM",
                 )
                 self.emit(f"{note}: MAC {in_index}/{in_dim} block {out_block}", mxm_start=1)
-                self.emit(f"{note}: MAC pipeline block {out_block}", mxm_start=1)
             self.nop(2, f"{note}: settle MXM block {out_block}")
             self.mxm_row0_to_vxm_to_mem0(output_base + out_block, f"{note}: quant block {out_block}")
 
@@ -410,9 +462,16 @@ def compile_decode_stage(symbols: dict[str, dict[str, int | list[int] | str]]) -
 
     e.add_rows_to_mem0(Scratch.TOKEN0, Scratch.POS0, Scratch.X0, "embedding add row0")
     e.add_rows_to_mem0(Scratch.TOKEN1, Scratch.POS1, Scratch.X1, "embedding add row1")
-    e.rmsnorm_pair_to_mem0(Scratch.X0, Scratch.X1, Scratch.XN0, Scratch.XN1, gamma, "input rms")
-    e.broadcast_mem0_row(Scratch.XN0, Scratch.X_BCAST, "broadcast x row0")
-    e.broadcast_mem0_row(Scratch.XN1, Scratch.X_BCAST + LANES, "broadcast x row1")
+    # Golden MicroGPT first normalizes token+position embeddings, then the
+    # transformer block uses that normalized vector as its residual stream.
+    # Keep that value in X0/X1 so later residual adds match the CPU model.
+    e.rmsnorm_pair_to_mem0(Scratch.X0, Scratch.X1, Scratch.X0, Scratch.X1, gamma, "embedding rms")
+    # The attention block applies its own pre-attention RMSNorm to the residual
+    # stream before Q/K/V projection.  This is nearly idempotent numerically but
+    # keeping the explicit op makes the static schedule match the golden graph.
+    e.rmsnorm_pair_to_mem0(Scratch.X0, Scratch.X1, Scratch.XN0, Scratch.XN1, gamma, "attention rms")
+    e.broadcast_mem0_row(Scratch.XN0, Scratch.X_BCAST, "broadcast attention input row0")
+    e.broadcast_mem0_row(Scratch.XN1, Scratch.X_BCAST + LANES, "broadcast attention input row1")
 
     for name, dst in (
         ("layer0.attn_wq.matvec_t", Scratch.Q),

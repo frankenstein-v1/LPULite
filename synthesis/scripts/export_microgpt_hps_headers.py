@@ -21,6 +21,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_ARTIFACT_DIR = ROOT / "model" / "artifacts" / "fpga_microgpt"
 DEFAULT_OUTPUT = ROOT / "synthesis" / "linux" / "include" / "microgpt_hps_image.h"
+DEFAULT_CHECKPOINT = ROOT / "model" / "artifacts" / "microgpt_weights_int8.json"
 
 
 def read_hex_rows(path: Path, width: int) -> list[int]:
@@ -54,11 +55,32 @@ def find_split_pc(trace_path: Path) -> int:
     raise RuntimeError("could not find prefix/suffix split in decode trace")
 
 
+def find_pc(trace: list[dict], prefix: str) -> int:
+    for entry in trace:
+        note = entry.get("note", "")
+        if isinstance(note, str) and note.startswith(prefix):
+            return int(entry["pc"])
+    raise RuntimeError(f"could not find trace entry starting with {prefix!r}")
+
+
+def find_broadcast_end_pc(trace: list[dict], prefix: str) -> int:
+    return find_pc(trace, f"{prefix}: write broadcast lane 7") + 1
+
+
 def c_array_rows(name: str, rows: list[int]) -> str:
     lines = [f"static const tinylpu_row96_t {name}[] = {{"]
     for value in rows:
         w0, w1, w2 = row_words(value)
         lines.append(f"    {{0x{w0:08X}u, 0x{w1:08X}u, 0x{w2:08X}u}},")
+    lines.append("};")
+    return "\n".join(lines)
+
+
+def c_string_array(name: str, values: list[str]) -> str:
+    lines = [f"static const char *const {name}[] = {{"]
+    for value in values:
+        escaped = value.replace("\\", "\\\\").replace('"', '\\"')
+        lines.append(f'    "{escaped}",')
     lines.append("};")
     return "\n".join(lines)
 
@@ -78,11 +100,27 @@ def main() -> int:
     schedule = json.loads(schedule_path.read_text(encoding="utf-8"))
     imem = read_hex_rows(imem_path, 96)
     mem1 = read_hex_rows(mem1_path, 72)
+    trace = json.loads(trace_path.read_text(encoding="utf-8"))
     split_pc = find_split_pc(trace_path)
+    prefix_attention_bcast_start = find_pc(trace, "broadcast attention input row0")
+    prefix_wq_start = find_pc(trace, "layer0.attn_wq: clear MXM output block 0")
+    suffix_attention_proj_start = find_pc(trace, "attn output projection: clear MXM output block 0")
+    suffix_mlp_bcast_start = find_pc(trace, "broadcast mlp row0")
+    suffix_mlp_fc1_start = find_pc(trace, "mlp fc1: clear MXM output block 0")
+    hidden_bcast_starts = [find_pc(trace, f"broadcast mlp hidden {idx}") for idx in range(8)]
+    hidden_bcast_ends = [find_broadcast_end_pc(trace, f"broadcast mlp hidden {idx}") for idx in range(8)]
+    final_bcast_start = find_pc(trace, "broadcast final row0")
+    lm_head_start = find_pc(trace, "lm head: clear MXM output block 0")
     mem0 = schedule["mem0_abi"]
     symbols = schedule["mem1"]["symbols"]
     config = schedule["config"]
     tokenizer = schedule["tokenizer"]
+    target_names: list[str] = []
+    if DEFAULT_CHECKPOINT.is_file():
+        checkpoint = json.loads(DEFAULT_CHECKPOINT.read_text(encoding="utf-8"))
+        names = checkpoint.get("training", {}).get("target_names", [])
+        if isinstance(names, list):
+            target_names = [str(name).lower() for name in names]
 
     output = args.output
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -114,12 +152,21 @@ typedef struct {{
 #define MICROGPT_VOCAB_SIZE {int(config["vocab_size"])}
 #define MICROGPT_BOS_TOKEN_ID {int(tokenizer["bos_token_id"])}
 #define MICROGPT_TOKEN_CHARS "{chars}"
+#define MICROGPT_TARGET_NAME_COUNT {len(target_names)}
 
 #define MICROGPT_IMEM_INSTRUCTIONS {len(imem)}
 #define MICROGPT_PREFIX_INSTRUCTIONS {split_pc}
 #define MICROGPT_SUFFIX_INSTRUCTIONS {len(imem) - split_pc}
 #define MICROGPT_IMEM_PAGE_SIZE {int(schedule["imem"]["page_size"])}
 #define MICROGPT_MEM1_ROWS {len(mem1)}
+
+#define MICROGPT_PREFIX_ATTN_BCAST_START {prefix_attention_bcast_start}
+#define MICROGPT_PREFIX_WQ_START {prefix_wq_start}
+#define MICROGPT_SUFFIX_ATTN_PROJ_START {suffix_attention_proj_start}
+#define MICROGPT_SUFFIX_MLP_BCAST_START {suffix_mlp_bcast_start}
+#define MICROGPT_SUFFIX_MLP_FC1_START {suffix_mlp_fc1_start}
+#define MICROGPT_SUFFIX_FINAL_BCAST_START {final_bcast_start}
+#define MICROGPT_SUFFIX_LM_HEAD_START {lm_head_start}
 
 #define MICROGPT_MEM0_TOKEN_ROW0 {int(mem0["token_embedding_rows"][0])}
 #define MICROGPT_MEM0_TOKEN_ROW1 {int(mem0["token_embedding_rows"][1])}
@@ -138,6 +185,22 @@ typedef struct {{
 #define MICROGPT_MEM0_LOGIT_ROW2 {int(mem0["logit_rows"][2])}
 #define MICROGPT_MEM0_LOGIT_ROW3 {int(mem0["logit_rows"][3])}
 
+#define MICROGPT_MEM0_XN_ROW0 10
+#define MICROGPT_MEM0_XN_ROW1 11
+#define MICROGPT_MEM0_X_ROW0 8
+#define MICROGPT_MEM0_X_ROW1 9
+#define MICROGPT_MEM0_X_BCAST_BASE 32
+#define MICROGPT_MEM0_ATTN_BCAST_BASE 112
+#define MICROGPT_MEM0_MLP_BCAST_BASE 192
+#define MICROGPT_MEM0_MLP_H_BASE 256
+#define MICROGPT_MEM0_MLP_H_BCAST_BASE 320
+
+static const uint32_t g_microgpt_hidden_bcast_start[8] = {{
+{''.join(f"    {value}u,\n" for value in hidden_bcast_starts)}}};
+
+static const uint32_t g_microgpt_hidden_bcast_end[8] = {{
+{''.join(f"    {value}u,\n" for value in hidden_bcast_ends)}}};
+
 #define MICROGPT_MEM1_WTE_BASE {int(symbols["wte"]["base_row"])}
 #define MICROGPT_MEM1_WPE_BASE {int(symbols["wpe"]["base_row"])}
 
@@ -147,6 +210,8 @@ typedef struct {{
 {c_array_rows("g_microgpt_vliw", imem)}
 
 {c_array_rows("g_microgpt_mem1", mem1)}
+
+{c_string_array("g_microgpt_target_names", target_names)}
 
 #endif /* MICROGPT_HPS_IMAGE_H */
 """
