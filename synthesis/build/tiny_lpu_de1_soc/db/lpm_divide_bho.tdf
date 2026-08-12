@@ -1,0 +1,43 @@
+--lpm_divide DEVICE_FAMILY="Cyclone V" LPM_DREPRESENTATION="SIGNED" LPM_NREPRESENTATION="SIGNED" LPM_REMAINDERPOSITIVE="FALSE" LPM_WIDTHD=3 LPM_WIDTHN=31 OPTIMIZE_FOR_SPEED=5 denom numer remain CARRY_CHAIN="MANUAL" CARRY_CHAIN_LENGTH=48 IGNORE_CARRY_BUFFERS="OFF"
+--VERSION_BEGIN 25.1 cbx_cycloneii 2025:10:22:10:31:27:SC cbx_lpm_abs 2025:10:22:10:31:27:SC cbx_lpm_add_sub 2025:10:22:10:31:27:SC cbx_lpm_divide 2025:10:22:10:31:27:SC cbx_mgl 2025:10:22:10:31:44:SC cbx_nadder 2025:10:22:10:31:27:SC cbx_stratix 2025:10:22:10:31:27:SC cbx_stratixii 2025:10:22:10:31:26:SC cbx_util_mgl 2025:10:22:10:31:27:SC  VERSION_END
+
+
+-- Copyright (C) 2025  Altera Corporation. All rights reserved.
+--  Your use of Altera Corporation's design tools, logic functions 
+--  and other software and tools, and any partner logic 
+--  functions, and any output files from any of the foregoing 
+--  (including device programming or simulation files), and any 
+--  associated documentation or information are expressly subject 
+--  to the terms and conditions of the Altera Program License 
+--  Subscription Agreement, the Altera Quartus Prime License Agreement,
+--  the Altera IP License Agreement, or other applicable license
+--  agreement, including, without limitation, that your use is for
+--  the sole purpose of programming logic devices manufactured by
+--  Altera and sold by Altera or its authorized distributors.  Please
+--  refer to the Altera Software License Subscription Agreements 
+--  on the Quartus Prime software download page.
+
+
+FUNCTION abs_divider_hbg (denominator[2..0], numerator[30..0])
+RETURNS ( quotient[30..0], remainder[2..0]);
+
+--synthesis_resources = lut 216 
+SUBDESIGN lpm_divide_bho
+( 
+	denom[2..0]	:	input;
+	numer[30..0]	:	input;
+	quotient[30..0]	:	output;
+	remain[2..0]	:	output;
+) 
+VARIABLE 
+	divider : abs_divider_hbg;
+	numer_tmp[30..0]	: WIRE;
+
+BEGIN 
+	divider.denominator[] = denom[];
+	divider.numerator[] = numer_tmp[];
+	numer_tmp[] = numer[];
+	quotient[] = divider.quotient[];
+	remain[] = divider.remainder[];
+END;
+--VALID FILE

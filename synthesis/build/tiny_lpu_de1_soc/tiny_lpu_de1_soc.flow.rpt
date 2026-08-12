@@ -1,0 +1,129 @@
+Flow report for tiny_lpu_de1_soc
+Sun Jul 26 16:09:42 2026
+Quartus Prime Version 25.1std.0 Build 1129 10/21/2025 SC Lite Edition
+
+
+---------------------
+; Table of Contents ;
+---------------------
+  1. Legal Notice
+  2. Flow Summary
+  3. Flow Settings
+  4. Flow Non-Default Global Settings
+  5. Flow Elapsed Time
+  6. Flow OS Summary
+  7. Flow Log
+  8. Flow Messages
+  9. Flow Suppressed Messages
+
+
+
+----------------
+; Legal Notice ;
+----------------
+Copyright (C) 2025  Altera Corporation. All rights reserved.
+Your use of Altera Corporation's design tools, logic functions 
+and other software and tools, and any partner logic 
+functions, and any output files from any of the foregoing 
+(including device programming or simulation files), and any 
+associated documentation or information are expressly subject 
+to the terms and conditions of the Altera Program License 
+Subscription Agreement, the Altera Quartus Prime License Agreement,
+the Altera IP License Agreement, or other applicable license
+agreement, including, without limitation, that your use is for
+the sole purpose of programming logic devices manufactured by
+Altera and sold by Altera or its authorized distributors.  Please
+refer to the Altera Software License Subscription Agreements 
+on the Quartus Prime software download page.
+
+
+
++-----------------------------------------------------------------------------------+
+; Flow Summary                                                                      ;
++---------------------------------+-------------------------------------------------+
+; Flow Status                     ; Successful - Sun Jul 26 16:09:14 2026           ;
+; Quartus Prime Version           ; 25.1std.0 Build 1129 10/21/2025 SC Lite Edition ;
+; Revision Name                   ; tiny_lpu_de1_soc                                ;
+; Top-level Entity Name           ; de1_soc_top                                     ;
+; Family                          ; Cyclone V                                       ;
+; Device                          ; 5CSEMA5F31C6                                    ;
+; Timing Models                   ; Final                                           ;
+; Logic utilization (in ALMs)     ; 22,314 / 32,070 ( 70 % )                        ;
+; Total registers                 ; 9915                                            ;
+; Total pins                      ; 3 / 457 ( < 1 % )                               ;
+; Total virtual pins              ; 0                                               ;
+; Total block memory bits         ; 2,534,144 / 4,065,280 ( 62 % )                  ;
+; Total DSP Blocks                ; 87 / 87 ( 100 % )                               ;
+; Total HSSI RX PCSs              ; 0                                               ;
+; Total HSSI PMA RX Deserializers ; 0                                               ;
+; Total HSSI TX PCSs              ; 0                                               ;
+; Total HSSI PMA TX Serializers   ; 0                                               ;
+; Total PLLs                      ; 0 / 6 ( 0 % )                                   ;
+; Total DLLs                      ; 0 / 4 ( 0 % )                                   ;
++---------------------------------+-------------------------------------------------+
+
+
++-----------------------------------------+
+; Flow Settings                           ;
++-------------------+---------------------+
+; Option            ; Setting             ;
++-------------------+---------------------+
+; Start date & time ; 07/26/2026 15:48:28 ;
+; Main task         ; Compilation         ;
+; Revision Name     ; tiny_lpu_de1_soc    ;
++-------------------+---------------------+
+
+
++----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+; Flow Non-Default Global Settings                                                                                                                                                                               ;
++-----------------------+-----------------------------------------------------------------------------------------------------------------------------+------------------+--------------------------+------------+
+; Assignment Name       ; Value                                                                                                                       ; Default Value    ; Entity Name              ; Section Id ;
++-----------------------+-----------------------------------------------------------------------------------------------------------------------------+------------------+--------------------------+------------+
+; COMPILER_SIGNATURE_ID ; 61903905898835.178509530832156                                                                                              ; --               ; --                       ; --         ;
+; MISC_FILE             ; C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/../platform_designer_system.cmp         ; --               ; --                       ; --         ;
+; MISC_FILE             ; C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/../../platform_designer_system.qsys     ; --               ; --                       ; --         ;
+; SEARCH_PATH           ; C:/Users/micha/Documents(Local)/Projects/tinyLPU/src                                                                        ; --               ; --                       ; --         ;
+; SLD_FILE              ; C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/platform_designer_system.debuginfo      ; --               ; --                       ; --         ;
+; SLD_INFO              ; QSYS_NAME platform_designer_system HAS_SOPCINFO 1 GENERATION_ID 1785095299                                                  ; --               ; platform_designer_system ; --         ;
+; SOPCINFO_FILE         ; C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/../../platform_designer_system.sopcinfo ; --               ; --                       ; --         ;
+; SYNTHESIS_ONLY_QIP    ; On                                                                                                                          ; --               ; --                       ; --         ;
+; TOP_LEVEL_ENTITY      ; de1_soc_top                                                                                                                 ; tiny_lpu_de1_soc ; --                       ; --         ;
+; VERILOG_MACRO         ; SYNTHESIS                                                                                                                   ; --               ; --                       ; --         ;
++-----------------------+-----------------------------------------------------------------------------------------------------------------------------+------------------+--------------------------+------------+
+
+
++--------------------------------------------------------------------------------------------------------------------------+
+; Flow Elapsed Time                                                                                                        ;
++----------------------+--------------+-------------------------+---------------------+------------------------------------+
+; Module Name          ; Elapsed Time ; Average Processors Used ; Peak Virtual Memory ; Total CPU Time (on all processors) ;
++----------------------+--------------+-------------------------+---------------------+------------------------------------+
+; Analysis & Synthesis ; 00:02:25     ; 2.1                     ; 5548 MB             ; 00:04:02                           ;
+; Fitter               ; 00:17:41     ; 1.2                     ; 8568 MB             ; 01:35:07                           ;
+; Assembler            ; 00:00:18     ; 1.0                     ; 5597 MB             ; 00:00:18                           ;
+; Timing Analyzer      ; 00:00:26     ; 6.4                     ; 6128 MB             ; 00:02:22                           ;
+; Total                ; 00:20:50     ; --                      ; --                  ; 01:41:49                           ;
++----------------------+--------------+-------------------------+---------------------+------------------------------------+
+
+
++------------------------------------------------------------------------------------+
+; Flow OS Summary                                                                    ;
++----------------------+------------------+------------+------------+----------------+
+; Module Name          ; Machine Hostname ; OS Name    ; OS Version ; Processor type ;
++----------------------+------------------+------------+------------+----------------+
+; Analysis & Synthesis ; Michael-Laptop   ; Windows 10 ; 10.0       ; x86_64         ;
+; Fitter               ; Michael-Laptop   ; Windows 10 ; 10.0       ; x86_64         ;
+; Assembler            ; Michael-Laptop   ; Windows 10 ; 10.0       ; x86_64         ;
+; Timing Analyzer      ; Michael-Laptop   ; Windows 10 ; 10.0       ; x86_64         ;
++----------------------+------------------+------------+------------+----------------+
+
+
+------------
+; Flow Log ;
+------------
+quartus_map --read_settings_files=on --write_settings_files=off tiny_lpu_de1_soc -c tiny_lpu_de1_soc
+quartus_fit --read_settings_files=off --write_settings_files=off tiny_lpu_de1_soc -c tiny_lpu_de1_soc
+quartus_asm --read_settings_files=off --write_settings_files=off tiny_lpu_de1_soc -c tiny_lpu_de1_soc
+quartus_sta tiny_lpu_de1_soc -c tiny_lpu_de1_soc
+
+
+

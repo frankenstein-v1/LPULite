@@ -1,0 +1,1 @@
+Warning (10268): Verilog HDL information at lpu_de1_soc_wrapper.sv(18): always construct contains both blocking and non-blocking assignments File: C:/Users/micha/Documents(Local)/Projects/tinyLPU/src/lpu_de1_soc_wrapper.sv Line: 18

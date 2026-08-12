@@ -85,10 +85,10 @@ module rmsnorm_chunk_tb;
         #1;
         out_ready = 1'b0;
 
-        if (row0_lane < 40 || row0_lane > 80) begin
+        if (row0_lane < 100 || row0_lane > 130) begin
             $fatal(1, "unexpected chunk0 output: %0d", row0_lane);
         end
-        if (row1_lane < 130 || row1_lane > 220) begin
+        if (row1_lane < 320 || row1_lane > 370) begin
             $fatal(1, "unexpected chunk1 output: %0d", row1_lane);
         end
         if (row0_lane == row1_lane) begin

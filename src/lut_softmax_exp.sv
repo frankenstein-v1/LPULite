@@ -25,8 +25,14 @@ module lut_softmax_exp #(
     logic signed [DW-1:0] z;
     assign z = -q / LN2;
 
+`ifdef TINYLPU_VXM_LOGIC_MULT
+    (* multstyle = "logic" *) logic signed [DW-1:0] z_ln2;
+`else
+    logic signed [DW-1:0] z_ln2;
+`endif
     logic signed [DW-1:0] p;
-    assign p = q + (z * LN2);
+    assign z_ln2 = z * LN2;
+    assign p = q + z_ln2;
 
     // Address is the absolute value of the remainder p: addr = -p
     // Since p is in [-177, 0], addr is in [0, 177] (which fits in 8 bits)
@@ -230,3 +236,5 @@ module lut_softmax_exp #(
     assign q_out = lut_value >>> z;
 
 endmodule
+
+`default_nettype wire

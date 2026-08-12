@@ -1,0 +1,106 @@
+Info: Starting: Create HDL design files for synthesis
+Info: qsys-generate C:\Users\micha\Documents(Local)\Projects\tinyLPU\synthesis\build\hps_scratch2\scratch_hps2.qsys --synthesis=VERILOG --output-directory=C:\Users\micha\Documents(Local)\Projects\tinyLPU\synthesis\build\hps_scratch2\scratch_hps2\synthesis --family="Cyclone V" --part=5CSEMA5F31C6
+Progress: Loading hps_scratch2/scratch_hps2.qsys
+Progress: Reading input file
+Progress: Adding clk_0 [clock_source 25.1]
+Progress: Parameterizing module clk_0
+Progress: Adding hps_0 [altera_hps 25.1]
+Progress: Parameterizing module hps_0
+Progress: Building connections
+Progress: Parameterizing connections
+Progress: Validating
+Progress: Done reading input file
+Info: scratch_hps2.hps_0: HPS Main PLL counter settings: n = 0  m = 73
+Info: scratch_hps2.hps_0: HPS peripherial PLL counter settings: n = 0  m = 39
+Warning: scratch_hps2.hps_0: "Configuration/HPS-to-FPGA user 0 clock frequency" (desired_cfg_clk_mhz) requested 100.0 MHz, but only achieved 97.368421 MHz
+Warning: scratch_hps2.hps_0: 1 or more output clock frequencies cannot be achieved precisely, consider revising desired output clock frequencies.
+Warning: scratch_hps2.hps_0: HPS model no longer supports simulation for HPS FPGA Bridges.
+Warning: scratch_hps2.hps_0: ODT is disabled. Enabling ODT (Mode Register 1) may improve signal integrity
+Warning: scratch_hps2.hps_0: set_interface_assignment: Interface "hps_io" does not exist
+Info: scratch_hps2: Generating "scratch_hps2" for QUARTUS_SYNTH
+Info: hps_0: "Running  for module: hps_0"
+Info: hps_0: HPS Main PLL counter settings: n = 0  m = 73
+Info: hps_0: HPS peripherial PLL counter settings: n = 0  m = 39
+Warning: hps_0: "Configuration/HPS-to-FPGA user 0 clock frequency" (desired_cfg_clk_mhz) requested 100.0 MHz, but only achieved 97.368421 MHz
+Warning: hps_0: 1 or more output clock frequencies cannot be achieved precisely, consider revising desired output clock frequencies.
+Warning: hps_0: HPS model no longer supports simulation for HPS FPGA Bridges.
+Warning: hps_0: ODT is disabled. Enabling ODT (Mode Register 1) may improve signal integrity
+Warning: hps_0: set_interface_assignment: Interface "hps_io" does not exist
+Info: hps_0: "scratch_hps2" instantiated altera_hps "hps_0"
+Info: fpga_interfaces: "hps_0" instantiated altera_interface_generator "fpga_interfaces"
+Info: hps_io: "hps_0" instantiated altera_hps_io "hps_io"
+Error: border: Error during execution of script generate_hps_sdram.tcl: seq: Error during execution of "{C:/altera_lite/25.1std/quartus/../nios2eds/Nios II Command Shell.bat} make all 2>> stderr.txt": child process exited abnormally
+Error: border: Error during execution of script generate_hps_sdram.tcl: seq: Execution of command "{C:/altera_lite/25.1std/quartus/../nios2eds/Nios II Command Shell.bat} make all 2>> stderr.txt" failed
+Error: border: Error during execution of script generate_hps_sdram.tcl: seq: Nios II Command Shell.bat requires Windows Subsystem for Linux (WSL) to run.
+Error: border: Error during execution of script generate_hps_sdram.tcl: seq: Please install WSL and try again.
+Error: border: Error during execution of script generate_hps_sdram.tcl: seq: child process exited abnormally
+Error: border: Error during execution of script generate_hps_sdram.tcl: seq: add_fileset_file: No such file C:/Users/micha/AppData/Local/Temp/alt0674_4932579628758741927.dir/0004_seq_gen/hps_AC_ROM.hex
+Error: border: Error during execution of script generate_hps_sdram.tcl: Generation stopped, 3 or more modules remaining
+Error: border: Execution of script generate_hps_sdram.tcl failed
+Error: border: 2026.08.09.14:01:07 Info:
+Error: border: ********************************************************************************************************************
+Error: border: 
+Error: border: Use qsys-generate for a simpler command-line interface for generating IP.
+Error: border: 
+Error: border: Run ip-generate with switch --remove-qsys-generate-warning to prevent this notice from appearing in subsequent runs.
+Error: border: 
+Error: border: ********************************************************************************************************************
+Error: border: 2026.08.09.14:01:09 Warning: Ignored parameter assignment device=5CSEMA5F31C6
+Error: border: 2026.08.09.14:01:09 Warning: Ignored parameter assignment extended_family_support=true
+Error: border: 2026.08.09.14:01:11 Warning: hps_sdram: ODT is disabled. Enabling ODT (Mode Register 1) may improve signal integrity
+Error: border: 2026.08.09.14:01:11 Warning: hps_sdram: 'Quick' simulation modes are NOT timing accurate. Some simulation memory models may issue warnings or errors
+Error: border: 2026.08.09.14:01:11 Warning: hps_sdram.seq: This module has no ports or interfaces
+Error: border: 2026.08.09.14:01:11 Warning: hps_sdram.c0: ODT is disabled. Enabling ODT (Mode Register 1) may improve signal integrity
+Error: border: 2026.08.09.14:01:11 Warning: hps_sdram.p0: p0.scc must be exported, or connected to a matching conduit.
+Error: border: 2026.08.09.14:01:11 Warning: hps_sdram.as: as.afi_init_cal_req must be exported, or connected to a matching conduit.
+Error: border: 2026.08.09.14:01:11 Warning: hps_sdram.as: as.tracking must be exported, or connected to a matching conduit.
+Error: border: 2026.08.09.14:01:11 Warning: hps_sdram.c0: c0.status must be exported, or connected to a matching conduit.
+Error: border: 2026.08.09.14:01:11 Warning: hps_sdram.p0: p0.avl must be connected to an Avalon-MM master
+Error: border: 2026.08.09.14:01:11 Info: hps_sdram: Generating "hps_sdram" for QUARTUS_SYNTH
+Error: border: 2026.08.09.14:01:14 Info: pll: "hps_sdram" instantiated altera_mem_if_hps_pll "pll"
+Error: border: 2026.08.09.14:01:14 Info: p0: Generating clock pair generator
+Error: border: 2026.08.09.14:01:14 Info: p0: Generating hps_sdram_p0_altdqdqs
+Error: border: 2026.08.09.14:01:18 Info: p0:
+Error: border: 2026.08.09.14:01:18 Info: p0: *****************************
+Error: border: 2026.08.09.14:01:18 Info: p0:
+Error: border: 2026.08.09.14:01:18 Info: p0: Remember to run the hps_sdram_p0_pin_assignments.tcl
+Error: border: 2026.08.09.14:01:18 Info: p0: script after running Synthesis and before Fitting.
+Error: border: 2026.08.09.14:01:18 Info: p0:
+Error: border: 2026.08.09.14:01:18 Info: p0: *****************************
+Error: border: 2026.08.09.14:01:18 Info: p0:
+Error: border: 2026.08.09.14:01:18 Info: p0: "hps_sdram" instantiated altera_mem_if_ddr3_hard_phy_core "p0"
+Error: border: 2026.08.09.14:01:19 Error: seq: Error during execution of "{C:/altera_lite/25.1std/quartus/../nios2eds/Nios II Command Shell.bat} make all 2>> stderr.txt": child process exited abnormally
+Error: border: 2026.08.09.14:01:19 Error: seq: Execution of command "{C:/altera_lite/25.1std/quartus/../nios2eds/Nios II Command Shell.bat} make all 2>> stderr.txt" failed
+Error: border: 2026.08.09.14:01:19 Error: seq: Nios II Command Shell.bat requires Windows Subsystem for Linux (WSL) to run.
+Error: border: 2026.08.09.14:01:19 Error: seq: Please install WSL and try again.
+Error: border: 2026.08.09.14:01:19 Error: seq: child process exited abnormally
+Error: border: 2026.08.09.14:01:19 Error: seq: add_fileset_file: No such file C:/Users/micha/AppData/Local/Temp/alt0674_4932579628758741927.dir/0004_seq_gen/hps_AC_ROM.hex
+Error: border: while executing
+Error: border: "add_fileset_file $file_name [::alt_mem_if::util::hwtcl_utils::get_file_type $file_name 0] PATH $file_pathname"
+Error: border: ("foreach" body line 4)
+Error: border: invoked from within
+Error: border: "foreach file_pathname $return_files_sw {
+Error: border: 		_dprint 1 "Preparing to add $file_pathname"
+Error: border: 		set file_name [file tail $file_pathname]
+Error: border: 		add_fileset_file $..."
+Error: border: (procedure "generate_sw" line 18)
+Error: border: invoked from within
+Error: border: "generate_sw $name $fileset"
+Error: border: ("if" then script line 4)
+Error: border: invoked from within
+Error: border: "if {[string compare -nocase $fileset QUARTUS_SYNTH] == 0} {
+Error: border: 		set top_level_file "altera_mem_if_hhp_qseq_synth_top.v"
+Error: border: 		add_fileset_file $top_level_fi..."
+Error: border: (procedure "generate_files" line 4)
+Error: border: invoked from within
+Error: border: "generate_files $name QUARTUS_SYNTH"
+Error: border: (procedure "generate_synth" line 3)
+Error: border: invoked from within
+Error: border: "generate_synth altera_mem_if_hhp_qseq_synth_top"
+Error: border: 2026.08.09.14:01:19 Info: seq: "hps_sdram" instantiated altera_mem_if_hhp_ddr3_qseq "seq"
+Error: border: 2026.08.09.14:01:19 Error: Generation stopped, 3 or more modules remaining
+Error: border: 2026.08.09.14:01:19 Info: hps_sdram: Done "hps_sdram" with 7 modules, 33 files
+Info: border: "hps_io" instantiated altera_interface_generator "border"
+Info: scratch_hps2: Done "scratch_hps2" with 5 modules, 39 files
+Error: qsys-generate failed with exit code 1: 71 Errors, 10 Warnings
+Info: Finished: Create HDL design files for synthesis

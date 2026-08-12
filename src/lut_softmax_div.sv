@@ -383,3 +383,5 @@ module lut_softmax_div #(
     end
 
 endmodule
+
+`default_nettype wire

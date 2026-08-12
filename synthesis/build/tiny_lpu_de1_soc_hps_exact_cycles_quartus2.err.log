@@ -1,0 +1,12 @@
+TBBmalloc: skip allocation functions replacement in ucrtbase.dll: unknown prologue for function _msize
+------------------------------------------------
+ERROR: Can't create project: C:/Users/micha//Projects/tinyLPU/synthesis/build/tiny_lpu_de1_soc_hps/tiny_lpu_de1_soc_hps. Specify a legal project name.
+
+    while executing
+"project_new $project_name -revision $rev_name "
+    invoked from within
+"if { ![project_exists $project_name] } {
+	msg_vdebug "Creating Project: $project_name (Rev = $rev_name)" 
+	project_new $project_name -revision $rev_na..."
+    (file "c:/altera_lite/25.1std/quartus/common/tcl/internal/qsh_flow.tcl" line 64)
+------------------------------------------------

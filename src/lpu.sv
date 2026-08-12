@@ -160,6 +160,64 @@ logic signed [7:0] mxm_westbound_scale;
 
 assign mxm_westbound_scale = westbound_row_scale(westbound_payload);
 
+function automatic fixed32_row_data_t sign_extend_westbound_row_to_fixed32(
+    input westbound_row_t raw_row
+);
+    fixed32_row_data_t out_row;
+    logic signed [7:0] lane8;
+    begin
+        out_row = '0;
+        for (int lane = 0; lane < MXM_SIZE; lane++) begin
+            lane8 = $signed(raw_row[lane*8 +: 8]);
+            out_row[lane*32 +: 32] = {{24{lane8[7]}}, lane8};
+        end
+        sign_extend_westbound_row_to_fixed32 = out_row;
+    end
+endfunction
+
+function automatic fixed32_lane_t saturate_i64_to_i32(
+    input longint signed value
+);
+    begin
+        if (value > 64'sd2147483647)
+            saturate_i64_to_i32 = 32'sh7fff_ffff;
+        else if (value < -64'sd2147483648)
+            saturate_i64_to_i32 = 32'sh8000_0000;
+        else
+            saturate_i64_to_i32 = fixed32_lane_t'(value);
+    end
+endfunction
+
+function automatic fixed32_row_data_t align_fixed32_row_to_q8_8(
+    input fixed32_row_data_t raw_row,
+    input fixed_row_scale_t  row_scale
+);
+    fixed32_row_data_t out_row;
+    fixed32_lane_t lane_value;
+    longint signed widened_value;
+    int shift_amount;
+    begin
+        out_row = '0;
+        shift_amount = $signed(row_scale) + 8;
+        for (int lane = 0; lane < MXM_SIZE; lane++) begin
+            lane_value = $signed(raw_row[lane*32 +: 32]);
+            widened_value = longint'(lane_value);
+            if (shift_amount >= 0) begin
+                if (shift_amount >= 31)
+                    out_row[lane*32 +: 32] = lane_value[31] ? 32'sh8000_0000 : 32'sh7fff_ffff;
+                else
+                    out_row[lane*32 +: 32] = saturate_i64_to_i32(widened_value <<< shift_amount);
+            end else begin
+                if ((-shift_amount) >= 31)
+                    out_row[lane*32 +: 32] = lane_value[31] ? -32'sd1 : 32'sd0;
+                else
+                    out_row[lane*32 +: 32] = lane_value >>> (-shift_amount);
+            end
+        end
+        align_fixed32_row_to_q8_8 = out_row;
+    end
+endfunction
+
 //icu instance
 icu u_icu(
     .clk(clk),
@@ -348,7 +406,7 @@ logic mxm_valid_e;
 eastbound_row_t vxm_payload_e_bus;
 eastbound_row_t sxm_payload_e_bus;
 eastbound_row_t mem0_payload_e_bus;
-mxm_row_t mem0_dequant_payload_e_bus;
+mxm_row_t mem0_raw_payload_e_bus;
 
 assign eastbound_payload_lane0 = eastbound_payload[63:0];
 
@@ -359,13 +417,10 @@ always @* begin
 
     vxm_payload_e_bus = make_eastbound_row({192'd0, vxm_stream_out_buf}, vxm_stream_out_scale_buf);
     sxm_payload_e_bus = make_eastbound_row({192'd0, sxm_stream_out_to_mxm_left}, '0);
-    mem0_payload_e_bus = make_eastbound_row(mem0_dequant_payload_e_bus, mem_row_scale(mem0_stream_out));
+    mem0_payload_e_bus = make_eastbound_row(mem0_raw_payload_e_bus, mem_row_scale(mem0_stream_out));
 end
 
-mem_row_dequant u_mem0_dequant (
-    .raw_row_i(mem0_stream_out),
-    .fixed32_row_o(mem0_dequant_payload_e_bus)
-);
+assign mem0_raw_payload_e_bus = sign_extend_westbound_row_to_fixed32(westbound_row_t'(mem0_stream_out));
 
 mxm_eastbound_adapter #(
     .MXM_SIZE(MXM_SIZE),
@@ -503,9 +558,15 @@ assign vxm_load_operand = vxm_load_operand_east || vxm_load_operand_west;
 always @* begin
     vxm_operand_payload = '0;
     if (vxm_load_operand_east) begin
-        vxm_operand_payload = eastbound_row_data(eastbound_payload);
+        if ((vxm_operand_sel == VXM_OPERAND_DATA) || (vxm_operand_sel == VXM_OPERAND_BIAS))
+            vxm_operand_payload = align_fixed32_row_to_q8_8(
+                eastbound_row_data(eastbound_payload),
+                eastbound_row_scale(eastbound_payload)
+            );
+        else
+            vxm_operand_payload = eastbound_row_data(eastbound_payload);
     end else if (vxm_load_operand_west) begin
-        vxm_operand_payload[63:0] = westbound_row_data(westbound_payload);
+        vxm_operand_payload = sign_extend_westbound_row_to_fixed32(westbound_payload);
     end
 end
 

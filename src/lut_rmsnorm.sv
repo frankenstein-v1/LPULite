@@ -70,6 +70,7 @@ module lut_rmsnorm #(
         logic [4:0]  idx;
         logic [31:0] raw_lut;
         logic [31:0] res;
+        logic [39:0] res_q8_8_adjusted;
         integer half_msb;
         begin
             if (ms_val == 64'd0) begin
@@ -90,7 +91,12 @@ module lut_rmsnorm #(
                     // 1/sqrt(2) approx 23170 in Q1.15
                     res = (res * 32'd23170) >> 15;
                 end
-                compute_inv_sqrt = res;
+                // ms_val is Q16.16 when x_in is Q8.8.  Compensate by 2**8
+                // so the returned reciprocal RMS is Q1.15 for real-valued x.
+                res_q8_8_adjusted = {8'd0, res} << 8;
+                compute_inv_sqrt = (res_q8_8_adjusted > 40'd2147483647)
+                    ? 32'd2147483647
+                    : res_q8_8_adjusted[31:0];
             end
         end
     endfunction
@@ -129,10 +135,10 @@ module lut_rmsnorm #(
             end
 
             // Product: x_lane * inv_rms_q15 * g_lane
-            // inv_rms_q15 is Q1.15, g_lane is Q1.7 (scaled by 128)
-            // Shift right by 15 keeps the output scaled by g_lane
+            // x_lane is Q8.8, inv_rms_q15 is Q1.15, and g_lane is Q1.7.
+            // Shift by 15 + 7 to keep the output in Q8.8.
             prod = 64'(x_lane) * 64'($signed(inv_rms_q15)) * 64'(g_lane);
-            final_lane = prod >>> 15;
+            final_lane = prod >>> 22;
 
             y_out[i*LANE_W +: LANE_W] = LANE_W'(final_lane);
         end

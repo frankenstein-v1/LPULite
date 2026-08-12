@@ -36,6 +36,13 @@ localparam int MAC_SCALE_W   = 8;
 logic signed [MAC_PRODUCT_W-1:0] product_wire [mxm_size-1:0][mxm_size-1:0];
 logic signed [MAC_ACC_W-1:0]     mac_accum_wire [mxm_size-1:0][mxm_size-1:0];
 logic signed [MAC_SCALE_W-1:0]   mac_acc_scale_wire [mxm_size-1:0][mxm_size-1:0];
+logic signed [MAC_SCALE_W-1:0]   mxm_product_scale;
+logic signed [MAC_SCALE_W-1:0]   mxm_aligned_scale;
+logic        [MAC_SCALE_W-1:0]   mxm_acc_shift;
+logic        [MAC_SCALE_W-1:0]   mxm_product_shift;
+logic signed [MAC_SCALE_W-1:0]   mxm_acc_scale_reg;
+logic                            mxm_acc_scale_valid;
+logic                            mxm_any_mac_en;
 
 // Compatibility mirrors for existing debug/testbench hierarchy references.
 wire signed [7:0] mxm_input_ingress_reg [mxm_size-1:0];
@@ -124,7 +131,7 @@ assign mxm_ingress_is_input = (mxm_ingress_mode == 2'b01);
 //if the select bits is weight, load it into weight register
 assign mxm_ingress_is_wght = (mxm_ingress_mode == 2'b10);
 
-always_ff @(posedge clk or posedge rst) begin 
+always_ff @(posedge clk or posedge rst) begin
     // rst is asynchronous; mxm_clear is a synchronous command.
     if (rst) begin 
         mxm_input_ingress_loaded <= 1'b0;
@@ -200,7 +207,38 @@ always_ff @(posedge clk or posedge rst) begin
             mxm_wght_pending <= 1'b0;
         end
     end 
-end 
+end
+
+assign mxm_any_mac_en = |mxm_mac_en_feed;
+assign mxm_product_scale =
+    $signed(mxm_input_scale_bank[mxm_input_active_bank]) + $signed(mxm_wght_scale_reg);
+
+always_comb begin
+    mxm_aligned_scale = mxm_acc_scale_reg;
+    mxm_acc_shift = '0;
+    mxm_product_shift = '0;
+    if (!mxm_acc_scale_valid) begin
+        mxm_aligned_scale = mxm_product_scale;
+    end else if ($signed(mxm_product_scale) < $signed(mxm_acc_scale_reg)) begin
+        mxm_acc_shift = $signed(mxm_acc_scale_reg) - $signed(mxm_product_scale);
+        mxm_aligned_scale = mxm_product_scale;
+    end else if ($signed(mxm_product_scale) > $signed(mxm_acc_scale_reg)) begin
+        mxm_product_shift = $signed(mxm_product_scale) - $signed(mxm_acc_scale_reg);
+    end
+end
+
+always_ff @(posedge clk or posedge rst) begin
+    if (rst) begin
+        mxm_acc_scale_reg <= '0;
+        mxm_acc_scale_valid <= 1'b0;
+    end else if (mxm_clear) begin
+        mxm_acc_scale_reg <= '0;
+        mxm_acc_scale_valid <= 1'b0;
+    end else if (mxm_any_mac_en) begin
+        mxm_acc_scale_reg <= mxm_aligned_scale;
+        mxm_acc_scale_valid <= 1'b1;
+    end
+end
 
 always @* begin 
     for (int idx = 0; idx < mxm_size; idx++) begin 
@@ -283,7 +321,8 @@ generate
                 .WEIGHT_W(MAC_OPERAND_W),
                 .PRODUCT_W(MAC_PRODUCT_W),
                 .ACC_W(MAC_ACC_W),
-                .SCALE_W(MAC_SCALE_W)
+                .SCALE_W(MAC_SCALE_W),
+                .EXTERNAL_SCALE_CONTROL(1'b1)
             ) u_mac (
                 .clk(clk),
                 .rst(rst),
@@ -293,6 +332,10 @@ generate
                 .weight_i(mxm_wght_mac_feed[c]),
                 .input_scale_i(mxm_input_ingress_loaded ? mxm_input_scale_bank[mxm_input_active_bank] : mxm_input_scale_i),
                 .weight_scale_i(mxm_wght_scale_reg),
+                .acc_valid_i(mxm_acc_scale_valid),
+                .aligned_scale_i(mxm_aligned_scale),
+                .acc_shift_i(mxm_acc_shift),
+                .product_shift_i(mxm_product_shift),
                 .acc_o(mac_accum_wire[r][c]),
                 .acc_scale_o(mac_acc_scale_wire[r][c]),
                 .product_o(product_wire[r][c])
@@ -305,6 +348,6 @@ generate
 
 endgenerate
 
-assign mxm_out_scale_o = mac_acc_scale_wire[0][0];
+assign mxm_out_scale_o = mxm_acc_scale_reg;
    
 endmodule

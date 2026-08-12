@@ -1,0 +1,133 @@
+------------------------------------------------------------
+Timing Analyzer Summary
+------------------------------------------------------------
+
+Type  : Slow 1100mV 85C Model Setup 'CLOCK_50'
+Slack : 12.502
+TNS   : 0.000
+
+Type  : Slow 1100mV 85C Model Setup 'QSYS_CLK'
+Slack : 57.502
+TNS   : 0.000
+
+Type  : Slow 1100mV 85C Model Hold 'QSYS_CLK'
+Slack : 0.234
+TNS   : 0.000
+
+Type  : Slow 1100mV 85C Model Hold 'CLOCK_50'
+Slack : 0.381
+TNS   : 0.000
+
+Type  : Slow 1100mV 85C Model Recovery 'QSYS_CLK'
+Slack : 146.346
+TNS   : 0.000
+
+Type  : Slow 1100mV 85C Model Removal 'QSYS_CLK'
+Slack : 0.581
+TNS   : 0.000
+
+Type  : Slow 1100mV 85C Model Minimum Pulse Width 'CLOCK_50'
+Slack : 8.921
+TNS   : 0.000
+
+Type  : Slow 1100mV 85C Model Minimum Pulse Width 'QSYS_CLK'
+Slack : 78.879
+TNS   : 0.000
+
+Type  : Slow 1100mV 0C Model Setup 'CLOCK_50'
+Slack : 12.711
+TNS   : 0.000
+
+Type  : Slow 1100mV 0C Model Setup 'QSYS_CLK'
+Slack : 56.000
+TNS   : 0.000
+
+Type  : Slow 1100mV 0C Model Hold 'QSYS_CLK'
+Slack : 0.194
+TNS   : 0.000
+
+Type  : Slow 1100mV 0C Model Hold 'CLOCK_50'
+Slack : 0.403
+TNS   : 0.000
+
+Type  : Slow 1100mV 0C Model Recovery 'QSYS_CLK'
+Slack : 146.749
+TNS   : 0.000
+
+Type  : Slow 1100mV 0C Model Removal 'QSYS_CLK'
+Slack : 0.534
+TNS   : 0.000
+
+Type  : Slow 1100mV 0C Model Minimum Pulse Width 'CLOCK_50'
+Slack : 8.877
+TNS   : 0.000
+
+Type  : Slow 1100mV 0C Model Minimum Pulse Width 'QSYS_CLK'
+Slack : 78.879
+TNS   : 0.000
+
+Type  : Fast 1100mV 85C Model Setup 'CLOCK_50'
+Slack : 15.627
+TNS   : 0.000
+
+Type  : Fast 1100mV 85C Model Setup 'QSYS_CLK'
+Slack : 102.608
+TNS   : 0.000
+
+Type  : Fast 1100mV 85C Model Hold 'QSYS_CLK'
+Slack : 0.162
+TNS   : 0.000
+
+Type  : Fast 1100mV 85C Model Hold 'CLOCK_50'
+Slack : 0.183
+TNS   : 0.000
+
+Type  : Fast 1100mV 85C Model Recovery 'QSYS_CLK'
+Slack : 151.649
+TNS   : 0.000
+
+Type  : Fast 1100mV 85C Model Removal 'QSYS_CLK'
+Slack : 0.304
+TNS   : 0.000
+
+Type  : Fast 1100mV 85C Model Minimum Pulse Width 'CLOCK_50'
+Slack : 8.812
+TNS   : 0.000
+
+Type  : Fast 1100mV 85C Model Minimum Pulse Width 'QSYS_CLK'
+Slack : 78.964
+TNS   : 0.000
+
+Type  : Fast 1100mV 0C Model Setup 'CLOCK_50'
+Slack : 15.839
+TNS   : 0.000
+
+Type  : Fast 1100mV 0C Model Setup 'QSYS_CLK'
+Slack : 106.722
+TNS   : 0.000
+
+Type  : Fast 1100mV 0C Model Hold 'QSYS_CLK'
+Slack : 0.127
+TNS   : 0.000
+
+Type  : Fast 1100mV 0C Model Hold 'CLOCK_50'
+Slack : 0.175
+TNS   : 0.000
+
+Type  : Fast 1100mV 0C Model Recovery 'QSYS_CLK'
+Slack : 152.355
+TNS   : 0.000
+
+Type  : Fast 1100mV 0C Model Removal 'QSYS_CLK'
+Slack : 0.271
+TNS   : 0.000
+
+Type  : Fast 1100mV 0C Model Minimum Pulse Width 'CLOCK_50'
+Slack : 8.756
+TNS   : 0.000
+
+Type  : Fast 1100mV 0C Model Minimum Pulse Width 'QSYS_CLK'
+Slack : 78.968
+TNS   : 0.000
+
+------------------------------------------------------------
