@@ -33,7 +33,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from lpu_vliw_compiler import (  # noqa: E402
     EB_MEM0,
     EB_MXM,
+    EB_SXM,
     EB_VXM,
+    EC_MEM1,
     EC_MEM0,
     EC_VXM,
     INGRESS_INPUT,
@@ -454,6 +456,201 @@ class Scratch:
     MLP_OUT = 400
     LOGITS = 448
     TMP0 = 512
+    SOFTMAX_IN = 600
+    SOFTMAX_OUT = 640
+    ATTN_Q_BCAST = 672
+    ATTN_QK_SCORE = 676
+    ATTN_PV_PROB = 680
+    ATTN_PV_OUT = 696
+    ATTN_HEAD_OUT = 697
+    ATTN_K_TILE_IN = 720
+
+    # Runtime-staged attention matrices.  These live above the immutable model
+    # image and the K/V caches in MEM1.
+    ATTN_KT_STAGE = 1088
+    ATTN_V_STAGE = 1104
+
+
+def compile_softmax_microkernel() -> ScheduleEmitter:
+    """Build the fixed 16-row VXM softmax feed/drain program.
+
+    The HPS scheduler writes one duplicated score per row at SOFTMAX_IN.  A
+    duplicated score makes all eight lanes one token; summing the eight Q0.7
+    output lanes recovers that token's probability.  Unused causal positions
+    are filled with a large negative row by the scheduler.
+    """
+    e = ScheduleEmitter()
+    softmax_ctrl = 0b1000
+    for chunk in range(16):
+        for cycle in range(MEM_READ_HOLD_CYCLES):
+            e.emit(
+                f"softmax chunk {chunk}: read MEM0[{Scratch.SOFTMAX_IN + chunk}] hold {cycle}",
+                mem0_read_en=1,
+                mem0_addr=Scratch.SOFTMAX_IN + chunk,
+                vxm_ctrl=softmax_ctrl,
+            )
+        e.emit(
+            f"softmax chunk {chunk}: feed VXM",
+            eastbound_sel=EB_MEM0,
+            eastbound_consumer_sel=EC_VXM,
+            vxm_operand_sel=VXM_OPERAND_DATA,
+            vxm_ctrl=softmax_ctrl,
+        )
+        for _ in range(8):
+            e.emit(f"softmax chunk {chunk}: pipeline hold", vxm_ctrl=softmax_ctrl)
+
+    # Let four rows fill the output FIFO, then drain at a conservative fixed
+    # cadence. VXM backpressure stops softmax while the FIFO is full.
+    for _ in range(96):
+        e.emit("softmax: initial output wait", vxm_ctrl=softmax_ctrl)
+    for chunk in range(16):
+        e.emit(
+            f"softmax chunk {chunk}: write MEM0[{Scratch.SOFTMAX_OUT + chunk}]",
+            westbound_sel=WB_VXM,
+            westbound_consumer_sel=WC_MEM0,
+            mem0_write_en=1,
+            mem0_addr=Scratch.SOFTMAX_OUT + chunk,
+            vxm_ctrl=softmax_ctrl,
+        )
+        for _ in range(16):
+            e.emit(f"softmax chunk {chunk}: drain hold", vxm_ctrl=softmax_ctrl)
+    return e
+
+
+def append_schedule(dst: ScheduleEmitter, src: ScheduleEmitter, label: str) -> None:
+    """Append one emitter while preserving useful absolute trace PCs."""
+    base = len(dst.instructions)
+    dst.instructions.extend(src.instructions)
+    dst.trace.extend(
+        {"pc": base + int(entry["pc"]), "note": f"{label}: {entry['note']}"}
+        for entry in src.trace
+    )
+
+
+def compile_attention_microkernel() -> tuple[ScheduleEmitter, dict[str, dict[str, int]]]:
+    """Compile resident SXM K^T -> MXM QK -> VXM softmax -> MXM PV stages.
+
+    The ARM scheduler aligns each block-scaled K tile to the SXM's single tile
+    exponent and supplies the causal mask.  SXM performs the position-by-
+    dimension transpose, MXM performs every attention multiply/accumulate,
+    and exp/reciprocal/normalization remain in VXM softmax.  Eight NOPs
+    terminate each independently invoked section so exact-cycle execution
+    cannot flow into the following resident section.
+    """
+    e = ScheduleEmitter()
+    sections: dict[str, dict[str, int]] = {}
+
+    def finish_section(name: str, start: int) -> None:
+        e.nop(8, f"attention {name}: retirement padding")
+        section_instructions = len(e.instructions) - start
+        # Exact-cycle execution stops with ICU already fetching the row at
+        # start+section_instructions. ICU controls are intentionally not gated
+        # by run_en, so that fetched row must be inert while the HPS stages the
+        # next operands or reads results. Keep this guard outside the callable
+        # section; the following entry point begins after it.
+        e.nop(1, f"attention {name}: stopped-PC guard")
+        sections[name] = {"start": start, "instructions": section_instructions}
+
+    # ARM always places the selected head's four K dimensions in tile columns
+    # 0..3. Two entry points differ only in whether SXM writes the transposed
+    # rows into the even (positions 0..7) or odd (positions 8..15) MXM weight
+    # rows. The existing VXM store adapter then packs the SXM rows into MEM1
+    # directly, without an ARM read/copy pass.
+    for block in range(2):
+        transpose_start = len(e.instructions)
+        for row in range(LANES):
+            e.mem0_read_hold(
+                Scratch.ATTN_K_TILE_IN + row,
+                f"attention K transpose block {block}: source row {row}",
+            )
+            e.emit(
+                f"attention K transpose block {block}: SXM capture row {row}",
+                westbound_sel=WB_MEM0,
+                westbound_consumer_sel=WC_SXM,
+                sxm_transpose_load=1 if row == 0 else 0,
+                sxm_load_from_west=1,
+            )
+        e.emit(
+            f"attention K transpose block {block}: begin SXM emit",
+            sxm_transpose_emit=1,
+        )
+        for dim in range(LANES):
+            fields = {"eastbound_sel": EB_SXM}
+            if dim < 4:
+                # MEM1's generic eastbound truncation expects a packed VXM
+                # row. Pass the four useful SXM rows through VXM's existing
+                # identity/quantize path before storing them; the transpose
+                # and all data movement remain inside the LPU.
+                fields.update(
+                    eastbound_consumer_sel=EC_VXM,
+                    vxm_operand_sel=VXM_OPERAND_DATA,
+                )
+            e.emit(
+                f"attention K transpose block {block}: "
+                + (
+                    f"send dimension {dim} through VXM store adapter"
+                    if dim < 4
+                    else f"discard unused dimension {dim}"
+                ),
+                **fields,
+            )
+        e.nop(16, f"attention K transpose block {block}: wait VXM store adapter")
+        for dim in range(4):
+            e.emit(
+                f"attention K transpose block {block}: write dimension {dim} to MXM staging",
+                eastbound_sel=EB_VXM,
+                eastbound_consumer_sel=EC_MEM1,
+                mem1_write_en=1,
+                mem1_addr=Scratch.ATTN_KT_STAGE + dim * 2 + block,
+            )
+        finish_section(f"k_transpose_block{block}", transpose_start)
+
+    qk_start = len(e.instructions)
+    e.matvec_to_mem0(
+        Scratch.ATTN_Q_BCAST,
+        Scratch.ATTN_KT_STAGE,
+        4,
+        16,
+        Scratch.ATTN_QK_SCORE,
+        "attention QK on MXM",
+    )
+    finish_section("qk", qk_start)
+
+    softmax_start = len(e.instructions)
+    append_schedule(e, compile_softmax_microkernel(), "attention softmax")
+    finish_section("softmax", softmax_start)
+
+    pv_start = len(e.instructions)
+    e.matvec_to_mem0(
+        Scratch.ATTN_PV_PROB,
+        Scratch.ATTN_V_STAGE,
+        16,
+        8,
+        Scratch.ATTN_PV_OUT,
+        "attention PV on MXM",
+    )
+    finish_section("pv", pv_start)
+
+    merge_start = len(e.instructions)
+    e.add_rows_to_mem0(
+        Scratch.ATTN_HEAD_OUT + 0,
+        Scratch.ATTN_HEAD_OUT + 1,
+        Scratch.ATTN,
+        "attention merge heads 0 and 1",
+    )
+    e.add_rows_to_mem0(
+        Scratch.ATTN_HEAD_OUT + 2,
+        Scratch.ATTN_HEAD_OUT + 3,
+        Scratch.ATTN + 1,
+        "attention merge heads 2 and 3",
+    )
+    finish_section("merge", merge_start)
+
+    if len(e.instructions) > IMEM_WORDS:
+        raise RuntimeError(
+            f"resident attention kernel needs {len(e.instructions)} IMEM rows; limit is {IMEM_WORDS}"
+        )
+    return e, sections
 
 
 def compile_decode_stage(symbols: dict[str, dict[str, int | list[int] | str]]) -> ScheduleEmitter:
@@ -571,22 +768,30 @@ def main() -> int:
 
     mem1 = build_mem1_image(checkpoint)
     schedule = compile_decode_stage(mem1.symbols)
+    softmax_kernel = compile_softmax_microkernel()
+    attention_kernel, attention_sections = compile_attention_microkernel()
     output = args.output
     output.mkdir(parents=True, exist_ok=True)
 
     mem1_path = output / "microgpt_scheduler_mem1.hex"
     imem_path = output / "microgpt_decode_vliw.hex"
+    softmax_path = output / "microgpt_softmax_vliw.hex"
+    attention_path = output / "microgpt_attention_vliw.hex"
     manifest_path = output / "microgpt_decode_schedule.json"
     trace_path = output / "microgpt_decode_trace.json"
 
     write_hex(mem1_path, mem1.rows, 72)
     write_hex(imem_path, schedule.instructions, 96)
+    write_hex(softmax_path, softmax_kernel.instructions, 96)
+    write_hex(attention_path, attention_kernel.instructions, 96)
     trace_path.write_text(json.dumps(schedule.trace, indent=2) + "\n", encoding="utf-8")
 
     limitations = [
         "RMSNorm is compiled as two 8-lane chunks for MicroGPT hidden size 16",
-        "current RTL has no masked lane insert for dynamic K/V cache updates; attention rows must be staged over JTAG from FPGA-produced K/V rows",
-        "the emitted schedule performs no host tensor arithmetic, but host-side JTAG data movement is part of the runtime ABI",
+        "the resident attention microkernel uses SXM for K transpose before MXM QK",
+        "the resident attention microkernel time-multiplexes the existing MXM for QK and PV",
+        "the HPS runtime aligns block-scaled K tiles to the SXM tile exponent and supplies the causal/dynamic-length mask",
+        "no attention dot products or weighted sums are calculated by the ARM in fpga-mxm mode",
     ]
     manifest = {
         "format": "tinylpu.microgpt.static-paged-schedule",
@@ -613,6 +818,27 @@ def main() -> int:
             "k_rows": [Scratch.K, Scratch.K + 1],
             "v_rows": [Scratch.V, Scratch.V + 1],
             "logit_rows": [Scratch.LOGITS, Scratch.LOGITS + 1, Scratch.LOGITS + 2, Scratch.LOGITS + 3],
+            "softmax_input_rows": [Scratch.SOFTMAX_IN, Scratch.SOFTMAX_IN + 15],
+            "softmax_output_rows": [Scratch.SOFTMAX_OUT, Scratch.SOFTMAX_OUT + 15],
+            "attention_q_broadcast_rows": [Scratch.ATTN_Q_BCAST, Scratch.ATTN_Q_BCAST + 3],
+            "attention_qk_score_rows": [Scratch.ATTN_QK_SCORE, Scratch.ATTN_QK_SCORE + 1],
+            "attention_pv_probability_rows": [Scratch.ATTN_PV_PROB, Scratch.ATTN_PV_PROB + 15],
+            "attention_pv_output_row": Scratch.ATTN_PV_OUT,
+            "attention_head_output_rows": [Scratch.ATTN_HEAD_OUT, Scratch.ATTN_HEAD_OUT + 3],
+            "attention_k_tile_input_rows": [Scratch.ATTN_K_TILE_IN, Scratch.ATTN_K_TILE_IN + 7],
+        },
+        "microkernels": {
+            "softmax": {
+                "path": str(softmax_path.resolve()),
+                "instructions": len(softmax_kernel.instructions),
+            },
+            "attention": {
+                "path": str(attention_path.resolve()),
+                "instructions": len(attention_kernel.instructions),
+                "sections": attention_sections,
+                "mem1_k_transpose_stage_rows": [Scratch.ATTN_KT_STAGE, Scratch.ATTN_KT_STAGE + 7],
+                "mem1_v_stage_rows": [Scratch.ATTN_V_STAGE, Scratch.ATTN_V_STAGE + 15],
+            },
         },
         "limitations": limitations,
         "run_hint": (
@@ -623,6 +849,8 @@ def main() -> int:
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     print(f"wrote MEM1 image: {mem1_path} ({len(mem1.rows)} rows)")
     print(f"wrote VLIW image: {imem_path} ({len(schedule.instructions)} instructions)")
+    print(f"wrote softmax kernel: {softmax_path} ({len(softmax_kernel.instructions)} instructions)")
+    print(f"wrote attention kernel: {attention_path} ({len(attention_kernel.instructions)} instructions)")
     print(f"wrote manifest: {manifest_path}")
     print(f"wrote trace: {trace_path}")
     if len(schedule.instructions) > IMEM_WORDS:

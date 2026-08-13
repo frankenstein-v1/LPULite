@@ -137,6 +137,7 @@ module vxm #(
     logic                     residual_done;
     logic                     residual_row_valid;
     logic                     residual_result_valid;
+    logic                     residual_inflight;
     logic                     residual_stall;
     logic                     residual_active_mode_softmax;
     logic                     residual_result_mode_softmax;
@@ -215,6 +216,7 @@ module vxm #(
                                   rmsnorm_output_valid;
     assign residual_start = residual_input_valid &&
                             residual_ready &&
+                            !residual_inflight &&
                             !residual_result_valid;
     assign softmax_result_accept = residual_start && softmax_result_valid;
     assign softmax_result_can_take = !softmax_result_valid || softmax_result_accept;
@@ -256,6 +258,7 @@ module vxm #(
             softmax_result_valid <= 1'b0;
             softmax_result_reg  <= '0;
             residual_result_valid <= 1'b0;
+            residual_inflight <= 1'b0;
             residual_result_reg <= '0;
             residual_active_mode_softmax <= 1'b0;
             residual_result_mode_softmax <= 1'b0;
@@ -263,6 +266,11 @@ module vxm #(
             stream_out_scale_reg <= '0;
             stream_out_valid_reg <= 1'b0;
         end else begin
+            if (residual_start)
+                residual_inflight <= 1'b1;
+            else if (residual_done)
+                residual_inflight <= 1'b0;
+
             if (quant_issue)
                 quant_inflight <= 1'b1;
             else if (quantize_valid)

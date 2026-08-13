@@ -17,9 +17,14 @@ module sxm #(
     input  logic [11:0] opcode_weight,
     input  logic        load_from_west,
     input  superlane_t eastbound_in,
+    input  logic        eastbound_valid_i,
+    input  logic signed [7:0] eastbound_scale_i,
     output superlane_t eastbound_out,
     input  superlane_t westbound_in,
+    input  logic        westbound_valid_i,
+    input  logic signed [7:0] westbound_scale_i,
     output superlane_t westbound_out,
+    output logic signed [7:0] emit_scale_o,
     output logic       emit_valid
 );
 
@@ -28,7 +33,7 @@ module sxm #(
     localparam int IDX_W = (LANES <= 1) ? 1 : $clog2(LANES);
     localparam logic [IDX_W-1:0] IDX_ONE = {{(IDX_W-1){1'b0}}, 1'b1};
     localparam logic [IDX_W-1:0] LAST_LOAD_IDX = LANES - 2;
-    localparam logic [IDX_W-1:0] LAST_EMIT_IDX = LANES - 2;
+    localparam logic [IDX_W-1:0] LAST_EMIT_IDX = LANES - 1;
 
     fixed8_lane_t transpose_rows [0:LANES-1][0:LANES-1];
     logic [IDX_W-1:0] transpose_load_idx;
@@ -36,6 +41,7 @@ module sxm #(
     logic             transpose_loading;
     logic             transpose_emitting;
     logic             load_from_west_reg;
+    logic signed [7:0] transpose_scale;
 
     logic transpose_load_pulse;
     logic transpose_emit_pulse;
@@ -64,16 +70,22 @@ module sxm #(
             transpose_loading  <= 1'b0;
             transpose_emitting <= 1'b0;
             load_from_west_reg <= 1'b0;
+            transpose_scale    <= '0;
         end else begin
-            if (transpose_load_pulse) begin
+            if (transpose_load_pulse &&
+                (load_from_west ? westbound_valid_i : eastbound_valid_i)) begin
                 transpose_loading  <= 1'b1;
                 transpose_load_idx <= '0;
                 load_from_west_reg <= load_from_west;
+                // A block-scaled transpose can preserve one exponent exactly
+                // when all captured rows share it.  Broadcasts intentionally
+                // load the same row eight times, so this is their common scale.
+                transpose_scale <= load_from_west ? westbound_scale_i : eastbound_scale_i;
                 capture_row('0, load_from_west ? westbound_in : eastbound_in);
             end else if (transpose_loading) begin
                 if (transpose_emit_pulse) begin
                     transpose_loading <= 1'b0;
-                end else begin
+                end else if (load_from_west_reg ? westbound_valid_i : eastbound_valid_i) begin
                     capture_row(
                         transpose_load_idx + IDX_ONE,
                         load_from_west_reg ? westbound_in : eastbound_in
@@ -97,12 +109,13 @@ module sxm #(
 
     logic [IDX_W-1:0] current_emit_idx;
     assign current_emit_idx = transpose_emit_pulse ? '0 :
-                              transpose_emitting   ? (transpose_emit_idx + IDX_ONE) :
+                              transpose_emitting   ? transpose_emit_idx :
                                                      '0;
 
     logic is_emitting;
     assign is_emitting = transpose_emitting || transpose_emit_pulse;
     assign emit_valid = is_emitting;
+    assign emit_scale_o = transpose_scale;
 
     superlane_t transpose_emit_row;
     always @* begin

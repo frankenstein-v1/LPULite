@@ -115,7 +115,10 @@ westbound_row_t westbound_payload;
 logic       westbound_valid;
 eastbound_row_t eastbound_payload;
 logic       eastbound_valid;
-superlane_t eastbound_payload_lane0;
+superlane_t sxm_eastbound_live;
+superlane_t sxm_westbound_live;
+logic signed [7:0] sxm_eastbound_scale_live;
+logic signed [7:0] sxm_westbound_scale_live;
 
 // mem0 datapath
 mem_row_t   mem0_stream_in;
@@ -134,6 +137,7 @@ logic vxm_west_en;
 
 superlane_t sxm_stream_out_to_mxm_left;
 superlane_t sxm_stream_out_to_mxm_top;
+logic signed [7:0] sxm_stream_out_scale;
 
 fixed8_row_data_t vxm_stream_out_live;
 logic [31:0] vxm_stream_out_scale_live;
@@ -172,6 +176,19 @@ function automatic fixed32_row_data_t sign_extend_westbound_row_to_fixed32(
             out_row[lane*32 +: 32] = {{24{lane8[7]}}, lane8};
         end
         sign_extend_westbound_row_to_fixed32 = out_row;
+    end
+endfunction
+
+function automatic superlane_t narrow_fixed32_row_to_superlane(
+    input fixed32_row_data_t raw_row
+);
+    superlane_t out_row;
+    begin
+        out_row = '0;
+        for (int lane = 0; lane < MXM_SIZE; lane++) begin
+            out_row[lane*8 +: 8] = raw_row[lane*32 +: 8];
+        end
+        narrow_fixed32_row_to_superlane = out_row;
     end
 endfunction
 
@@ -384,7 +401,7 @@ westbound_bus u_westbound_bus(
     .mem0_valid(mem0_valid),
     .mem1_valid(mem1_valid),
     // SXM emits transpose rows onto westbound for downstream scheduling.
-    .sxm_payload(make_westbound_row(sxm_stream_out_to_mxm_top, '0)),
+    .sxm_payload(make_westbound_row(sxm_stream_out_to_mxm_top, sxm_stream_out_scale)),
     .sxm_valid(sxm_emit_valid),
     .vxm_payload(make_westbound_row(vxm_stream_out_buf, vxm_stream_out_scale_buf)),
     .vxm_valid(vxm_stream_out_buf_valid_w),
@@ -408,15 +425,18 @@ eastbound_row_t sxm_payload_e_bus;
 eastbound_row_t mem0_payload_e_bus;
 mxm_row_t mem0_raw_payload_e_bus;
 
-assign eastbound_payload_lane0 = eastbound_payload[63:0];
-
 always @* begin
     vxm_payload_e_bus = '0;
     sxm_payload_e_bus = '0;
     mem0_payload_e_bus = '0;
 
     vxm_payload_e_bus = make_eastbound_row({192'd0, vxm_stream_out_buf}, vxm_stream_out_scale_buf);
-    sxm_payload_e_bus = make_eastbound_row({192'd0, sxm_stream_out_to_mxm_left}, '0);
+    sxm_payload_e_bus = make_eastbound_row(
+        sign_extend_westbound_row_to_fixed32(
+            make_westbound_row(sxm_stream_out_to_mxm_left, sxm_stream_out_scale)
+        ),
+        sxm_stream_out_scale
+    );
     mem0_payload_e_bus = make_eastbound_row(mem0_raw_payload_e_bus, mem_row_scale(mem0_stream_out));
 end
 
@@ -463,22 +483,14 @@ eastbound_consumer_decode u_eastbound_consumer_decode(
     .mem1_east_en(mem1_east_en)
 );
 
-superlane_t sxm_e_payload_reg;
-superlane_t sxm_w_payload_reg;
-
-always_ff @(posedge clk or negedge rst_n) begin
-    if (!rst_n) begin
-        sxm_e_payload_reg <= '0;
-        sxm_w_payload_reg <= '0;
-    end else begin
-        if (sxm_east_en && eastbound_valid)
-            sxm_e_payload_reg <= eastbound_payload_lane0;
-        if (sxm_west_en && westbound_valid)
-            sxm_w_payload_reg <= westbound_row_data(westbound_payload);
-    end
-end
-
-assign sxm_load_from_west = sxm_load_from_west_ctrl || (sxm_west_en && westbound_valid);
+// Feed SXM from the live selected bus.  Registering these payloads and then
+// capturing them inside SXM on the same edge made SXM see the previous row,
+// shifting every transpose/broadcast by one lane.
+assign sxm_eastbound_live = narrow_fixed32_row_to_superlane(eastbound_row_data(eastbound_payload));
+assign sxm_westbound_live = westbound_row_data(westbound_payload);
+assign sxm_eastbound_scale_live = eastbound_row_scale(eastbound_payload);
+assign sxm_westbound_scale_live = westbound_row_scale(westbound_payload);
+assign sxm_load_from_west = sxm_load_from_west_ctrl;
 
 sxm #(
     .LANES(MXM_SIZE)
@@ -488,10 +500,15 @@ sxm #(
     .opcode_input(sxm_opcode_input),
     .opcode_weight(sxm_opcode_weight),
     .load_from_west(sxm_load_from_west),
-    .eastbound_in(sxm_e_payload_reg),
-    .westbound_in(sxm_w_payload_reg),
+    .eastbound_in(sxm_eastbound_live),
+    .eastbound_valid_i(sxm_east_en),
+    .eastbound_scale_i(sxm_eastbound_scale_live),
+    .westbound_in(sxm_westbound_live),
+    .westbound_valid_i(sxm_west_en),
+    .westbound_scale_i(sxm_westbound_scale_live),
     .eastbound_out(sxm_stream_out_to_mxm_left),
     .westbound_out(sxm_stream_out_to_mxm_top),
+    .emit_scale_o(sxm_stream_out_scale),
     .emit_valid(sxm_emit_valid)
 );
 

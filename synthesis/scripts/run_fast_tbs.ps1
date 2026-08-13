@@ -47,8 +47,20 @@ Run-Tb -Name "mac_mixed_scale_tb" -Sources @(
     "src\mac.sv"
 )
 
+Run-Tb -Name "sxm_scaled_broadcast_tb" -Sources @(
+    "tb\sxm_scaled_broadcast_tb.sv",
+    "src\sxm.sv"
+)
+
 Run-Tb -Name "softmax_lut_tb" -Sources @(
     "tb\softmax_lut_tb.sv",
+    "src\lut_softmax_exp.sv",
+    "src\lut_softmax_div.sv",
+    "src\softmax.sv"
+)
+
+Run-Tb -Name "softmax_chunk16_tb" -Sources @(
+    "tb\softmax_chunk16_tb.sv",
     "src\lut_softmax_exp.sv",
     "src\lut_softmax_div.sv",
     "src\softmax.sv"
