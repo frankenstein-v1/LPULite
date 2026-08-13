@@ -96,10 +96,14 @@ def main() -> int:
     trace_path = artifact_dir / "microgpt_decode_trace.json"
     imem_path = artifact_dir / "microgpt_decode_vliw.hex"
     mem1_path = artifact_dir / "microgpt_scheduler_mem1.hex"
+    softmax_path = artifact_dir / "microgpt_softmax_vliw.hex"
+    attention_path = artifact_dir / "microgpt_attention_vliw.hex"
 
     schedule = json.loads(schedule_path.read_text(encoding="utf-8"))
     imem = read_hex_rows(imem_path, 96)
     mem1 = read_hex_rows(mem1_path, 72)
+    softmax_imem = read_hex_rows(softmax_path, 96)
+    attention_imem = read_hex_rows(attention_path, 96)
     trace = json.loads(trace_path.read_text(encoding="utf-8"))
     split_pc = find_split_pc(trace_path)
     prefix_attention_bcast_start = find_pc(trace, "broadcast attention input row0")
@@ -115,6 +119,8 @@ def main() -> int:
     symbols = schedule["mem1"]["symbols"]
     config = schedule["config"]
     tokenizer = schedule["tokenizer"]
+    attention_meta = schedule["microkernels"]["attention"]
+    attention_sections = attention_meta["sections"]
     target_names: list[str] = []
     if DEFAULT_CHECKPOINT.is_file():
         checkpoint = json.loads(DEFAULT_CHECKPOINT.read_text(encoding="utf-8"))
@@ -159,6 +165,23 @@ typedef struct {{
 #define MICROGPT_SUFFIX_INSTRUCTIONS {len(imem) - split_pc}
 #define MICROGPT_IMEM_PAGE_SIZE {int(schedule["imem"]["page_size"])}
 #define MICROGPT_MEM1_ROWS {len(mem1)}
+#define MICROGPT_SOFTMAX_IN_BASE {int(mem0["softmax_input_rows"][0])}
+#define MICROGPT_SOFTMAX_OUT_BASE {int(mem0["softmax_output_rows"][0])}
+#define MICROGPT_SOFTMAX_CHUNKS 16
+#define MICROGPT_SOFTMAX_INSTRUCTIONS {len(softmax_imem)}
+#define MICROGPT_ATTENTION_INSTRUCTIONS {len(attention_imem)}
+#define MICROGPT_ATTN_K_TRANSPOSE_BLOCK0_START {int(attention_sections["k_transpose_block0"]["start"])}
+#define MICROGPT_ATTN_K_TRANSPOSE_BLOCK0_INSTRUCTIONS {int(attention_sections["k_transpose_block0"]["instructions"])}
+#define MICROGPT_ATTN_K_TRANSPOSE_BLOCK1_START {int(attention_sections["k_transpose_block1"]["start"])}
+#define MICROGPT_ATTN_K_TRANSPOSE_BLOCK1_INSTRUCTIONS {int(attention_sections["k_transpose_block1"]["instructions"])}
+#define MICROGPT_ATTN_QK_START {int(attention_sections["qk"]["start"])}
+#define MICROGPT_ATTN_QK_INSTRUCTIONS {int(attention_sections["qk"]["instructions"])}
+#define MICROGPT_ATTN_SOFTMAX_START {int(attention_sections["softmax"]["start"])}
+#define MICROGPT_ATTN_SOFTMAX_INSTRUCTIONS {int(attention_sections["softmax"]["instructions"])}
+#define MICROGPT_ATTN_PV_START {int(attention_sections["pv"]["start"])}
+#define MICROGPT_ATTN_PV_INSTRUCTIONS {int(attention_sections["pv"]["instructions"])}
+#define MICROGPT_ATTN_MERGE_START {int(attention_sections["merge"]["start"])}
+#define MICROGPT_ATTN_MERGE_INSTRUCTIONS {int(attention_sections["merge"]["instructions"])}
 
 #define MICROGPT_PREFIX_ATTN_BCAST_START {prefix_attention_bcast_start}
 #define MICROGPT_PREFIX_WQ_START {prefix_wq_start}
@@ -194,6 +217,12 @@ typedef struct {{
 #define MICROGPT_MEM0_MLP_BCAST_BASE 192
 #define MICROGPT_MEM0_MLP_H_BASE 256
 #define MICROGPT_MEM0_MLP_H_BCAST_BASE 320
+#define MICROGPT_MEM0_ATTN_Q_BCAST_BASE {int(mem0["attention_q_broadcast_rows"][0])}
+#define MICROGPT_MEM0_ATTN_QK_SCORE_BASE {int(mem0["attention_qk_score_rows"][0])}
+#define MICROGPT_MEM0_ATTN_PV_PROB_BASE {int(mem0["attention_pv_probability_rows"][0])}
+#define MICROGPT_MEM0_ATTN_PV_OUT_ROW {int(mem0["attention_pv_output_row"])}
+#define MICROGPT_MEM0_ATTN_HEAD_OUT_BASE {int(mem0["attention_head_output_rows"][0])}
+#define MICROGPT_MEM0_ATTN_K_TILE_IN_BASE {int(mem0["attention_k_tile_input_rows"][0])}
 
 static const uint32_t g_microgpt_hidden_bcast_start[8] = {{
 {''.join(f"    {value}u,\n" for value in hidden_bcast_starts)}}};
@@ -206,8 +235,14 @@ static const uint32_t g_microgpt_hidden_bcast_end[8] = {{
 
 #define MICROGPT_K_CACHE_BASE 1024
 #define MICROGPT_V_CACHE_BASE 1024
+#define MICROGPT_MEM1_ATTN_KT_STAGE_BASE {int(attention_meta["mem1_k_transpose_stage_rows"][0])}
+#define MICROGPT_MEM1_ATTN_V_STAGE_BASE {int(attention_meta["mem1_v_stage_rows"][0])}
 
 {c_array_rows("g_microgpt_vliw", imem)}
+
+{c_array_rows("g_microgpt_softmax_vliw", softmax_imem)}
+
+{c_array_rows("g_microgpt_attention_vliw", attention_imem)}
 
 {c_array_rows("g_microgpt_mem1", mem1)}
 
@@ -220,6 +255,7 @@ static const uint32_t g_microgpt_hidden_bcast_end[8] = {{
     print(f"wrote {output.relative_to(ROOT)}")
     print(f"  VLIW instructions: {len(imem)} (prefix {split_pc}, suffix {len(imem) - split_pc})")
     print(f"  MEM1 rows: {len(mem1)}")
+    print(f"  softmax kernel: {len(softmax_imem)} instructions")
     return 0
 
 

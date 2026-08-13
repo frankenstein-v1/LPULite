@@ -2,7 +2,7 @@ CC ?= gcc
 PYTHON ?= python3
 CFLAGS ?= -O2 -Wall -Wextra -std=c11 -D_DEFAULT_SOURCE
 CPPFLAGS += -Iinclude
-LDLIBS += -lm
+LDLIBS += -lm -lrt
 
 TARGET := microgpt_hps_runtime
 SRCS := src/microgpt_hps_runtime.c src/tinylpu_hps_mmio.c

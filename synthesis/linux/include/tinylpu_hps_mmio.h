@@ -58,6 +58,12 @@ void tinylpu_copy_row(tinylpu_mmio_t *dev, uint32_t src_base, uint32_t src_row, 
 void tinylpu_load_imem_page(tinylpu_mmio_t *dev, const tinylpu_mmio_row_t *program, size_t count);
 void tinylpu_run_page(tinylpu_mmio_t *dev, unsigned settle_us);
 uint32_t tinylpu_run_cycles(tinylpu_mmio_t *dev, uint32_t cycles, unsigned poll_us);
+uint32_t tinylpu_run_cycles_from(
+    tinylpu_mmio_t *dev,
+    uint32_t pc,
+    uint32_t cycles,
+    unsigned poll_us
+);
 
 #ifdef __cplusplus
 }

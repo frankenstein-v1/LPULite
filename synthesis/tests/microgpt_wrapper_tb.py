@@ -23,6 +23,8 @@ CHECKPOINT_PATH = ROOT / "model" / "artifacts" / "microgpt_weights_int8.json"
 SCHEDULE_PATH = ARTIFACT_DIR / "microgpt_decode_schedule.json"
 MEM1_PATH = ARTIFACT_DIR / "microgpt_scheduler_mem1.hex"
 VLIW_PATH = ARTIFACT_DIR / "microgpt_decode_vliw.hex"
+SOFTMAX_VLIW_PATH = ARTIFACT_DIR / "microgpt_softmax_vliw.hex"
+ATTENTION_VLIW_PATH = ARTIFACT_DIR / "microgpt_attention_vliw.hex"
 
 MEM0_BASE = 0x4000
 MEM1_BASE = 0x8000
@@ -132,6 +134,13 @@ def pack_float_row(values: list[float]) -> int:
     return word
 
 
+def pack_float_row_at_scale(values: list[float], scale: int) -> int:
+    vals = values[:LANES] + [0.0] * max(0, LANES - len(values))
+    inv = math.ldexp(1.0, -scale)
+    lanes = [max(-127, min(127, int(round(value * inv)))) for value in vals]
+    return pack_quant_row(lanes, scale)
+
+
 def vec_to_rows(vec: list[float]) -> list[int]:
     return [pack_float_row(vec[start : start + LANES]) for start in range(0, N_EMBD, LANES)]
 
@@ -203,9 +212,9 @@ class AvalonDriver:
         words = tuple([await self.read32(addr + lane * 4) for lane in range(3)])
         return row_from_words(words)  # type: ignore[arg-type]
 
-    async def run_cycles(self, cycles: int) -> int:
+    async def run_cycles(self, cycles: int, pc: int = 0) -> int:
         before = await self.read32(CTRL_CYCLES)
-        await self.write32(CTRL_PC_LOAD, 0)
+        await self.write32(CTRL_PC_LOAD, pc)
         await self.write32(CTRL_RUN_CYCLES, cycles)
         for _ in range(cycles + 50):
             remaining = await self.read32(CTRL_RUN_CYCLES)
@@ -291,7 +300,14 @@ async def cache_current_kv(driver: AvalonDriver, mem0_abi: dict, pos_id: int) ->
     await copy_row(driver, MEM0_BASE, int(mem0_abi["v_rows"][1]), MEM1_BASE, v_base + 1)
 
 
-async def stage_host_attention(driver: AvalonDriver, mem0_abi: dict, through_pos: int, n_head: int) -> None:
+async def stage_host_attention(
+    driver: AvalonDriver,
+    mem0_abi: dict,
+    through_pos: int,
+    n_head: int,
+    softmax_vliw: list[int] | None = None,
+    page_size: int = 900,
+) -> None:
     q_rows = [
         await driver.read_row(MEM0_BASE, int(mem0_abi["q_rows"][0])),
         await driver.read_row(MEM0_BASE, int(mem0_abi["q_rows"][1])),
@@ -316,13 +332,180 @@ async def stage_host_attention(driver: AvalonDriver, mem0_abi: dict, through_pos
             val = row_to_vec(v_rows)
             scores.append(sum(q[base + i] * key[base + i] for i in range(head_dim)) / math.sqrt(head_dim))
             values.append(val)
-        weights = softmax(scores)
+        if softmax_vliw is None:
+            weights = softmax(scores)
+        else:
+            for pos in range(16):
+                if pos <= through_pos:
+                    score_row = pack_float_row([scores[pos]] * LANES)
+                else:
+                    score_row = pack_quant_row([-127] * LANES, 0)
+                await driver.write_row(MEM0_BASE, 600 + pos, score_row)
+            await run_program(driver, softmax_vliw, 0, len(softmax_vliw), page_size)
+            weights = []
+            for pos in range(through_pos + 1):
+                lanes, scale = unpack_row(await driver.read_row(MEM0_BASE, 640 + pos))
+                weights.append(sum(math.ldexp(float(lane & 0xFF), scale) for lane in lanes))
         for i in range(head_dim):
             context[base + i] = sum(weights[pos] * values[pos][base + i] for pos in range(through_pos + 1))
 
     rows = vec_to_rows(context)
     await driver.write_row(MEM0_BASE, int(mem0_abi["staged_attention_rows"][0]), rows[0])
     await driver.write_row(MEM0_BASE, int(mem0_abi["staged_attention_rows"][1]), rows[1])
+
+
+async def stage_mxm_attention(
+    driver: AvalonDriver,
+    mem0_abi: dict,
+    through_pos: int,
+    n_head: int,
+    attention_vliw: list[int],
+    attention_meta: dict,
+) -> None:
+    """Stage cache layouts while FPGA MXM performs QK and PV arithmetic."""
+    assert N_EMBD == 16 and n_head == 4
+    assert 0 <= through_pos < 16
+    head_dim = N_EMBD // n_head
+    sections = attention_meta["sections"]
+    q_bcast_base = int(mem0_abi["attention_q_broadcast_rows"][0])
+    qk_score_base = int(mem0_abi["attention_qk_score_rows"][0])
+    pv_prob_base = int(mem0_abi["attention_pv_probability_rows"][0])
+    pv_out_row = int(mem0_abi["attention_pv_output_row"])
+    head_out_base = int(mem0_abi["attention_head_output_rows"][0])
+    k_tile_in_base = int(mem0_abi["attention_k_tile_input_rows"][0])
+    kt_stage_base = int(attention_meta["mem1_k_transpose_stage_rows"][0])
+    v_stage_base = int(attention_meta["mem1_v_stage_rows"][0])
+
+    # This image remains resident while its QK, softmax, PV, and merge entry
+    # points are called repeatedly below.
+    await load_imem_page(driver, attention_vliw, 0, len(attention_vliw))
+    await driver.write32(CTRL_PC_LOAD, len(attention_vliw) - 1)
+    for _ in range(3):
+        await RisingEdge(driver.dut.clk)
+
+    async def run_section(name: str) -> None:
+        section = sections[name]
+        requested = int(section["instructions"])
+        actual = await driver.run_cycles(requested, int(section["start"]))
+        assert actual == requested, (
+            f"attention {name} cycle mismatch: actual={actual} requested={requested}"
+        )
+
+    q_rows = [
+        await driver.read_row(MEM0_BASE, int(mem0_abi["q_rows"][0])),
+        await driver.read_row(MEM0_BASE, int(mem0_abi["q_rows"][1])),
+    ]
+    q_quant = [unpack_row(row) for row in q_rows]
+    key_vectors: list[list[float]] = []
+    value_rows: list[list[int]] = []
+    for pos in range(through_pos + 1):
+        key_vectors.append(row_to_vec([
+            await driver.read_row(MEM0_BASE, 1024 + pos * ROWS_PER_VEC + 0),
+            await driver.read_row(MEM0_BASE, 1024 + pos * ROWS_PER_VEC + 1),
+        ]))
+        value_rows.append([
+            await driver.read_row(MEM1_BASE, 1024 + pos * ROWS_PER_VEC + 0),
+            await driver.read_row(MEM1_BASE, 1024 + pos * ROWS_PER_VEC + 1),
+        ])
+
+    masked = pack_quant_row([-127] * LANES, 0)
+    zero_row = pack_quant_row([0] * LANES, 0)
+    for head in range(n_head):
+        row_index = head // 2
+        lane_base = (head % 2) * head_dim
+
+        # Q is already quantized. Replication is layout staging only; all four
+        # Q*K multiply-accumulates for every token execute in MXM.
+        q_lanes, q_scale = q_quant[row_index]
+        for dim in range(head_dim):
+            await driver.write_row(
+                MEM0_BASE,
+                q_bcast_base + dim,
+                pack_quant_row([q_lanes[lane_base + dim]] * LANES, q_scale),
+            )
+
+        # SXM transposes each 8-position K tile. SXM carries one exponent per
+        # tile, so ARM aligns the heterogeneous cached-row exponents first but
+        # does not move position values into dimension rows itself.
+        for block in range(2):
+            if block * LANES > through_pos:
+                for dim in range(head_dim):
+                    await driver.write_row(
+                        MEM1_BASE,
+                        kt_stage_base + dim * 2 + block,
+                        zero_row,
+                    )
+                continue
+            tile = [[0.0] * LANES for _ in range(LANES)]
+            for tile_pos in range(LANES):
+                pos = block * LANES + tile_pos
+                if pos <= through_pos:
+                    for dim in range(head_dim):
+                        tile[tile_pos][dim] = key_vectors[pos][
+                            head * head_dim + dim
+                        ]
+            absmax = max(abs(value) for row in tile for value in row)
+            tile_scale = 0 if absmax == 0.0 else math.ceil(math.log2(absmax / 127.0))
+            tile_scale = max(-128, min(127, tile_scale))
+            for tile_pos, row in enumerate(tile):
+                await driver.write_row(
+                    MEM0_BASE,
+                    k_tile_in_base + tile_pos,
+                    pack_float_row_at_scale(row, tile_scale),
+                )
+            await run_section(f"k_transpose_block{block}")
+
+        await run_section("qk")
+
+        # Duplicate each MXM score for the existing 16-chunk FPGA softmax.
+        # A 4-wide head requires QK/sqrt(4), exactly an exponent decrement.
+        score_rows = [
+            unpack_row(await driver.read_row(MEM0_BASE, qk_score_base + 0)),
+            unpack_row(await driver.read_row(MEM0_BASE, qk_score_base + 1)),
+        ]
+        for pos in range(16):
+            if pos <= through_pos:
+                score_lanes, score_scale = score_rows[pos // LANES]
+                scaled = max(-128, score_scale - 1)
+                row = pack_quant_row([score_lanes[pos % LANES]] * LANES, scaled)
+            else:
+                row = masked
+            await driver.write_row(MEM0_BASE, 600 + pos, row)
+        await run_section("softmax")
+
+        # Softmax emits eight equal lanes per token whose sum is p. Raising
+        # the exponent by three changes each lane from p/8 to p for MXM input.
+        # V rows are lane-masked to the current head; MXM performs every p*V
+        # multiply and every accumulation across the 16 token positions.
+        for pos in range(16):
+            if pos <= through_pos:
+                prob_lanes, prob_scale = unpack_row(
+                    await driver.read_row(MEM0_BASE, 640 + pos)
+                )
+                await driver.write_row(
+                    MEM0_BASE,
+                    pv_prob_base + pos,
+                    pack_quant_row(prob_lanes, min(127, prob_scale + 3)),
+                )
+                v_lanes, v_scale = unpack_row(value_rows[pos][row_index])
+                masked_v = [0] * LANES
+                for lane in range(lane_base, lane_base + head_dim):
+                    masked_v[lane] = v_lanes[lane]
+                await driver.write_row(
+                    MEM1_BASE,
+                    v_stage_base + pos,
+                    pack_quant_row(masked_v, v_scale),
+                )
+            else:
+                await driver.write_row(MEM0_BASE, pv_prob_base + pos, zero_row)
+                await driver.write_row(MEM1_BASE, v_stage_base + pos, zero_row)
+
+        await run_section("pv")
+        await copy_row(driver, MEM0_BASE, pv_out_row, MEM0_BASE, head_out_base + head)
+
+    # Heads 0/1 occupy disjoint halves of row 0, and heads 2/3 disjoint halves
+    # of row 1. Existing VXM residual-add merges each pair on FPGA.
+    await run_section("merge")
 
 
 async def log_decode_state(driver: AvalonDriver, dut, mem0_abi: dict, label: str) -> None:
@@ -457,9 +640,12 @@ async def test_microgpt_wrapper_prompt_next_token(dut):
     schedule = json.loads(SCHEDULE_PATH.read_text(encoding="utf-8"))
     mem1 = read_hex(MEM1_PATH)
     vliw = read_hex(VLIW_PATH)
+    softmax_vliw = read_hex(SOFTMAX_VLIW_PATH)
+    attention_vliw = read_hex(ATTENTION_VLIW_PATH)
     config = schedule["config"]
     tokenizer = schedule["tokenizer"]
     mem0_abi = schedule["mem0_abi"]
+    attention_meta = schedule["microkernels"]["attention"]
     symbols = schedule["mem1"]["symbols"]
     page_size = int(schedule["imem"]["page_size"])
     trace = json.loads((ARTIFACT_DIR / "microgpt_decode_trace.json").read_text(encoding="utf-8"))
@@ -487,6 +673,15 @@ async def test_microgpt_wrapper_prompt_next_token(dut):
     if prompt == "<empty>":
         prompt = ""
     expected_next_char = os.getenv("MICROGPT_EXPECT_NEXT", "v")
+    broadcast_mode = os.getenv("MICROGPT_BROADCAST_MODE", "host").lower()
+    assert broadcast_mode in {"host", "sxm"}, (
+        f"MICROGPT_BROADCAST_MODE must be 'host' or 'sxm', got {broadcast_mode!r}"
+    )
+    attention_mode = os.getenv("MICROGPT_ATTENTION", "host").lower()
+    assert attention_mode in {"host", "fpga-softmax", "fpga-mxm"}, (
+        "MICROGPT_ATTENTION must be 'host', 'fpga-softmax', or "
+        f"'fpga-mxm', got {attention_mode!r}"
+    )
     characters = tokenizer["characters"]
     char_to_id = {character: index for index, character in enumerate(characters)}
     tokens = [int(tokenizer["bos_token_id"])] + [char_to_id[ch] for ch in prompt]
@@ -496,11 +691,15 @@ async def test_microgpt_wrapper_prompt_next_token(dut):
     async def run_one_token(pos: int, token_id: int) -> list[float]:
         await write_step_inputs(driver, mem1, symbols, token_id, pos)
         await run_program(driver, vliw, 0, attention_bcast_start_pc, page_size)
-        await stage_broadcast_row(driver, 10, 32)
-        await stage_broadcast_row(driver, 11, 40)
+        if broadcast_mode == "host":
+            await stage_broadcast_row(driver, 10, 32)
+            await stage_broadcast_row(driver, 11, 40)
+            qkv_start_pc = wq_start_pc
+        else:
+            qkv_start_pc = attention_bcast_start_pc
         if pos == 0 and prefix_phase_probes_enabled():
             await log_decode_state(driver, dut, mem0_abi, f"pos={pos} token={token_id} after host X broadcast")
-            await run_program(driver, vliw, wq_start_pc, wk_start_pc - wq_start_pc, page_size)
+            await run_program(driver, vliw, qkv_start_pc, wk_start_pc - qkv_start_pc, page_size)
             log_internal_flow(dut, f"pos={pos} token={token_id} after WQ")
             await log_decode_state(driver, dut, mem0_abi, f"pos={pos} token={token_id} after WQ")
             await run_program(driver, vliw, wk_start_pc, wv_start_pc - wk_start_pc, page_size)
@@ -510,7 +709,7 @@ async def test_microgpt_wrapper_prompt_next_token(dut):
             log_internal_flow(dut, f"pos={pos} token={token_id} after WV")
             await log_decode_state(driver, dut, mem0_abi, f"pos={pos} token={token_id} after WV")
         else:
-            await run_program(driver, vliw, wq_start_pc, prefix_count - wq_start_pc, page_size)
+            await run_program(driver, vliw, qkv_start_pc, prefix_count - qkv_start_pc, page_size)
         if pos == 0 and state_probes_for_position(pos):
             log_internal_flow(dut, f"pos={pos} token={token_id} after prefix")
         if state_probes_for_position(pos):
@@ -538,7 +737,24 @@ async def test_microgpt_wrapper_prompt_next_token(dut):
                 mem0_abi,
                 f"pos={pos} token={token_id} after cache",
             )
-        await stage_host_attention(driver, mem0_abi, pos, int(config["n_head"]))
+        if attention_mode == "fpga-mxm":
+            await stage_mxm_attention(
+                driver,
+                mem0_abi,
+                pos,
+                int(config["n_head"]),
+                attention_vliw,
+                attention_meta,
+            )
+        else:
+            await stage_host_attention(
+                driver,
+                mem0_abi,
+                pos,
+                int(config["n_head"]),
+                softmax_vliw if attention_mode == "fpga-softmax" else None,
+                page_size,
+            )
         if state_probes_for_position(pos):
             await log_decode_state(
                 driver,
@@ -546,6 +762,13 @@ async def test_microgpt_wrapper_prompt_next_token(dut):
                 mem0_abi,
                 f"pos={pos} token={token_id} after attention",
             )
+        if broadcast_mode == "sxm":
+            # The remainder of the static schedule contains every attention,
+            # MLP-hidden, and final-residual SXM broadcast.  Running it as one
+            # range exercises the same dataflow used by the FPGA runtime.
+            await run_program(driver, vliw, prefix_count, len(vliw) - prefix_count, page_size)
+            return await decode_logits(driver, mem0_abi, int(config["vocab_size"]))
+
         await stage_broadcast_row(driver, int(mem0_abi["staged_attention_rows"][0]), 112)
         await stage_broadcast_row(driver, int(mem0_abi["staged_attention_rows"][1]), 120)
         await run_program(
@@ -592,6 +815,41 @@ async def test_microgpt_wrapper_prompt_next_token(dut):
         return await decode_logits(driver, mem0_abi, int(config["vocab_size"]))
 
     logits: list[float] = []
+    warmup_prompts = [
+        item.strip().lower()
+        for item in os.getenv("MICROGPT_WARMUP_PROMPTS", "").split(",")
+        if item.strip()
+    ]
+    if warmup_prompts:
+        checkpoint = json.loads(CHECKPOINT_PATH.read_text(encoding="utf-8"))
+        target_names = set(checkpoint.get("training", {}).get("target_names", []))
+        for warmup_prompt in warmup_prompts:
+            await reset_prompt_state(driver, mem0_abi)
+            warmup_ids = [int(tokenizer["bos_token_id"])] + [char_to_id[ch] for ch in warmup_prompt]
+            warmup_logits: list[float] = []
+            for warmup_pos, warmup_id in enumerate(warmup_ids):
+                warmup_logits = await run_one_token(warmup_pos, warmup_id)
+            warmup_generated = list(warmup_prompt)
+            for warmup_step in range(12):
+                warmup_next = max(range(len(warmup_logits)), key=lambda idx: warmup_logits[idx])
+                if warmup_next == int(tokenizer["bos_token_id"]):
+                    break
+                warmup_generated.append(characters[warmup_next])
+                if ''.join(warmup_generated) in target_names:
+                    break
+                warmup_logits = await run_one_token(
+                    len(warmup_ids) + warmup_step,
+                    warmup_next,
+                )
+            dut._log.info(
+                "MicroGPT same-boot warmup prompt=%r generated=%r",
+                warmup_prompt,
+                ''.join(warmup_generated),
+            )
+        # Match the Linux runtime: every new terminal prompt performs a soft
+        # reset and clears the scratch/KV state without reloading the model.
+        await reset_prompt_state(driver, mem0_abi)
+
     for pos, token_id in enumerate(tokens):
         logits = await run_one_token(pos, token_id)
 
@@ -599,13 +857,15 @@ async def test_microgpt_wrapper_prompt_next_token(dut):
     next_id = ranked[0]
     next_char = characters[next_id] if next_id < len(characters) else "<bos>"
     dut._log.info(
-        "MicroGPT wrapper prompt=%r next=%s top5=%s schedule=%d prefix=%d suffix=%d",
+        "MicroGPT wrapper prompt=%r next=%s top5=%s schedule=%d prefix=%d suffix=%d broadcast=%s attention=%s",
         prompt,
         next_char,
         [(idx, characters[idx] if idx < len(characters) else "<bos>", logits[idx]) for idx in ranked],
         len(vliw),
         prefix_count,
         suffix_count,
+        broadcast_mode,
+        attention_mode,
     )
     assert next_char == expected_next_char, (
         f"expected next token {expected_next_char!r}, got {next_char!r}; "

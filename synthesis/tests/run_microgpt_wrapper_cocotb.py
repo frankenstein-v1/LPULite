@@ -3,8 +3,8 @@
 
 This is the fast pre-Quartus integration test: it drives the same Avalon-MM
 register/memory map used by the Linux HPS runtime, loads the generated MEM1 and
-VLIW images, runs the static prefix/suffix pages, computes the current host-side
-attention stage in Python, and checks the next token for a prompt.
+VLIW images, runs the static prefix/suffix pages, selects the requested host or
+FPGA attention path, and checks the next token for a prompt.
 """
 
 from __future__ import annotations
@@ -39,21 +39,24 @@ def main() -> None:
         always=True,
         waves=os.getenv("WAVES", "0") == "1",
     )
+    results = build_dir / "results.xml"
+    results.unlink(missing_ok=True)
     runner.test(
         hdl_toplevel="lpu_de1_soc_wrapper",
-        test_module="microgpt_wrapper_tb",
+        test_module=os.getenv("TEST_MODULE", "microgpt_wrapper_tb"),
         build_dir=build_dir,
         waves=os.getenv("WAVES", "0") == "1",
     )
 
-    results = build_dir / "results.xml"
-    if results.exists():
-        tree = ET.parse(results)
-        failures = tree.findall(".//failure")
-        errors = tree.findall(".//error")
-        if failures or errors:
-            print(f"{results}: {len(failures)} failure(s), {len(errors)} error(s)")
-            sys.exit(1)
+    if not results.exists():
+        print(f"{results}: cocotb did not produce a results file")
+        sys.exit(1)
+    tree = ET.parse(results)
+    failures = tree.findall(".//failure")
+    errors = tree.findall(".//error")
+    if failures or errors:
+        print(f"{results}: {len(failures)} failure(s), {len(errors)} error(s)")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

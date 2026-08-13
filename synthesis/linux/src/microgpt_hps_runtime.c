@@ -9,11 +9,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 
 typedef enum {
     ATTENTION_CURRENT = 0,
     ATTENTION_HOST = 1,
+    ATTENTION_FPGA_SOFTMAX = 2,
+    ATTENTION_FPGA_MXM = 3,
 } attention_mode_t;
 
 typedef enum {
@@ -28,10 +31,62 @@ typedef struct {
     bool skip_load_weights;
     bool verbose;
     bool probe_only;
+    bool sxm_probe;
+    bool benchmark;
+    bool host_broadcasts;
     attention_mode_t attention_mode;
     decode_mode_t decode_mode;
     unsigned max_new_tokens;
 } runtime_options_t;
+
+static double monotonic_seconds(void) {
+    struct timespec now;
+    if (clock_gettime(CLOCK_MONOTONIC, &now) != 0) {
+        return 0.0;
+    }
+    return (double)now.tv_sec + (double)now.tv_nsec * 1.0e-9;
+}
+
+static void print_benchmark(
+    int prompt_tokens,
+    unsigned output_tokens,
+    unsigned prefill_steps,
+    unsigned decode_steps,
+    double request_seconds,
+    double prefill_seconds,
+    double decode_step_seconds,
+    double ttft_seconds
+) {
+    double e2e_tps = request_seconds > 0.0
+        ? (double)output_tokens / request_seconds
+        : 0.0;
+    double prefill_sps = prefill_seconds > 0.0
+        ? (double)prefill_steps / prefill_seconds
+        : 0.0;
+    double decode_sps = decode_step_seconds > 0.0
+        ? (double)decode_steps / decode_step_seconds
+        : 0.0;
+
+    fprintf(stderr,
+        "[perf] ARM+FPGA wall clock (reset/MMIO/page loads/polling/attention/decode included)\n"
+        "[perf] prompt_tokens=%d output_tokens=%u lpu_steps=%u (prefill=%u decode=%u)\n"
+        "[perf] request=%.3f s  TTFT=%s%.3f s  end_to_end=%.3f output tokens/s\n"
+        "[perf] prefill=%.3f s (%.3f LPU steps/s)  decode_steps=%.3f s (%.3f LPU steps/s)\n",
+        prompt_tokens,
+        output_tokens,
+        prefill_steps + decode_steps,
+        prefill_steps,
+        decode_steps,
+        request_seconds,
+        output_tokens ? "" : "n/a ",
+        output_tokens ? ttft_seconds : 0.0,
+        e2e_tps,
+        prefill_seconds,
+        prefill_sps,
+        decode_step_seconds,
+        decode_sps);
+    fflush(stderr);
+}
 
 static char token_char(int token_id);
 static bool is_target_name(const char *text);
@@ -94,6 +149,32 @@ static tinylpu_mmio_row_t pack_float_row(const double *values, int count) {
         packed |= ((uint64_t)((uint8_t)((int8_t)q))) << (i * 8);
     }
 
+    tinylpu_mmio_row_t row = {
+        (uint32_t)(packed & 0xFFFFFFFFu),
+        (uint32_t)(packed >> 32),
+        (uint32_t)((uint8_t)((int8_t)scale)),
+    };
+    return row;
+}
+
+static tinylpu_mmio_row_t pack_float_row_at_scale(
+    const double *values,
+    int count,
+    int scale
+) {
+    if (scale < -128) scale = -128;
+    if (scale > 127) scale = 127;
+    const double inv = ldexp(1.0, -scale);
+    uint64_t packed = 0;
+    for (int lane = 0; lane < MICROGPT_LANES; ++lane) {
+        int q = 0;
+        if (lane < count) {
+            q = (int)llround(values[lane] * inv);
+            if (q < -127) q = -127;
+            if (q > 127) q = 127;
+        }
+        packed |= ((uint64_t)((uint8_t)((int8_t)q))) << (lane * 8);
+    }
     tinylpu_mmio_row_t row = {
         (uint32_t)(packed & 0xFFFFFFFFu),
         (uint32_t)(packed >> 32),
@@ -225,7 +306,14 @@ static void debug_dump_runtime_rows(tinylpu_mmio_t *dev, const char *stage) {
     fflush(stderr);
 }
 
-static void run_program(tinylpu_mmio_t *dev, const char *label, size_t start_pc, size_t instruction_count, const runtime_options_t *opt) {
+static void run_image(
+    tinylpu_mmio_t *dev,
+    const char *label,
+    const tinylpu_row96_t *image,
+    size_t start_pc,
+    size_t instruction_count,
+    const runtime_options_t *opt
+) {
     size_t done = 0;
     unsigned page = 0;
     while (done < instruction_count) {
@@ -240,10 +328,17 @@ static void run_program(tinylpu_mmio_t *dev, const char *label, size_t start_pc,
                     (unsigned)page_count);
             fflush(stderr);
         }
-        for (size_t row = 0; row < TINYLPU_IMEM_ROWS; ++row) {
+        // Exact-cycle execution cannot reach the rest of IMEM.  Write only
+        // the active page and its eight retirement NOPs instead of clearing
+        // all 1024 rows on every page load.
+        size_t rows_to_write = page_count + 8u;
+        if (rows_to_write > TINYLPU_IMEM_ROWS) {
+            rows_to_write = TINYLPU_IMEM_ROWS;
+        }
+        for (size_t row = 0; row < rows_to_write; ++row) {
             tinylpu_mmio_row_t value = {0, 0, 0};
             if (row < page_count) {
-                value = as_mmio_row(g_microgpt_vliw[start_pc + done + row]);
+                value = as_mmio_row(image[start_pc + done + row]);
             }
             tinylpu_write_row(dev, TINYLPU_IMEM_OFFSET, (uint32_t)row, value);
         }
@@ -262,6 +357,44 @@ static void run_program(tinylpu_mmio_t *dev, const char *label, size_t start_pc,
             fflush(stderr);
         }
         done += page_count;
+    }
+}
+
+static void run_program(tinylpu_mmio_t *dev, const char *label, size_t start_pc, size_t instruction_count, const runtime_options_t *opt) {
+    run_image(dev, label, g_microgpt_vliw, start_pc, instruction_count, opt);
+}
+
+static void run_softmax_program(
+    tinylpu_mmio_t *dev,
+    const runtime_options_t *opt,
+    bool load_image
+) {
+    if (load_image) {
+        run_image(
+            dev,
+            "attention-softmax",
+            g_microgpt_softmax_vliw,
+            0,
+            MICROGPT_SOFTMAX_INSTRUCTIONS,
+            opt
+        );
+        return;
+    }
+
+    // All four heads use the same one-page kernel, with no other LPU program
+    // running between them.  Keep it resident after head 0 instead of writing
+    // all 1024 IMEM rows over MMIO three more times per token.
+    uint32_t requested_cycles = MICROGPT_SOFTMAX_INSTRUCTIONS + 8u;
+    if (opt->verbose) {
+        fprintf(stderr, "[attention-softmax] run resident kernel cycles=%u\n",
+                requested_cycles);
+        fflush(stderr);
+    }
+    uint32_t actual_cycles = tinylpu_run_cycles(dev, requested_cycles, opt->settle_us);
+    if (opt->verbose) {
+        fprintf(stderr, "[attention-softmax] resident kernel done cycles=%u/%u\n",
+                actual_cycles, requested_cycles);
+        fflush(stderr);
     }
 }
 
@@ -300,9 +433,60 @@ static void stage_current_attention(tinylpu_mmio_t *dev, bool verbose) {
     tinylpu_copy_row(dev, TINYLPU_MEM0_OFFSET, MICROGPT_MEM0_V_ROW1, TINYLPU_MEM0_OFFSET, MICROGPT_MEM0_ATTN_ROW1);
 }
 
-static void stage_host_attention(tinylpu_mmio_t *dev, int through_pos, bool verbose) {
-    if (verbose) {
-        fprintf(stderr, "[attention] host causal through_pos=%d\n", through_pos);
+static void fpga_softmax(
+    tinylpu_mmio_t *dev,
+    const double scores[MICROGPT_BLOCK_SIZE],
+    int count,
+    double weights[MICROGPT_BLOCK_SIZE],
+    const runtime_options_t *opt,
+    bool load_program
+) {
+    int8_t masked_lanes[MICROGPT_LANES];
+    for (int lane = 0; lane < MICROGPT_LANES; ++lane) {
+        masked_lanes[lane] = -127;
+    }
+    for (int pos = 0; pos < MICROGPT_SOFTMAX_CHUNKS; ++pos) {
+        tinylpu_mmio_row_t row;
+        if (pos < count) {
+            double duplicated[MICROGPT_LANES];
+            for (int lane = 0; lane < MICROGPT_LANES; ++lane) {
+                duplicated[lane] = scores[pos];
+            }
+            row = pack_float_row(duplicated, MICROGPT_LANES);
+        } else {
+            // Software supplies the causal/dynamic-length mask; the FPGA does
+            // every exp, reciprocal, and normalization operation.
+            row = pack_quant_row(masked_lanes, 0);
+        }
+        tinylpu_write_row(dev, TINYLPU_MEM0_OFFSET, MICROGPT_SOFTMAX_IN_BASE + (uint32_t)pos, row);
+    }
+
+    run_softmax_program(dev, opt, load_program);
+    for (int pos = 0; pos < count; ++pos) {
+        int8_t lanes[MICROGPT_LANES];
+        int8_t scale;
+        unpack_row(
+            tinylpu_read_row(dev, TINYLPU_MEM0_OFFSET, MICROGPT_SOFTMAX_OUT_BASE + (uint32_t)pos),
+            lanes,
+            &scale
+        );
+        double probability = 0.0;
+        for (int lane = 0; lane < MICROGPT_LANES; ++lane) {
+            probability += ldexp((double)(uint8_t)lanes[lane], scale);
+        }
+        weights[pos] = probability;
+    }
+}
+
+static void stage_host_attention(
+    tinylpu_mmio_t *dev,
+    int through_pos,
+    const runtime_options_t *opt,
+    bool use_fpga_softmax
+) {
+    if (opt->verbose) {
+        fprintf(stderr, "[attention] ARM QK/PV, %s softmax, through_pos=%d\n",
+                use_fpga_softmax ? "FPGA" : "ARM", through_pos);
         fflush(stderr);
     }
     tinylpu_mmio_row_t q_rows[MICROGPT_ROWS_PER_VEC] = {
@@ -331,7 +515,11 @@ static void stage_host_attention(tinylpu_mmio_t *dev, int through_pos, bool verb
             }
             scores[pos] = dot / sqrt((double)MICROGPT_HEAD_DIM);
         }
-        softmax(scores, through_pos + 1, weights);
+        if (use_fpga_softmax) {
+            fpga_softmax(dev, scores, through_pos + 1, weights, opt, head == 0);
+        } else {
+            softmax(scores, through_pos + 1, weights);
+        }
         for (int i = 0; i < MICROGPT_HEAD_DIM; ++i) {
             double acc = 0.0;
             for (int pos = 0; pos <= through_pos; ++pos) {
@@ -351,6 +539,323 @@ static void stage_host_attention(tinylpu_mmio_t *dev, int through_pos, bool verb
     vector_to_rows(context, context_rows);
     tinylpu_write_row(dev, TINYLPU_MEM0_OFFSET, MICROGPT_MEM0_ATTN_ROW0, context_rows[0]);
     tinylpu_write_row(dev, TINYLPU_MEM0_OFFSET, MICROGPT_MEM0_ATTN_ROW1, context_rows[1]);
+}
+
+static void load_attention_image(tinylpu_mmio_t *dev, const runtime_options_t *opt) {
+    if (opt->verbose) {
+        fprintf(stderr, "[attention-mxm] load resident image: %u instructions\n",
+                MICROGPT_ATTENTION_INSTRUCTIONS);
+        fflush(stderr);
+    }
+    for (uint32_t row = 0; row < MICROGPT_ATTENTION_INSTRUCTIONS; ++row) {
+        tinylpu_write_row(
+            dev,
+            TINYLPU_IMEM_OFFSET,
+            row,
+            as_mmio_row(g_microgpt_attention_vliw[row])
+        );
+    }
+    // Park ICU on the final stopped-PC guard. Without this, loading row 0 can
+    // leave the K-tile MEM0 read asserted while ARM is staging operands.
+    tinylpu_write32(
+        dev,
+        TINYLPU_CTRL_PC_LOAD,
+        MICROGPT_ATTENTION_INSTRUCTIONS - 1u
+    );
+}
+
+static void run_attention_section(
+    tinylpu_mmio_t *dev,
+    const char *label,
+    uint32_t start,
+    uint32_t instructions,
+    const runtime_options_t *opt
+) {
+    if (opt->verbose) {
+        fprintf(stderr, "[attention-mxm] run %s pc=%u cycles=%u\n",
+                label, start, instructions);
+        fflush(stderr);
+    }
+    uint32_t actual = tinylpu_run_cycles_from(
+        dev,
+        start,
+        instructions,
+        opt->settle_us
+    );
+    if (actual != instructions) {
+        fprintf(stderr,
+                "[attention-mxm] warning: %s cycle mismatch actual=%u requested=%u\n",
+                label, actual, instructions);
+        fflush(stderr);
+    }
+}
+
+static int8_t clamp_scale(int scale) {
+    if (scale < -128) return -128;
+    if (scale > 127) return 127;
+    return (int8_t)scale;
+}
+
+static void stage_mxm_attention(
+    tinylpu_mmio_t *dev,
+    int through_pos,
+    const runtime_options_t *opt
+) {
+    if (opt->verbose) {
+        fprintf(stderr,
+                "[attention] FPGA SXM K^T -> FPGA MXM QK -> FPGA softmax -> FPGA MXM PV, through_pos=%d\n",
+                through_pos);
+        fflush(stderr);
+    }
+    load_attention_image(dev, opt);
+
+    tinylpu_mmio_row_t q_rows[MICROGPT_ROWS_PER_VEC] = {
+        tinylpu_read_row(dev, TINYLPU_MEM0_OFFSET, MICROGPT_MEM0_Q_ROW0),
+        tinylpu_read_row(dev, TINYLPU_MEM0_OFFSET, MICROGPT_MEM0_Q_ROW1),
+    };
+    int8_t q_lanes[MICROGPT_ROWS_PER_VEC][MICROGPT_LANES];
+    int8_t q_scales[MICROGPT_ROWS_PER_VEC];
+    for (int row = 0; row < MICROGPT_ROWS_PER_VEC; ++row) {
+        unpack_row(q_rows[row], q_lanes[row], &q_scales[row]);
+    }
+
+    double keys[MICROGPT_BLOCK_SIZE][MICROGPT_N_EMBD] = {{0}};
+    tinylpu_mmio_row_t value_rows[MICROGPT_BLOCK_SIZE][MICROGPT_ROWS_PER_VEC];
+    memset(value_rows, 0, sizeof(value_rows));
+    for (int pos = 0; pos <= through_pos; ++pos) {
+        tinylpu_mmio_row_t k_rows[MICROGPT_ROWS_PER_VEC] = {
+            tinylpu_read_row(
+                dev,
+                TINYLPU_MEM0_OFFSET,
+                MICROGPT_K_CACHE_BASE + (uint32_t)pos * MICROGPT_ROWS_PER_VEC + 0u
+            ),
+            tinylpu_read_row(
+                dev,
+                TINYLPU_MEM0_OFFSET,
+                MICROGPT_K_CACHE_BASE + (uint32_t)pos * MICROGPT_ROWS_PER_VEC + 1u
+            ),
+        };
+        row_to_vector(k_rows, keys[pos]);
+        for (int row = 0; row < MICROGPT_ROWS_PER_VEC; ++row) {
+            value_rows[pos][row] = tinylpu_read_row(
+                dev,
+                TINYLPU_MEM1_OFFSET,
+                MICROGPT_V_CACHE_BASE + (uint32_t)pos * MICROGPT_ROWS_PER_VEC + (uint32_t)row
+            );
+        }
+    }
+
+    int8_t masked_lanes[MICROGPT_LANES];
+    int8_t zero_lanes[MICROGPT_LANES] = {0};
+    for (int lane = 0; lane < MICROGPT_LANES; ++lane) {
+        masked_lanes[lane] = -127;
+    }
+    const tinylpu_mmio_row_t masked_row = pack_quant_row(masked_lanes, 0);
+    const tinylpu_mmio_row_t zero_row = pack_quant_row(zero_lanes, 0);
+
+    for (int head = 0; head < MICROGPT_N_HEAD; ++head) {
+        const int row_index = head / 2;
+        const int lane_base = (head % 2) * MICROGPT_HEAD_DIM;
+
+        // Replicate the four quantized Q scalars into MXM input rows. This and
+        // the cache scale alignment below are layout/representation staging.
+        for (int dim = 0; dim < MICROGPT_HEAD_DIM; ++dim) {
+            int8_t replicated[MICROGPT_LANES];
+            for (int lane = 0; lane < MICROGPT_LANES; ++lane) {
+                replicated[lane] = q_lanes[row_index][lane_base + dim];
+            }
+            tinylpu_write_row(
+                dev,
+                TINYLPU_MEM0_OFFSET,
+                MICROGPT_MEM0_ATTN_Q_BCAST_BASE + (uint32_t)dim,
+                pack_quant_row(replicated, q_scales[row_index])
+            );
+        }
+
+        // SXM performs the actual position-by-dimension transpose for each
+        // 8-token K tile. Its tile carries one shared exponent, so ARM first
+        // aligns the heterogeneous cached-row exponents and masks the lanes
+        // outside this head. This is representation/layout work only.
+        for (int block = 0; block < 2; ++block) {
+            if (block * MICROGPT_LANES > through_pos) {
+                for (int dim = 0; dim < MICROGPT_HEAD_DIM; ++dim) {
+                    tinylpu_write_row(
+                        dev,
+                        TINYLPU_MEM1_OFFSET,
+                        MICROGPT_MEM1_ATTN_KT_STAGE_BASE + (uint32_t)(dim * 2 + block),
+                        zero_row
+                    );
+                }
+                continue;
+            }
+            double tile[MICROGPT_LANES][MICROGPT_LANES] = {{0}};
+            double absmax = 0.0;
+            for (int tile_pos = 0; tile_pos < MICROGPT_LANES; ++tile_pos) {
+                const int pos = block * MICROGPT_LANES + tile_pos;
+                if (pos <= through_pos) {
+                    for (int dim = 0; dim < MICROGPT_HEAD_DIM; ++dim) {
+                        const double value = keys[pos][head * MICROGPT_HEAD_DIM + dim];
+                        // All heads use columns 0..3. The block-specific SXM
+                        // entry point sends these four transposed rows through
+                        // the LPU's VXM store adapter into interleaved MEM1.
+                        tile[tile_pos][dim] = value;
+                        if (fabs(value) > absmax) absmax = fabs(value);
+                    }
+                }
+            }
+            int tile_scale = 0;
+            if (absmax > 0.0) {
+                tile_scale = (int)ceil(log2(absmax / 127.0));
+                if (tile_scale < -128) tile_scale = -128;
+                if (tile_scale > 127) tile_scale = 127;
+            }
+            for (int tile_pos = 0; tile_pos < MICROGPT_LANES; ++tile_pos) {
+                tinylpu_write_row(
+                    dev,
+                    TINYLPU_MEM0_OFFSET,
+                    MICROGPT_MEM0_ATTN_K_TILE_IN_BASE + (uint32_t)tile_pos,
+                    pack_float_row_at_scale(
+                        tile[tile_pos],
+                        MICROGPT_LANES,
+                        tile_scale
+                    )
+                );
+            }
+            if (block == 0) {
+                run_attention_section(
+                    dev,
+                    "K[0:8] transpose on SXM -> MEM1",
+                    MICROGPT_ATTN_K_TRANSPOSE_BLOCK0_START,
+                    MICROGPT_ATTN_K_TRANSPOSE_BLOCK0_INSTRUCTIONS,
+                    opt
+                );
+            } else {
+                run_attention_section(
+                    dev,
+                    "K[8:16] transpose on SXM -> MEM1",
+                    MICROGPT_ATTN_K_TRANSPOSE_BLOCK1_START,
+                    MICROGPT_ATTN_K_TRANSPOSE_BLOCK1_INSTRUCTIONS,
+                    opt
+                );
+            }
+        }
+
+        run_attention_section(
+            dev,
+            "QK",
+            MICROGPT_ATTN_QK_START,
+            MICROGPT_ATTN_QK_INSTRUCTIONS,
+            opt
+        );
+
+        tinylpu_mmio_row_t score_rows[2] = {
+            tinylpu_read_row(dev, TINYLPU_MEM0_OFFSET, MICROGPT_MEM0_ATTN_QK_SCORE_BASE + 0u),
+            tinylpu_read_row(dev, TINYLPU_MEM0_OFFSET, MICROGPT_MEM0_ATTN_QK_SCORE_BASE + 1u),
+        };
+        int8_t score_lanes[2][MICROGPT_LANES];
+        int8_t score_scales[2];
+        for (int block = 0; block < 2; ++block) {
+            unpack_row(score_rows[block], score_lanes[block], &score_scales[block]);
+        }
+        for (int pos = 0; pos < MICROGPT_BLOCK_SIZE; ++pos) {
+            tinylpu_mmio_row_t row = masked_row;
+            if (pos <= through_pos) {
+                const int block = pos / MICROGPT_LANES;
+                int8_t duplicated[MICROGPT_LANES];
+                for (int lane = 0; lane < MICROGPT_LANES; ++lane) {
+                    duplicated[lane] = score_lanes[block][pos % MICROGPT_LANES];
+                }
+                // head_dim=4, therefore QK/sqrt(head_dim) is exactly a one-bit
+                // exponent decrement and requires no ARM floating-point math.
+                row = pack_quant_row(
+                    duplicated,
+                    clamp_scale((int)score_scales[block] - 1)
+                );
+            }
+            tinylpu_write_row(
+                dev,
+                TINYLPU_MEM0_OFFSET,
+                MICROGPT_SOFTMAX_IN_BASE + (uint32_t)pos,
+                row
+            );
+        }
+
+        run_attention_section(
+            dev,
+            "softmax",
+            MICROGPT_ATTN_SOFTMAX_START,
+            MICROGPT_ATTN_SOFTMAX_INSTRUCTIONS,
+            opt
+        );
+
+        for (int pos = 0; pos < MICROGPT_BLOCK_SIZE; ++pos) {
+            tinylpu_mmio_row_t probability = zero_row;
+            tinylpu_mmio_row_t value = zero_row;
+            if (pos <= through_pos) {
+                int8_t probability_lanes[MICROGPT_LANES];
+                int8_t probability_scale;
+                unpack_row(
+                    tinylpu_read_row(
+                        dev,
+                        TINYLPU_MEM0_OFFSET,
+                        MICROGPT_SOFTMAX_OUT_BASE + (uint32_t)pos
+                    ),
+                    probability_lanes,
+                    &probability_scale
+                );
+                // Each of the eight duplicated softmax lanes holds p/8. An
+                // exponent +3 presents p to MXM without ARM multiplication.
+                probability = pack_quant_row(
+                    probability_lanes,
+                    clamp_scale((int)probability_scale + 3)
+                );
+
+                int8_t source_lanes[MICROGPT_LANES];
+                int8_t value_scale;
+                int8_t head_lanes[MICROGPT_LANES] = {0};
+                unpack_row(value_rows[pos][row_index], source_lanes, &value_scale);
+                for (int lane = lane_base; lane < lane_base + MICROGPT_HEAD_DIM; ++lane) {
+                    head_lanes[lane] = source_lanes[lane];
+                }
+                value = pack_quant_row(head_lanes, value_scale);
+            }
+            tinylpu_write_row(
+                dev,
+                TINYLPU_MEM0_OFFSET,
+                MICROGPT_MEM0_ATTN_PV_PROB_BASE + (uint32_t)pos,
+                probability
+            );
+            tinylpu_write_row(
+                dev,
+                TINYLPU_MEM1_OFFSET,
+                MICROGPT_MEM1_ATTN_V_STAGE_BASE + (uint32_t)pos,
+                value
+            );
+        }
+
+        run_attention_section(
+            dev,
+            "PV",
+            MICROGPT_ATTN_PV_START,
+            MICROGPT_ATTN_PV_INSTRUCTIONS,
+            opt
+        );
+        tinylpu_copy_row(
+            dev,
+            TINYLPU_MEM0_OFFSET,
+            MICROGPT_MEM0_ATTN_PV_OUT_ROW,
+            TINYLPU_MEM0_OFFSET,
+            MICROGPT_MEM0_ATTN_HEAD_OUT_BASE + (uint32_t)head
+        );
+    }
+
+    run_attention_section(
+        dev,
+        "head merge",
+        MICROGPT_ATTN_MERGE_START,
+        MICROGPT_ATTN_MERGE_INSTRUCTIONS,
+        opt
+    );
 }
 
 static void decode_logits(tinylpu_mmio_t *dev, double logits[MICROGPT_VOCAB_SIZE], bool verbose) {
@@ -420,6 +925,37 @@ static void run_token(tinylpu_mmio_t *dev, int token_id, int pos_id, const runti
     }
 
     write_step_inputs(dev, token_id, pos_id, opt->verbose);
+    if (!opt->host_broadcasts) {
+        // Execute the compiler's SXM broadcasts in the FPGA.  The only split
+        // is where the scheduler/runtime supplies the causal attention row.
+        run_program(dev, "prefix-fpga-sxm", 0, MICROGPT_PREFIX_INSTRUCTIONS, opt);
+        if (opt->verbose) {
+            debug_dump_runtime_rows(dev, "after prefix");
+        }
+        cache_current_kv(dev, pos_id, opt->verbose);
+        if (opt->attention_mode == ATTENTION_HOST) {
+            stage_host_attention(dev, pos_id, opt, false);
+        } else if (opt->attention_mode == ATTENTION_FPGA_SOFTMAX) {
+            stage_host_attention(dev, pos_id, opt, true);
+        } else if (opt->attention_mode == ATTENTION_FPGA_MXM) {
+            stage_mxm_attention(dev, pos_id, opt);
+        } else {
+            stage_current_attention(dev, opt->verbose);
+        }
+        run_program(
+            dev,
+            "suffix-fpga-sxm",
+            MICROGPT_PREFIX_INSTRUCTIONS,
+            MICROGPT_IMEM_INSTRUCTIONS - MICROGPT_PREFIX_INSTRUCTIONS,
+            opt
+        );
+        if (opt->verbose) {
+            debug_dump_runtime_rows(dev, "after suffix");
+        }
+        decode_logits(dev, logits, opt->verbose);
+        return;
+    }
+
     run_program(dev, "prefix-pre-bcast", 0, MICROGPT_PREFIX_ATTN_BCAST_START, opt);
     if (opt->verbose) {
         fprintf(stderr, "[broadcast] stage attention input XN -> MXM rows\n");
@@ -438,7 +974,11 @@ static void run_token(tinylpu_mmio_t *dev, int token_id, int pos_id, const runti
     }
     cache_current_kv(dev, pos_id, opt->verbose);
     if (opt->attention_mode == ATTENTION_HOST) {
-        stage_host_attention(dev, pos_id, opt->verbose);
+        stage_host_attention(dev, pos_id, opt, false);
+    } else if (opt->attention_mode == ATTENTION_FPGA_SOFTMAX) {
+        stage_host_attention(dev, pos_id, opt, true);
+    } else if (opt->attention_mode == ATTENTION_FPGA_MXM) {
+        stage_mxm_attention(dev, pos_id, opt);
     } else {
         stage_current_attention(dev, opt->verbose);
     }
@@ -606,6 +1146,7 @@ static int constrained_next(const double logits[MICROGPT_VOCAB_SIZE], const char
 }
 
 static void generate(tinylpu_mmio_t *dev, const char *prompt, const runtime_options_t *opt) {
+    const double request_start = monotonic_seconds();
     reset_prompt_state(dev, opt);
 
     int tokens[MICROGPT_BLOCK_SIZE];
@@ -613,7 +1154,12 @@ static void generate(tinylpu_mmio_t *dev, const char *prompt, const runtime_opti
     double logits[MICROGPT_VOCAB_SIZE] = {0};
     char emitted[256];
     size_t emitted_len = 0;
+    unsigned output_tokens = 0;
+    unsigned decode_steps = 0;
+    double decode_step_seconds = 0.0;
+    double first_token_time = 0.0;
 
+    const double prefill_start = monotonic_seconds();
     for (int pos = 0; pos < count; ++pos) {
         if (opt->verbose) {
             fprintf(stderr, "[prefill] pos=%d/%d token=%d\n", pos + 1, count, tokens[pos]);
@@ -621,6 +1167,7 @@ static void generate(tinylpu_mmio_t *dev, const char *prompt, const runtime_opti
         }
         run_token(dev, tokens[pos], pos, opt, logits);
     }
+    const double prefill_end = monotonic_seconds();
 
     for (int i = 1; i < count; ++i) {
         char ch = token_char(tokens[i]);
@@ -636,6 +1183,18 @@ static void generate(tinylpu_mmio_t *dev, const char *prompt, const runtime_opti
 
     if (emitted_len > 0u && is_target_name(emitted)) {
         putchar('\n');
+        if (opt->benchmark) {
+            const double request_end = monotonic_seconds();
+            print_benchmark(
+                count - 1,
+                0,
+                (unsigned)count,
+                0,
+                request_end - request_start,
+                prefill_end - prefill_start,
+                0.0,
+                0.0);
+        }
         return;
     }
 
@@ -651,6 +1210,10 @@ static void generate(tinylpu_mmio_t *dev, const char *prompt, const runtime_opti
             break;
         }
         putchar(ch);
+        ++output_tokens;
+        if (first_token_time == 0.0) {
+            first_token_time = monotonic_seconds();
+        }
         if (emitted_len + 1u < sizeof(emitted)) {
             emitted[emitted_len++] = ch;
             emitted[emitted_len] = '\0';
@@ -666,9 +1229,24 @@ static void generate(tinylpu_mmio_t *dev, const char *prompt, const runtime_opti
             fprintf(stderr, "\n[generate] step=%u token=%d pos=%d\n", step + 1, next, pos);
             fflush(stderr);
         }
+        const double decode_step_start = monotonic_seconds();
         run_token(dev, next, pos, opt, logits);
+        decode_step_seconds += monotonic_seconds() - decode_step_start;
+        ++decode_steps;
     }
     putchar('\n');
+    if (opt->benchmark) {
+        const double request_end = monotonic_seconds();
+        print_benchmark(
+            count - 1,
+            output_tokens,
+            (unsigned)count,
+            decode_steps,
+            request_end - request_start,
+            prefill_end - prefill_start,
+            decode_step_seconds,
+            first_token_time > 0.0 ? first_token_time - request_start : 0.0);
+    }
 }
 
 static void usage(const char *argv0) {
@@ -680,8 +1258,14 @@ static void usage(const char *argv0) {
         "  --max-new-tokens N      generated chars per prompt (default 12)\n"
         "  --no-load-weights       assume MEM1 already contains model rows\n"
         "  --verbose               print progress for each token/page/MMIO stage\n"
+        "  --benchmark             report full ARM+FPGA wall-clock throughput per prompt\n"
+        "  --broadcast sxm         execute compiled broadcasts on FPGA SXM (diagnostic)\n"
+        "  --broadcast host        ARM stages broadcast rows (board-safe default)\n"
         "  --probe-only            map bridge, write/read a few control regs, then exit\n"
+        "  --sxm-probe             run one known-pattern FPGA SXM broadcast and exit\n"
         "  --attention host        ARM computes tiny causal attention context from FPGA K/V cache\n"
+        "  --attention fpga-mxm    FPGA SXM K^T, MXM QK/PV, and VXM softmax (default)\n"
+        "  --attention fpga-softmax FPGA softmax; ARM computes QK/PV (diagnostic)\n"
         "  --attention current     no ARM attention math; stage current V as context\n"
         "  --decode greedy         raw model argmax every step (default)\n"
         "  --decode target         constrain generated chars to exported target names\n",
@@ -708,7 +1292,10 @@ static int parse_args(int argc, char **argv, runtime_options_t *opt) {
     opt->skip_load_weights = false;
     opt->verbose = false;
     opt->probe_only = false;
-    opt->attention_mode = ATTENTION_HOST;
+    opt->sxm_probe = false;
+    opt->benchmark = false;
+    opt->host_broadcasts = true;
+    opt->attention_mode = ATTENTION_FPGA_MXM;
     opt->decode_mode = DECODE_GREEDY;
     opt->max_new_tokens = 12;
 
@@ -735,10 +1322,27 @@ static int parse_args(int argc, char **argv, runtime_options_t *opt) {
             opt->verbose = true;
         } else if (strcmp(argv[i], "--probe-only") == 0) {
             opt->probe_only = true;
+        } else if (strcmp(argv[i], "--sxm-probe") == 0) {
+            opt->sxm_probe = true;
+        } else if (strcmp(argv[i], "--benchmark") == 0) {
+            opt->benchmark = true;
+        } else if (strcmp(argv[i], "--broadcast") == 0 && i + 1 < argc) {
+            const char *mode = argv[++i];
+            if (strcmp(mode, "sxm") == 0) {
+                opt->host_broadcasts = false;
+            } else if (strcmp(mode, "host") == 0) {
+                opt->host_broadcasts = true;
+            } else {
+                return -1;
+            }
         } else if (strcmp(argv[i], "--attention") == 0 && i + 1 < argc) {
             const char *mode = argv[++i];
             if (strcmp(mode, "host") == 0) {
                 opt->attention_mode = ATTENTION_HOST;
+            } else if (strcmp(mode, "fpga-softmax") == 0) {
+                opt->attention_mode = ATTENTION_FPGA_SOFTMAX;
+            } else if (strcmp(mode, "fpga-mxm") == 0) {
+                opt->attention_mode = ATTENTION_FPGA_MXM;
             } else if (strcmp(mode, "current") == 0) {
                 opt->attention_mode = ATTENTION_CURRENT;
             } else {
@@ -813,6 +1417,80 @@ static int probe_bridge(tinylpu_mmio_t *dev) {
     return 0;
 }
 
+static int probe_sxm(tinylpu_mmio_t *dev, const runtime_options_t *opt) {
+    static const int8_t source[MICROGPT_LANES] = {
+        -91, -37, -5, 0, 7, 29, 63, 111
+    };
+    const int8_t source_scale = -6;
+    const size_t one_broadcast_instructions =
+        (MICROGPT_PREFIX_WQ_START - MICROGPT_PREFIX_ATTN_BCAST_START) / 2u;
+    tinylpu_mmio_row_t zero = {0, 0, 0};
+
+    puts("SXM probe: source lanes = [-91 -37 -5 0 7 29 63 111], scale=-6");
+    tinylpu_soft_reset(dev, 32u, opt->settle_us);
+    tinylpu_write_row(
+        dev,
+        TINYLPU_MEM0_OFFSET,
+        MICROGPT_MEM0_XN_ROW0,
+        pack_quant_row(source, source_scale)
+    );
+    for (uint32_t row = 0; row < MICROGPT_LANES; ++row) {
+        tinylpu_write_row(
+            dev,
+            TINYLPU_MEM0_OFFSET,
+            MICROGPT_MEM0_X_BCAST_BASE + row,
+            zero
+        );
+    }
+
+    run_program(
+        dev,
+        "sxm-probe",
+        MICROGPT_PREFIX_ATTN_BCAST_START,
+        one_broadcast_instructions,
+        opt
+    );
+
+    int failures = 0;
+    for (int row = 0; row < MICROGPT_LANES; ++row) {
+        int8_t lanes[MICROGPT_LANES];
+        int8_t scale;
+        unpack_row(
+            tinylpu_read_row(
+                dev,
+                TINYLPU_MEM0_OFFSET,
+                MICROGPT_MEM0_X_BCAST_BASE + (uint32_t)row
+            ),
+            lanes,
+            &scale
+        );
+        printf("SXM probe row %d: [%d %d %d %d %d %d %d %d] scale=%d%s\n",
+               row,
+               lanes[0], lanes[1], lanes[2], lanes[3],
+               lanes[4], lanes[5], lanes[6], lanes[7],
+               scale,
+               (scale == source_scale &&
+                lanes[0] == source[row] && lanes[1] == source[row] &&
+                lanes[2] == source[row] && lanes[3] == source[row] &&
+                lanes[4] == source[row] && lanes[5] == source[row] &&
+                lanes[6] == source[row] && lanes[7] == source[row]) ? " PASS" : " FAIL");
+        if (scale != source_scale) {
+            ++failures;
+            continue;
+        }
+        for (int lane = 0; lane < MICROGPT_LANES; ++lane) {
+            if (lanes[lane] != source[row]) {
+                ++failures;
+                break;
+            }
+        }
+    }
+    printf("SXM probe: %s (%d bad rows)\n", failures ? "FAIL" : "PASS", failures);
+    fflush(stdout);
+    tinylpu_soft_reset(dev, 32u, opt->settle_us);
+    return failures ? 1 : 0;
+}
+
 int main(int argc, char **argv) {
     runtime_options_t opt;
     if (parse_args(argc, argv, &opt) != 0) {
@@ -832,8 +1510,16 @@ int main(int argc, char **argv) {
            MICROGPT_PREFIX_INSTRUCTIONS,
            MICROGPT_SUFFIX_INSTRUCTIONS,
            MICROGPT_MEM1_ROWS);
-    printf("attention: %s\n", opt.attention_mode == ATTENTION_HOST ? "host TB causal attention" : "current-token FPGA V only");
+    const char *attention_name = opt.attention_mode == ATTENTION_HOST
+        ? "ARM causal attention"
+        : (opt.attention_mode == ATTENTION_FPGA_SOFTMAX
+            ? "FPGA softmax with ARM QK/PV staging"
+            : (opt.attention_mode == ATTENTION_FPGA_MXM
+                ? "FPGA SXM K^T + MXM QK/PV + VXM softmax"
+                : "current-token FPGA V only"));
+    printf("attention: %s\n", attention_name);
     printf("decode: %s\n", opt.decode_mode == DECODE_TARGET ? "target-name constrained" : "raw greedy");
+    printf("broadcast: %s\n", opt.host_broadcasts ? "ARM compatibility staging" : "FPGA SXM");
 
     if (opt.probe_only) {
         int rc = probe_bridge(&dev);
@@ -841,11 +1527,22 @@ int main(int argc, char **argv) {
         return rc;
     }
 
+    if (opt.sxm_probe) {
+        int rc = probe_sxm(&dev, &opt);
+        tinylpu_mmio_close(&dev);
+        return rc;
+    }
+
     if (!opt.skip_load_weights) {
         printf("Loading MEM1/model rows over HPS bridge...\n");
         fflush(stdout);
+        const double load_start = monotonic_seconds();
         load_mem1(&dev, opt.verbose);
         printf("MEM1 load complete.\n");
+        if (opt.benchmark) {
+            fprintf(stderr, "[perf] model load over ARM/MMIO: %.3f s (%u rows)\n",
+                    monotonic_seconds() - load_start, MICROGPT_MEM1_ROWS);
+        }
     }
 
     char prompt[256];

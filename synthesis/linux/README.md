@@ -10,6 +10,8 @@ The runtime uses the same generated model artifacts as the JTAG testbench:
 - `model/artifacts/fpga_microgpt/microgpt_decode_vliw.hex`
 - `model/artifacts/fpga_microgpt/microgpt_decode_schedule.json`
 - `model/artifacts/fpga_microgpt/microgpt_decode_trace.json`
+- `model/artifacts/fpga_microgpt/microgpt_softmax_vliw.hex`
+- `model/artifacts/fpga_microgpt/microgpt_attention_vliw.hex`
 
 ## Files
 
@@ -22,36 +24,71 @@ The runtime uses the same generated model artifacts as the JTAG testbench:
 - `Makefile`:
   regenerates the image header and builds the runtime.
 
-## Build on the DE1-SoC ARM Linux shell
+## Cross-compile on the laptop
 
-Copy the repo, or at least `synthesis/linux`, `synthesis/scripts`, and
-`model/artifacts/fpga_microgpt`, onto the ARM Linux filesystem.
+The Terasic Linux image does not include GCC. Build a static ARMv7 hard-float
+binary from the WSL terminal, then copy it to the board:
 
 ```sh
-cd tinyLPU/synthesis/linux
-make
+cd "/mnt/c/Users/micha/Documents(Local)/Projects/tinyLPU/synthesis/linux"
+make clean
+make CC=arm-linux-gnueabihf-gcc LDFLAGS=-static
 ```
 
-Then run:
+From Windows PowerShell:
+
+```powershell
+scp "C:\Users\micha\Documents(Local)\Projects\tinyLPU\synthesis\linux\microgpt_hps_runtime" root@192.168.1.101:/home/root/linux/
+```
+
+Then run on the board:
 
 ```sh
-sudo ./microgpt_hps_runtime --attention host
+cd /home/root/linux
+chmod +x microgpt_hps_runtime
+./microgpt_hps_runtime --attention fpga-mxm --broadcast host --benchmark
 ```
 
 Useful options:
 
 ```sh
-sudo ./microgpt_hps_runtime --attention current
-sudo ./microgpt_hps_runtime --no-load-weights
-sudo ./microgpt_hps_runtime --base 0xff200000 --span 0x10000
+./microgpt_hps_runtime --attention host --broadcast host --benchmark
+./microgpt_hps_runtime --attention fpga-softmax --broadcast host --benchmark
+./microgpt_hps_runtime --attention current
+./microgpt_hps_runtime --no-load-weights
+./microgpt_hps_runtime --base 0xff200000 --span 0x10000
 ```
 
-`--attention host` means the ARM-side testbench computes the small causal
-attention context from FPGA-produced Q/K/V rows cached in FPGA MEM0. The LPU
-still runs the VLIW pages for the model stages. `--attention current` performs
-no ARM attention math and stages the current FPGA-produced V row as the
-attention context, which is useful for hardware bring-up but is not exact
-multi-token attention.
+`--attention fpga-mxm` is the default. It time-multiplexes the existing MXM for
+both QK dot products and PV weighted sums, and executes exp, reciprocal, and
+normalization in the existing 16-chunk VXM softmax. Before QK, the existing SXM
+transposes each aligned 8x8 K tile from positions-by-dimensions into
+dimensions-by-positions. The ARM aligns the block-scaled K rows to the SXM's
+single tile exponent and writes the causal/dynamic-length mask. SXM sends its
+transposed dimensions through the existing VXM packing/store path into the
+MEM1 layout consumed by MXM, so ARM does not copy or transpose the emitted
+rows. The 1020-row resident attention
+image contains separately callable block-0 K-transpose, block-1 K-transpose,
+QK, softmax, PV, and head-merge entry points.
+
+`--attention fpga-softmax` is retained as a comparison mode: VXM computes
+softmax while ARM computes QK/PV. `--attention host` performs all causal
+attention arithmetic on ARM.
+`--attention current` stages only the current V row and is a bring-up mode, not
+exact multi-token attention.
+
+`--broadcast host` is the board-safe default while the synthesized SXM path is
+being diagnosed. `--broadcast sxm` executes every compiled model broadcast in
+the FPGA SXM and is retained as an explicit diagnostic mode. This option only
+selects the full-model broadcast path: `--attention fpga-mxm` uses SXM for the
+K transpose regardless of the selected broadcast mode.
+
+`--benchmark` reports model-load time and per-prompt ARM+FPGA wall-clock
+measurements. Its end-to-end output tokens/s includes reset, MMIO transfers,
+IMEM paging, FPGA execution/polling, the selected attention assistance, and
+decode logic. It excludes time spent typing and the one-time model load, which
+is reported separately. It also reports TTFT, prefill LPU steps/s, and decode
+LPU steps/s.
 
 ## Required FPGA address map
 
@@ -85,4 +122,3 @@ Windows/System Console testbench, but ARM Linux cannot use it as `/dev/mem`.
 For this runtime, the Platform Designer system must expose the HPS lightweight
 AXI/Avalon master to the same `lpu_de1_soc_wrapper` Avalon slave. This changes
 the board integration around the LPU, not the TinyLPU compute core.
-
