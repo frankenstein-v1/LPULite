@@ -38,14 +38,24 @@ typedef struct {
 } tinylpu_mmio_row_t;
 
 typedef struct {
+    uint64_t read32;
+    uint64_t write32;
+    uint64_t row_reads;
+    uint64_t row_writes;
+    uint64_t imem_row_writes;
+} tinylpu_mmio_stats_t;
+
+typedef struct {
     int fd;
     size_t span;
     uintptr_t phys_base;
     volatile uint8_t *base;
+    tinylpu_mmio_stats_t stats;
 } tinylpu_mmio_t;
 
 int tinylpu_mmio_open(tinylpu_mmio_t *dev, uintptr_t phys_base, size_t span);
 void tinylpu_mmio_close(tinylpu_mmio_t *dev);
+tinylpu_mmio_stats_t tinylpu_mmio_get_stats(const tinylpu_mmio_t *dev);
 
 void tinylpu_write32(tinylpu_mmio_t *dev, uint32_t offset, uint32_t value);
 uint32_t tinylpu_read32(tinylpu_mmio_t *dev, uint32_t offset);
@@ -53,6 +63,27 @@ void tinylpu_soft_reset(tinylpu_mmio_t *dev, uint32_t cycles, unsigned poll_us);
 
 void tinylpu_write_row(tinylpu_mmio_t *dev, uint32_t base_offset, uint32_t row, tinylpu_mmio_row_t value);
 tinylpu_mmio_row_t tinylpu_read_row(tinylpu_mmio_t *dev, uint32_t base_offset, uint32_t row);
+void tinylpu_write_rows(
+    tinylpu_mmio_t *dev,
+    uint32_t base_offset,
+    uint32_t first_row,
+    const tinylpu_mmio_row_t *values,
+    size_t count
+);
+void tinylpu_read_rows(
+    tinylpu_mmio_t *dev,
+    uint32_t base_offset,
+    uint32_t first_row,
+    tinylpu_mmio_row_t *values,
+    size_t count
+);
+void tinylpu_fill_rows(
+    tinylpu_mmio_t *dev,
+    uint32_t base_offset,
+    uint32_t first_row,
+    tinylpu_mmio_row_t value,
+    size_t count
+);
 void tinylpu_copy_row(tinylpu_mmio_t *dev, uint32_t src_base, uint32_t src_row, uint32_t dst_base, uint32_t dst_row);
 
 void tinylpu_load_imem_page(tinylpu_mmio_t *dev, const tinylpu_mmio_row_t *program, size_t count);

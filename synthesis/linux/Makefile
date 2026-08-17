@@ -1,6 +1,6 @@
 CC ?= gcc
 PYTHON ?= python3
-CFLAGS ?= -O2 -Wall -Wextra -std=c11 -D_DEFAULT_SOURCE
+CFLAGS ?= -O3 -Wall -Wextra -std=c11 -D_DEFAULT_SOURCE -mcpu=cortex-a9 -mfpu=neon -mfloat-abi=hard
 CPPFLAGS += -Iinclude
 LDLIBS += -lm -lrt
 
