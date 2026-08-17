@@ -15,6 +15,42 @@ static void io_barrier(void) {
     __sync_synchronize();
 }
 
+static void write_row_unbarriered(
+    tinylpu_mmio_t *dev,
+    uint32_t base_offset,
+    uint32_t row,
+    tinylpu_mmio_row_t value
+) {
+    uint32_t addr = base_offset + row * TINYLPU_ROW_BYTES;
+    *word_ptr(dev, addr + 0u) = value.w0;
+    *word_ptr(dev, addr + 4u) = value.w1;
+    /* Word 2 commits the wrapper's assembled row and must remain last. */
+    *word_ptr(dev, addr + 8u) = value.w2;
+    dev->stats.write32 += 3u;
+    dev->stats.row_writes += 1u;
+    if (base_offset == TINYLPU_IMEM_OFFSET) {
+        dev->stats.imem_row_writes += 1u;
+    }
+}
+
+static tinylpu_mmio_row_t read_row_unbarriered(
+    tinylpu_mmio_t *dev,
+    uint32_t base_offset,
+    uint32_t row
+) {
+    uint32_t addr = base_offset + row * TINYLPU_ROW_BYTES;
+    /* Prime the wrapper's registered SRAM read path. */
+    (void)*word_ptr(dev, addr);
+    tinylpu_mmio_row_t value = {
+        *word_ptr(dev, addr + 0u),
+        *word_ptr(dev, addr + 4u),
+        *word_ptr(dev, addr + 8u),
+    };
+    dev->stats.read32 += 4u;
+    dev->stats.row_reads += 1u;
+    return value;
+}
+
 int tinylpu_mmio_open(tinylpu_mmio_t *dev, uintptr_t phys_base, size_t span) {
     if (!dev) {
         errno = EINVAL;
@@ -25,6 +61,7 @@ int tinylpu_mmio_open(tinylpu_mmio_t *dev, uintptr_t phys_base, size_t span) {
     dev->span = span;
     dev->phys_base = phys_base;
     dev->base = NULL;
+    memset(&dev->stats, 0, sizeof(dev->stats));
 
     int fd = open("/dev/mem", O_RDWR | O_SYNC);
     if (fd < 0) {
@@ -47,6 +84,10 @@ int tinylpu_mmio_open(tinylpu_mmio_t *dev, uintptr_t phys_base, size_t span) {
     return 0;
 }
 
+tinylpu_mmio_stats_t tinylpu_mmio_get_stats(const tinylpu_mmio_t *dev) {
+    return dev->stats;
+}
+
 void tinylpu_mmio_close(tinylpu_mmio_t *dev) {
     if (!dev) {
         return;
@@ -65,12 +106,14 @@ void tinylpu_mmio_close(tinylpu_mmio_t *dev) {
 
 void tinylpu_write32(tinylpu_mmio_t *dev, uint32_t offset, uint32_t value) {
     *word_ptr(dev, offset) = value;
+    dev->stats.write32 += 1u;
     io_barrier();
 }
 
 uint32_t tinylpu_read32(tinylpu_mmio_t *dev, uint32_t offset) {
     io_barrier();
     uint32_t value = *word_ptr(dev, offset);
+    dev->stats.read32 += 1u;
     io_barrier();
     return value;
 }
@@ -95,30 +138,69 @@ void tinylpu_soft_reset(tinylpu_mmio_t *dev, uint32_t cycles, unsigned poll_us) 
 }
 
 void tinylpu_write_row(tinylpu_mmio_t *dev, uint32_t base_offset, uint32_t row, tinylpu_mmio_row_t value) {
-    uint32_t addr = base_offset + row * TINYLPU_ROW_BYTES;
-    tinylpu_write32(dev, addr + 0, value.w0);
-    tinylpu_write32(dev, addr + 4, value.w1);
-    /*
-     * The current Avalon wrapper commits the 96-bit/72-bit assembled row when
-     * word 2 is written, so word 2 must be last.
-     */
-    tinylpu_write32(dev, addr + 8, value.w2);
+    write_row_unbarriered(dev, base_offset, row, value);
+    io_barrier();
 }
 
 tinylpu_mmio_row_t tinylpu_read_row(tinylpu_mmio_t *dev, uint32_t base_offset, uint32_t row) {
-    uint32_t addr = base_offset + row * TINYLPU_ROW_BYTES;
-    /*
-     * The wrapper has a registered SRAM read path. A same-address dummy read
-     * gives the fabric one clocked MMIO transaction to present the row, matching
-     * the existing System Console/JTAG bring-up code.
-     */
-    (void)tinylpu_read32(dev, addr);
-    tinylpu_mmio_row_t value = {
-        tinylpu_read32(dev, addr + 0),
-        tinylpu_read32(dev, addr + 4),
-        tinylpu_read32(dev, addr + 8),
-    };
+    io_barrier();
+    tinylpu_mmio_row_t value = read_row_unbarriered(dev, base_offset, row);
+    io_barrier();
     return value;
+}
+
+void tinylpu_write_rows(
+    tinylpu_mmio_t *dev,
+    uint32_t base_offset,
+    uint32_t first_row,
+    const tinylpu_mmio_row_t *values,
+    size_t count
+) {
+    for (size_t index = 0; index < count; ++index) {
+        write_row_unbarriered(
+            dev,
+            base_offset,
+            first_row + (uint32_t)index,
+            values[index]
+        );
+    }
+    io_barrier();
+}
+
+void tinylpu_read_rows(
+    tinylpu_mmio_t *dev,
+    uint32_t base_offset,
+    uint32_t first_row,
+    tinylpu_mmio_row_t *values,
+    size_t count
+) {
+    io_barrier();
+    for (size_t index = 0; index < count; ++index) {
+        values[index] = read_row_unbarriered(
+            dev,
+            base_offset,
+            first_row + (uint32_t)index
+        );
+    }
+    io_barrier();
+}
+
+void tinylpu_fill_rows(
+    tinylpu_mmio_t *dev,
+    uint32_t base_offset,
+    uint32_t first_row,
+    tinylpu_mmio_row_t value,
+    size_t count
+) {
+    for (size_t index = 0; index < count; ++index) {
+        write_row_unbarriered(
+            dev,
+            base_offset,
+            first_row + (uint32_t)index,
+            value
+        );
+    }
+    io_barrier();
 }
 
 void tinylpu_copy_row(tinylpu_mmio_t *dev, uint32_t src_base, uint32_t src_row, uint32_t dst_base, uint32_t dst_row) {
@@ -126,12 +208,19 @@ void tinylpu_copy_row(tinylpu_mmio_t *dev, uint32_t src_base, uint32_t src_row, 
 }
 
 void tinylpu_load_imem_page(tinylpu_mmio_t *dev, const tinylpu_mmio_row_t *program, size_t count) {
-    for (size_t row = 0; row < TINYLPU_IMEM_ROWS; ++row) {
-        tinylpu_mmio_row_t value = {0, 0, 0};
-        if (row < count) {
-            value = program[row];
-        }
-        tinylpu_write_row(dev, TINYLPU_IMEM_OFFSET, (uint32_t)row, value);
+    if (count > TINYLPU_IMEM_ROWS) {
+        count = TINYLPU_IMEM_ROWS;
+    }
+    tinylpu_write_rows(dev, TINYLPU_IMEM_OFFSET, 0u, program, count);
+    if (count < TINYLPU_IMEM_ROWS) {
+        const tinylpu_mmio_row_t zero = {0, 0, 0};
+        tinylpu_fill_rows(
+            dev,
+            TINYLPU_IMEM_OFFSET,
+            (uint32_t)count,
+            zero,
+            TINYLPU_IMEM_ROWS - count
+        );
     }
 }
 
@@ -154,10 +243,9 @@ uint32_t tinylpu_run_cycles_from(
     tinylpu_write32(dev, TINYLPU_CTRL_PC_LOAD, pc);
     tinylpu_write32(dev, TINYLPU_CTRL_RUN_CYCLES, cycles);
 
-    for (;;) {
-        uint32_t run = tinylpu_read32(dev, TINYLPU_CTRL_RUN);
+    for (unsigned guard = 0; guard < 10000000u; ++guard) {
         uint32_t remaining = tinylpu_read32(dev, TINYLPU_CTRL_RUN_CYCLES);
-        if ((run == 0u) && (remaining == 0u)) {
+        if (remaining == 0u) {
             break;
         }
         if (poll_us) {

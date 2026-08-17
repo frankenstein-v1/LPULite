@@ -243,11 +243,13 @@ async def load_mem1(driver: AvalonDriver, mem1: list[int]) -> None:
 
 async def clear_runtime_state(driver: AvalonDriver, mem0_abi: dict) -> None:
     zero = 0
-    for row in range(int(mem0_abi["logit_rows"][-1]) + 1):
-        await driver.write_row(MEM0_BASE, row, zero)
-    for row in range(16 * ROWS_PER_VEC):
-        await driver.write_row(MEM0_BASE, 1024 + row, zero)
-        await driver.write_row(MEM1_BASE, 1024 + row, zero)
+    masked = pack_quant_row([-127] * LANES, 0)
+    for pos in range(16):
+        await driver.write_row(MEM0_BASE, 600 + pos, masked)
+        await driver.write_row(MEM0_BASE, 680 + pos, zero)
+        await driver.write_row(MEM1_BASE, 1104 + pos, zero)
+    for row in range(8):
+        await driver.write_row(MEM1_BASE, 1088 + row, zero)
 
 
 async def reset_prompt_state(driver: AvalonDriver, mem0_abi: dict) -> None:
@@ -257,7 +259,9 @@ async def reset_prompt_state(driver: AvalonDriver, mem0_abi: dict) -> None:
 
 
 async def load_imem_page(driver: AvalonDriver, vliw: list[int], start_pc: int, count: int) -> None:
-    for row in range(IMEM_ROWS):
+    # Execute eight retirement NOPs and clear the following stopped-PC guard.
+    # Match the Linux runtime instead of clearing all 1024 rows for tiny pages.
+    for row in range(min(IMEM_ROWS, count + 9)):
         value = vliw[start_pc + row] if row < count else 0
         await driver.write_row(IMEM_BASE, row, value)
 
@@ -408,8 +412,6 @@ async def stage_mxm_attention(
             await driver.read_row(MEM1_BASE, 1024 + pos * ROWS_PER_VEC + 1),
         ])
 
-    masked = pack_quant_row([-127] * LANES, 0)
-    zero_row = pack_quant_row([0] * LANES, 0)
     for head in range(n_head):
         row_index = head // 2
         lane_base = (head % 2) * head_dim
@@ -429,12 +431,6 @@ async def stage_mxm_attention(
         # does not move position values into dimension rows itself.
         for block in range(2):
             if block * LANES > through_pos:
-                for dim in range(head_dim):
-                    await driver.write_row(
-                        MEM1_BASE,
-                        kt_stage_base + dim * 2 + block,
-                        zero_row,
-                    )
                 continue
             tile = [[0.0] * LANES for _ in range(LANES)]
             for tile_pos in range(LANES):
@@ -463,13 +459,10 @@ async def stage_mxm_attention(
             unpack_row(await driver.read_row(MEM0_BASE, qk_score_base + 0)),
             unpack_row(await driver.read_row(MEM0_BASE, qk_score_base + 1)),
         ]
-        for pos in range(16):
-            if pos <= through_pos:
-                score_lanes, score_scale = score_rows[pos // LANES]
-                scaled = max(-128, score_scale - 1)
-                row = pack_quant_row([score_lanes[pos % LANES]] * LANES, scaled)
-            else:
-                row = masked
+        for pos in range(through_pos + 1):
+            score_lanes, score_scale = score_rows[pos // LANES]
+            scaled = max(-128, score_scale - 1)
+            row = pack_quant_row([score_lanes[pos % LANES]] * LANES, scaled)
             await driver.write_row(MEM0_BASE, 600 + pos, row)
         await run_section("softmax")
 
@@ -477,28 +470,24 @@ async def stage_mxm_attention(
         # the exponent by three changes each lane from p/8 to p for MXM input.
         # V rows are lane-masked to the current head; MXM performs every p*V
         # multiply and every accumulation across the 16 token positions.
-        for pos in range(16):
-            if pos <= through_pos:
-                prob_lanes, prob_scale = unpack_row(
-                    await driver.read_row(MEM0_BASE, 640 + pos)
-                )
-                await driver.write_row(
-                    MEM0_BASE,
-                    pv_prob_base + pos,
-                    pack_quant_row(prob_lanes, min(127, prob_scale + 3)),
-                )
-                v_lanes, v_scale = unpack_row(value_rows[pos][row_index])
-                masked_v = [0] * LANES
-                for lane in range(lane_base, lane_base + head_dim):
-                    masked_v[lane] = v_lanes[lane]
-                await driver.write_row(
-                    MEM1_BASE,
-                    v_stage_base + pos,
-                    pack_quant_row(masked_v, v_scale),
-                )
-            else:
-                await driver.write_row(MEM0_BASE, pv_prob_base + pos, zero_row)
-                await driver.write_row(MEM1_BASE, v_stage_base + pos, zero_row)
+        for pos in range(through_pos + 1):
+            prob_lanes, prob_scale = unpack_row(
+                await driver.read_row(MEM0_BASE, 640 + pos)
+            )
+            await driver.write_row(
+                MEM0_BASE,
+                pv_prob_base + pos,
+                pack_quant_row(prob_lanes, min(127, prob_scale + 3)),
+            )
+            v_lanes, v_scale = unpack_row(value_rows[pos][row_index])
+            masked_v = [0] * LANES
+            for lane in range(lane_base, lane_base + head_dim):
+                masked_v[lane] = v_lanes[lane]
+            await driver.write_row(
+                MEM1_BASE,
+                v_stage_base + pos,
+                pack_quant_row(masked_v, v_scale),
+            )
 
         await run_section("pv")
         await copy_row(driver, MEM0_BASE, pv_out_row, MEM0_BASE, head_out_base + head)

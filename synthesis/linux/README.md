@@ -49,6 +49,10 @@ chmod +x microgpt_hps_runtime
 ./microgpt_hps_runtime --attention fpga-mxm --broadcast host --benchmark
 ```
 
+These changes only rebuild the ARM/Linux executable. If the currently loaded
+`.sof` already runs `--attention fpga-mxm` correctly, **do not rerun Quartus or
+reprogram the FPGA** for this software optimization update.
+
 Useful options:
 
 ```sh
@@ -57,6 +61,7 @@ Useful options:
 ./microgpt_hps_runtime --attention current
 ./microgpt_hps_runtime --no-load-weights
 ./microgpt_hps_runtime --base 0xff200000 --span 0x10000
+./microgpt_hps_runtime --attention fpga-mxm --broadcast host --benchmark --prompt sat --repeat 10
 ```
 
 `--attention fpga-mxm` is the default. It time-multiplexes the existing MXM for
@@ -77,18 +82,69 @@ attention arithmetic on ARM.
 `--attention current` stages only the current V row and is a bring-up mode, not
 exact multi-token attention.
 
-`--broadcast host` is the board-safe default while the synthesized SXM path is
-being diagnosed. `--broadcast sxm` executes every compiled model broadcast in
-the FPGA SXM and is retained as an explicit diagnostic mode. This option only
-selects the full-model broadcast path: `--attention fpga-mxm` uses SXM for the
-K transpose regardless of the selected broadcast mode.
+`--broadcast host` is the default because full-chip simulation found it
+slightly faster for this schedule. `--broadcast sxm` is verified and executes
+every compiled model broadcast in the FPGA SXM, so it remains available for
+measurement on the real board. This option only selects the full-model
+broadcast path: `--attention fpga-mxm` uses SXM for the K transpose regardless
+of the selected broadcast mode.
 
 `--benchmark` reports model-load time and per-prompt ARM+FPGA wall-clock
 measurements. Its end-to-end output tokens/s includes reset, MMIO transfers,
 IMEM paging, FPGA execution/polling, the selected attention assistance, and
 decode logic. It excludes time spent typing and the one-time model load, which
 is reported separately. It also reports TTFT, prefill LPU steps/s, and decode
-LPU steps/s.
+LPU steps/s. It now also reports MMIO row/word counts and how many physical
+IMEM rows were skipped by the software shadow. Use `--prompt` with `--repeat`
+to avoid human typing delays and obtain an aggregate rate over multiple runs:
+
+```sh
+./microgpt_hps_runtime \
+  --attention fpga-mxm --broadcast host --decode greedy \
+  --benchmark --prompt sat --repeat 10
+```
+
+The aggregate line is the most stable tokens/second number. Output-token rate
+still depends on the prompt because different names generate different numbers
+of output tokens and require different numbers of autoregressive LPU steps.
+
+## Software-only performance changes
+
+The optimized runtime keeps the existing FPGA RTL, Avalon register map, and
+4,920-instruction model schedule unchanged. It reduces ARM/Linux overhead by:
+
+- polling exact-cycle completion immediately by default (`--settle-us 0`),
+  instead of sleeping between every poll;
+- batching consecutive row transfers so one ARM memory barrier covers a batch,
+  while preserving word 2 as the hardware row-commit write;
+- shadowing the 1,024-row physical IMEM and transmitting only changed ranges;
+- loading only the active page, eight retirement NOPs, and the required
+  stopped-PC guard row, instead of clearing all unused IMEM rows;
+- retaining packed K/V rows in an ARM mirror after their first FPGA readback,
+  avoiding repeated historical-cache reads while arranging the next FPGA
+  attention invocation;
+- staging only active sequence positions after causal masking and preserving
+  reset-established masked/zero rows for inactive positions;
+- resetting only state that must be initialized between prompts rather than
+  clearing the entire scratch and KV address ranges; and
+- compiling the runtime at `-O3` for Cortex-A9 hard-float/NEON.
+
+The ARM mirror does not perform QK, softmax, or PV in the default
+`--attention fpga-mxm` mode. It holds the already quantized K/V representation
+needed to lay out active operands. SXM still performs `K^T`, MXM performs QK
+and PV, and VXM performs softmax.
+
+The software keeps the tested 900-instruction paging boundary. Experiments
+with a 1,016-row page and with a compacted FC1/ReLU schedule produced incorrect
+logits in full-chip simulation, so those unsafe changes were rejected.
+
+Two otherwise attractive optimizations are outside the software-only scope:
+
+- HPS DMA is disabled in the current Platform Designer system, so adding DMA
+  transfers requires a hardware integration change.
+- The Platform Designer/LPU clock is currently derived from the 50 MHz board
+  clock with `qsys_clk_div[2]` (6.25 MHz). Raising it requires changing the FPGA
+  top-level clock integration and rebuilding the bitstream.
 
 ## Required FPGA address map
 
