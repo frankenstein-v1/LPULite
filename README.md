@@ -33,11 +33,14 @@ python model/scripts/train_tiny_lm.py
 python model/scripts/generate.py
 ```
 
-Build the DE1-SoC project:
+Build the current HPS/Linux DE1-SoC release:
 
-```bash
-python synthesis/scripts/build_de1_soc.py
+```powershell
+.\synthesis\scripts\build_microgpt_fpga_release.ps1
 ```
+
+The verified FPGA bitstream and complete board setup procedure are documented
+in [`synthesis/docs/microgpt_fpga_runbook.md`](synthesis/docs/microgpt_fpga_runbook.md).
 
 Generate the logic-level GDS3D showcase:
 
