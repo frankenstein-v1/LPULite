@@ -22,3 +22,15 @@ lpu_driver
 input.txt
 model/output/microgpt_names.txt
 model/stories260k/
+
+# Quartus bitstreams are release artifacts. Keep only the verified HPS image.
+*.sof
+!synthesis/build/tiny_lpu_de1_soc_hps/tiny_lpu_de1_soc_hps.sof
+
+# Local snapshots of Quartus compilation databases are large and reproducible.
+synthesis/build/**/db_pre_*/
+synthesis/build/**/incremental_db_pre_*/
+
+# Historical Quartus outputs are retained locally when needed, not published.
+archives/quartus_failed_build_*/
+archives/quartus_sof/
