@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""TinyLPU Weight Memory Packer.
+"""LPULite Weight Memory Packer.
 
 Formats model quantized weight matrices (Q/K/V projections, Out projection,
 RMSNorm scale values, LM Head matrix) into packed 32-bit words for FPGA MEM1 SRAM (0x8000).

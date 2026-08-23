@@ -56,7 +56,7 @@ module icu #(
     output logic [2:0] vxm_residual_op
 );
 
-`ifndef TINYLPU_USE_SKY130_SRAM
+`ifndef LPULITE_USE_SKY130_SRAM
     // Behavioral instruction memory used by simulation and FPGA builds.
     logic [95:0] imem_array [0:INSTRUCTION_COUNT-1];
 `endif
@@ -66,8 +66,8 @@ module icu #(
     logic [31:0] pc;
     logic [95:0] current_instruction;
 
-`ifdef TINYLPU_USE_SKY130_SRAM
-    tinylpu_sram_banked #(
+`ifdef LPULITE_USE_SKY130_SRAM
+    lpulite_sram_banked #(
         .DATA_W(96)
     ) u_imem_sram (
         .clk,
@@ -81,7 +81,7 @@ module icu #(
         .read2_data(current_instruction)
     );
 `else
-`ifdef TINYLPU_FPGA_ALTSYNCRAM
+`ifdef LPULITE_FPGA_ALTSYNCRAM
     logic [95:0] imem_q_fetch;
     logic [95:0] imem_q_ext;
     logic        ext_imem_read_q;

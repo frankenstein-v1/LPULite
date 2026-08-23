@@ -1,4 +1,4 @@
-# TinyLPU Native C Hardware Driver Makefile
+# LPULite Native C Hardware Driver Makefile
 # Supports both native x86 testing and ARM GCC cross-compilation for DE1-SoC
 
 CC ?= gcc

@@ -1,0 +1,50 @@
+set_global_assignment -name FAMILY "Cyclone V"
+set_global_assignment -name DEVICE 5CSEMA5F31C6
+set_global_assignment -name TOP_LEVEL_ENTITY de1_soc_hps_top
+set_global_assignment -name VERILOG_MACRO SYNTHESIS
+set_global_assignment -name VERILOG_MACRO LPULITE_FPGA_ALTSYNCRAM
+set_global_assignment -name VERILOG_MACRO LPULITE_MXM_MAC_LOGIC_MULT
+set_global_assignment -name VERILOG_MACRO LPULITE_VXM_LOGIC_MULT
+set_global_assignment -name SYSTEMVERILOG_FILE "T:/synthesis/rtl/de1_soc_hps_top.sv"
+set_global_assignment -name SDC_FILE "T:/synthesis/rtl/de1_soc_hps_top.sdc"
+set_global_assignment -name SYSTEMVERILOG_FILE "T:/src/acc.sv"
+set_global_assignment -name SYSTEMVERILOG_FILE "T:/src/icu.sv"
+set_global_assignment -name SYSTEMVERILOG_FILE "T:/src/lpu.sv"
+set_global_assignment -name SYSTEMVERILOG_FILE "T:/src/lut_rmsnorm.sv"
+set_global_assignment -name SYSTEMVERILOG_FILE "T:/src/lut_softmax_div.sv"
+set_global_assignment -name SYSTEMVERILOG_FILE "T:/src/lut_softmax_exp.sv"
+set_global_assignment -name SYSTEMVERILOG_FILE "T:/src/mac.sv"
+set_global_assignment -name SYSTEMVERILOG_FILE "T:/src/mem.sv"
+set_global_assignment -name SYSTEMVERILOG_FILE "T:/src/mem_row_dequant.sv"
+set_global_assignment -name SYSTEMVERILOG_FILE "T:/src/mxm.sv"
+set_global_assignment -name SYSTEMVERILOG_FILE "T:/src/quant.sv"
+set_global_assignment -name SYSTEMVERILOG_FILE "T:/src/residual_add.sv"
+set_global_assignment -name SYSTEMVERILOG_FILE "T:/src/rmsnorm.sv"
+set_global_assignment -name SYSTEMVERILOG_FILE "T:/src/row_fifo.sv"
+set_global_assignment -name SYSTEMVERILOG_FILE "T:/src/shared_bus_mux.sv"
+set_global_assignment -name SYSTEMVERILOG_FILE "T:/src/softmax.sv"
+set_global_assignment -name SYSTEMVERILOG_FILE "T:/src/sxm.sv"
+set_global_assignment -name SYSTEMVERILOG_FILE "T:/src/vxm.sv"
+set_global_assignment -name SYSTEMVERILOG_FILE "T:/src/vxm_rope.sv"
+set_global_assignment -name SYSTEMVERILOG_FILE "T:/src/eastbound_bus/eastbound_bus.sv"
+set_global_assignment -name SYSTEMVERILOG_FILE "T:/src/eastbound_bus/eastbound_consumer_decode.sv"
+set_global_assignment -name SYSTEMVERILOG_FILE "T:/src/eastbound_bus/mxm_eastbound_adapter.sv"
+set_global_assignment -name SYSTEMVERILOG_FILE "T:/src/westbound_bus/westbound_bus.sv"
+set_global_assignment -name SYSTEMVERILOG_FILE "T:/src/westbound_bus/westbound_consumer_decode.sv"
+set_global_assignment -name SEARCH_PATH "T:/src"
+set_global_assignment -name SEARCH_PATH "T:/synthesis/project/ip/lpu_de1_soc"
+set_location_assignment PIN_AF14 -to CLOCK_50
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to CLOCK_50
+set_location_assignment PIN_AJ4 -to KEY[0]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to KEY[0]
+set_location_assignment PIN_V16 -to LEDR[0]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LEDR[0]
+set_global_assignment -name PARTITION_NETLIST_TYPE SOURCE -section_id Top
+set_global_assignment -name PARTITION_FITTER_PRESERVATION_LEVEL PLACEMENT_AND_ROUTING -section_id Top
+set_global_assignment -name PARTITION_COLOR 16764057 -section_id Top
+set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top
+set_global_assignment -name MAX_BALANCING_DSP_BLOCKS 87
+set_global_assignment -name NUM_PARALLEL_PROCESSORS 2
+
+set_global_assignment -name LAST_QUARTUS_VERSION "25.1std.0 Lite Edition"
+set_global_assignment -name QIP_FILE "T:/synthesis/project/platform_designer_hps_system/synthesis/platform_designer_hps_system.qip"

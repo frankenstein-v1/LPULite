@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-printf "TinyLPU Verilog toolchain setup\n"
+printf "LPULite Verilog toolchain setup\n"
 
 has_required_tools() {
   command -v iverilog >/dev/null 2>&1 && \

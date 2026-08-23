@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <deploy
  date="2026.07.26.15:48:25"
- outputDirectory="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/">
+ outputDirectory="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/">
  <perimeter>
   <parameter
      name="AUTO_GENERATION_ID"
@@ -158,101 +158,101 @@
   <parameter name="AUTO_LPU_AVALON_ADDRESS_MAP" value="" />
   <generatedFiles>
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/platform_designer_system.v"
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/synthesis/platform_designer_system.v"
        type="VERILOG" />
   </generatedFiles>
   <childGeneratedFiles>
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/submodules/platform_designer_system_jtag_master.v"
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/synthesis/submodules/platform_designer_system_jtag_master.v"
        type="VERILOG" />
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/submodules/altera_avalon_st_jtag_interface.v"
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/synthesis/submodules/altera_avalon_st_jtag_interface.v"
        type="VERILOG"
        attributes="" />
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/submodules/altera_jtag_dc_streaming.v"
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/synthesis/submodules/altera_jtag_dc_streaming.v"
        type="VERILOG"
        attributes="" />
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/submodules/altera_jtag_sld_node.v"
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/synthesis/submodules/altera_jtag_sld_node.v"
        type="VERILOG"
        attributes="" />
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/submodules/altera_jtag_streaming.v"
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/synthesis/submodules/altera_jtag_streaming.v"
        type="VERILOG"
        attributes="" />
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/submodules/altera_avalon_st_clock_crosser.v"
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/synthesis/submodules/altera_avalon_st_clock_crosser.v"
        type="VERILOG"
        attributes="" />
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/submodules/altera_std_synchronizer_nocut.v"
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/synthesis/submodules/altera_std_synchronizer_nocut.v"
        type="VERILOG"
        attributes="" />
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/submodules/altera_avalon_st_pipeline_base.v"
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/synthesis/submodules/altera_avalon_st_pipeline_base.v"
        type="VERILOG"
        attributes="" />
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/submodules/altera_avalon_st_idle_remover.v"
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/synthesis/submodules/altera_avalon_st_idle_remover.v"
        type="VERILOG"
        attributes="" />
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/submodules/altera_avalon_st_idle_inserter.v"
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/synthesis/submodules/altera_avalon_st_idle_inserter.v"
        type="VERILOG"
        attributes="" />
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/submodules/altera_avalon_st_pipeline_stage.sv"
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/synthesis/submodules/altera_avalon_st_pipeline_stage.sv"
        type="SYSTEM_VERILOG"
        attributes="" />
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/submodules/altera_avalon_st_jtag_interface.sdc"
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/synthesis/submodules/altera_avalon_st_jtag_interface.sdc"
        type="SDC"
        attributes="" />
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/submodules/platform_designer_system_jtag_master_timing_adt.sv"
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/synthesis/submodules/platform_designer_system_jtag_master_timing_adt.sv"
        type="SYSTEM_VERILOG"
        attributes="" />
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/submodules/altera_avalon_sc_fifo.v"
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/synthesis/submodules/altera_avalon_sc_fifo.v"
        type="VERILOG"
        attributes="" />
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/submodules/altera_avalon_st_bytes_to_packets.v"
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/synthesis/submodules/altera_avalon_st_bytes_to_packets.v"
        type="VERILOG"
        attributes="" />
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/submodules/altera_avalon_st_packets_to_bytes.v"
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/synthesis/submodules/altera_avalon_st_packets_to_bytes.v"
        type="VERILOG"
        attributes="" />
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/submodules/altera_avalon_packets_to_master.v"
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/synthesis/submodules/altera_avalon_packets_to_master.v"
        type="VERILOG"
        attributes="" />
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/submodules/platform_designer_system_jtag_master_b2p_adapter.sv"
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/synthesis/submodules/platform_designer_system_jtag_master_b2p_adapter.sv"
        type="SYSTEM_VERILOG"
        attributes="" />
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/submodules/platform_designer_system_jtag_master_p2b_adapter.sv"
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/synthesis/submodules/platform_designer_system_jtag_master_p2b_adapter.sv"
        type="SYSTEM_VERILOG"
        attributes="" />
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/submodules/altera_reset_controller.v"
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/synthesis/submodules/altera_reset_controller.v"
        type="VERILOG"
        attributes="" />
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/submodules/altera_reset_synchronizer.v"
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/synthesis/submodules/altera_reset_synchronizer.v"
        type="VERILOG"
        attributes="" />
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/submodules/altera_reset_controller.sdc"
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/synthesis/submodules/altera_reset_controller.sdc"
        type="SDC"
        attributes="" />
   </childGeneratedFiles>
   <sourceFiles>
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system.qsys" />
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system.qsys" />
   </sourceFiles>
   <childSourceFiles>
    <file
@@ -357,92 +357,92 @@
   <parameter name="AUTO_DEVICE_SPEEDGRADE" value="6" />
   <generatedFiles>
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/submodules/platform_designer_system_jtag_master.v"
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/synthesis/submodules/platform_designer_system_jtag_master.v"
        type="VERILOG" />
   </generatedFiles>
   <childGeneratedFiles>
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/submodules/altera_avalon_st_jtag_interface.v"
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/synthesis/submodules/altera_avalon_st_jtag_interface.v"
        type="VERILOG"
        attributes="" />
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/submodules/altera_jtag_dc_streaming.v"
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/synthesis/submodules/altera_jtag_dc_streaming.v"
        type="VERILOG"
        attributes="" />
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/submodules/altera_jtag_sld_node.v"
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/synthesis/submodules/altera_jtag_sld_node.v"
        type="VERILOG"
        attributes="" />
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/submodules/altera_jtag_streaming.v"
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/synthesis/submodules/altera_jtag_streaming.v"
        type="VERILOG"
        attributes="" />
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/submodules/altera_avalon_st_clock_crosser.v"
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/synthesis/submodules/altera_avalon_st_clock_crosser.v"
        type="VERILOG"
        attributes="" />
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/submodules/altera_std_synchronizer_nocut.v"
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/synthesis/submodules/altera_std_synchronizer_nocut.v"
        type="VERILOG"
        attributes="" />
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/submodules/altera_avalon_st_pipeline_base.v"
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/synthesis/submodules/altera_avalon_st_pipeline_base.v"
        type="VERILOG"
        attributes="" />
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/submodules/altera_avalon_st_idle_remover.v"
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/synthesis/submodules/altera_avalon_st_idle_remover.v"
        type="VERILOG"
        attributes="" />
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/submodules/altera_avalon_st_idle_inserter.v"
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/synthesis/submodules/altera_avalon_st_idle_inserter.v"
        type="VERILOG"
        attributes="" />
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/submodules/altera_avalon_st_pipeline_stage.sv"
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/synthesis/submodules/altera_avalon_st_pipeline_stage.sv"
        type="SYSTEM_VERILOG"
        attributes="" />
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/submodules/altera_avalon_st_jtag_interface.sdc"
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/synthesis/submodules/altera_avalon_st_jtag_interface.sdc"
        type="SDC"
        attributes="" />
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/submodules/platform_designer_system_jtag_master_timing_adt.sv"
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/synthesis/submodules/platform_designer_system_jtag_master_timing_adt.sv"
        type="SYSTEM_VERILOG"
        attributes="" />
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/submodules/altera_avalon_sc_fifo.v"
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/synthesis/submodules/altera_avalon_sc_fifo.v"
        type="VERILOG"
        attributes="" />
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/submodules/altera_avalon_st_bytes_to_packets.v"
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/synthesis/submodules/altera_avalon_st_bytes_to_packets.v"
        type="VERILOG"
        attributes="" />
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/submodules/altera_avalon_st_packets_to_bytes.v"
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/synthesis/submodules/altera_avalon_st_packets_to_bytes.v"
        type="VERILOG"
        attributes="" />
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/submodules/altera_avalon_packets_to_master.v"
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/synthesis/submodules/altera_avalon_packets_to_master.v"
        type="VERILOG"
        attributes="" />
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/submodules/platform_designer_system_jtag_master_b2p_adapter.sv"
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/synthesis/submodules/platform_designer_system_jtag_master_b2p_adapter.sv"
        type="SYSTEM_VERILOG"
        attributes="" />
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/submodules/platform_designer_system_jtag_master_p2b_adapter.sv"
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/synthesis/submodules/platform_designer_system_jtag_master_p2b_adapter.sv"
        type="SYSTEM_VERILOG"
        attributes="" />
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/submodules/altera_reset_controller.v"
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/synthesis/submodules/altera_reset_controller.v"
        type="VERILOG"
        attributes="" />
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/submodules/altera_reset_synchronizer.v"
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/synthesis/submodules/altera_reset_synchronizer.v"
        type="VERILOG"
        attributes="" />
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/submodules/altera_reset_controller.sdc"
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/synthesis/submodules/altera_reset_controller.sdc"
        type="SDC"
        attributes="" />
   </childGeneratedFiles>
@@ -540,47 +540,47 @@
   <parameter name="EXPORT_JTAG" value="0" />
   <generatedFiles>
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/submodules/altera_avalon_st_jtag_interface.v"
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/synthesis/submodules/altera_avalon_st_jtag_interface.v"
        type="VERILOG"
        attributes="" />
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/submodules/altera_jtag_dc_streaming.v"
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/synthesis/submodules/altera_jtag_dc_streaming.v"
        type="VERILOG"
        attributes="" />
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/submodules/altera_jtag_sld_node.v"
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/synthesis/submodules/altera_jtag_sld_node.v"
        type="VERILOG"
        attributes="" />
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/submodules/altera_jtag_streaming.v"
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/synthesis/submodules/altera_jtag_streaming.v"
        type="VERILOG"
        attributes="" />
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/submodules/altera_avalon_st_clock_crosser.v"
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/synthesis/submodules/altera_avalon_st_clock_crosser.v"
        type="VERILOG"
        attributes="" />
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/submodules/altera_std_synchronizer_nocut.v"
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/synthesis/submodules/altera_std_synchronizer_nocut.v"
        type="VERILOG"
        attributes="" />
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/submodules/altera_avalon_st_pipeline_base.v"
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/synthesis/submodules/altera_avalon_st_pipeline_base.v"
        type="VERILOG"
        attributes="" />
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/submodules/altera_avalon_st_idle_remover.v"
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/synthesis/submodules/altera_avalon_st_idle_remover.v"
        type="VERILOG"
        attributes="" />
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/submodules/altera_avalon_st_idle_inserter.v"
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/synthesis/submodules/altera_avalon_st_idle_inserter.v"
        type="VERILOG"
        attributes="" />
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/submodules/altera_avalon_st_pipeline_stage.sv"
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/synthesis/submodules/altera_avalon_st_pipeline_stage.sv"
        type="SYSTEM_VERILOG"
        attributes="" />
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/submodules/altera_avalon_st_jtag_interface.sdc"
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/synthesis/submodules/altera_avalon_st_jtag_interface.sdc"
        type="SDC"
        attributes="" />
   </generatedFiles>
@@ -622,7 +622,7 @@
   <parameter name="inUsePackets" value="false" />
   <generatedFiles>
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/submodules/platform_designer_system_jtag_master_timing_adt.sv"
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/synthesis/submodules/platform_designer_system_jtag_master_timing_adt.sv"
        type="SYSTEM_VERILOG"
        attributes="" />
   </generatedFiles>
@@ -649,7 +649,7 @@
   <parameter name="ENABLE_EXPLICIT_MAXCHANNEL" value="false" />
   <generatedFiles>
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/submodules/altera_avalon_sc_fifo.v"
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/synthesis/submodules/altera_avalon_sc_fifo.v"
        type="VERILOG"
        attributes="" />
   </generatedFiles>
@@ -679,7 +679,7 @@
   <parameter name="CHANNEL_WIDTH" value="8" />
   <generatedFiles>
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/submodules/altera_avalon_st_bytes_to_packets.v"
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/synthesis/submodules/altera_avalon_st_bytes_to_packets.v"
        type="VERILOG"
        attributes="" />
   </generatedFiles>
@@ -707,7 +707,7 @@
   <parameter name="CHANNEL_WIDTH" value="8" />
   <generatedFiles>
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/submodules/altera_avalon_st_packets_to_bytes.v"
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/synthesis/submodules/altera_avalon_st_packets_to_bytes.v"
        type="VERILOG"
        attributes="" />
   </generatedFiles>
@@ -736,7 +736,7 @@
   <parameter name="FIFO_DEPTHS" value="2" />
   <generatedFiles>
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/submodules/altera_avalon_packets_to_master.v"
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/synthesis/submodules/altera_avalon_packets_to_master.v"
        type="VERILOG"
        attributes="" />
   </generatedFiles>
@@ -774,7 +774,7 @@
   <parameter name="inUsePackets" value="true" />
   <generatedFiles>
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/submodules/platform_designer_system_jtag_master_b2p_adapter.sv"
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/synthesis/submodules/platform_designer_system_jtag_master_b2p_adapter.sv"
        type="SYSTEM_VERILOG"
        attributes="" />
   </generatedFiles>
@@ -812,7 +812,7 @@
   <parameter name="inUsePackets" value="true" />
   <generatedFiles>
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/submodules/platform_designer_system_jtag_master_p2b_adapter.sv"
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/synthesis/submodules/platform_designer_system_jtag_master_p2b_adapter.sv"
        type="SYSTEM_VERILOG"
        attributes="" />
   </generatedFiles>
@@ -837,15 +837,15 @@
    name="altera_reset_controller">
   <generatedFiles>
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/submodules/altera_reset_controller.v"
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/synthesis/submodules/altera_reset_controller.v"
        type="VERILOG"
        attributes="" />
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/submodules/altera_reset_synchronizer.v"
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/synthesis/submodules/altera_reset_synchronizer.v"
        type="VERILOG"
        attributes="" />
    <file
-       path="C:/Users/micha/Documents(Local)/Projects/tinyLPU/platform_designer_system/synthesis/submodules/altera_reset_controller.sdc"
+       path="C:/Users/micha/Documents(Local)/Projects/LPULite/platform_designer_system/synthesis/submodules/altera_reset_controller.sdc"
        type="SDC"
        attributes="" />
   </generatedFiles>

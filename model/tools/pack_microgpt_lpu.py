@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Pack the shipped MicroGPT INT8 checkpoint into TinyLPU 72-bit MEM1 rows.
+"""Pack the shipped MicroGPT INT8 checkpoint into LPULite 72-bit MEM1 rows.
 
 This tool performs no inference.  It preserves every deployed INT8 lane and
 its shared power-of-two scale from ``microgpt_weights_int8.json`` and writes a
@@ -18,6 +18,14 @@ DEFAULT_OUTPUT = ROOT / "model" / "artifacts" / "fpga_microgpt"
 MEM1_ROWS = 16384
 
 
+def portable_path(path: Path) -> str:
+    """Keep generated metadata independent of the checkout directory name."""
+    try:
+        return path.resolve().relative_to(ROOT.resolve()).as_posix()
+    except ValueError:
+        return path.as_posix()
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--checkpoint", type=Path, default=DEFAULT_CHECKPOINT)
@@ -25,8 +33,8 @@ def main() -> int:
     args = parser.parse_args()
 
     checkpoint = json.loads(args.checkpoint.read_text(encoding="utf-8"))
-    if checkpoint.get("format") != "tinylpu.microgpt.lpu_int8":
-        parser.error(f"not a TinyLPU MicroGPT INT8 checkpoint: {args.checkpoint}")
+    if checkpoint.get("format") != "lpulite.microgpt.lpu_int8":
+        parser.error(f"not a LPULite MicroGPT INT8 checkpoint: {args.checkpoint}")
     numeric = checkpoint.get("numeric_contract", {})
     if numeric.get("packed_row_bits") != 72 or numeric.get("lanes_per_block") != 8:
         parser.error("checkpoint does not use the required 8xINT8/72-bit LPU row format")
@@ -52,9 +60,9 @@ def main() -> int:
     image_path = args.output / "microgpt_mem1.hex"
     image_path.write_text("\n".join(f"{row:018X}" for row in rows) + "\n", encoding="ascii")
     manifest = {
-        "format": "tinylpu.microgpt.mem1-image",
+        "format": "lpulite.microgpt.mem1-image",
         "format_version": 1,
-        "checkpoint": str(args.checkpoint.resolve()),
+        "checkpoint": portable_path(args.checkpoint),
         "config": checkpoint["config"],
         "tokenizer": checkpoint["tokenizer"],
         "mem1_rows": len(rows),

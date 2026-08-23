@@ -25,7 +25,7 @@ module lut_softmax_exp #(
     logic signed [DW-1:0] z;
     assign z = -q / LN2;
 
-`ifdef TINYLPU_VXM_LOGIC_MULT
+`ifdef LPULITE_VXM_LOGIC_MULT
     (* multstyle = "logic" *) logic signed [DW-1:0] z_ln2;
 `else
     logic signed [DW-1:0] z_ln2;

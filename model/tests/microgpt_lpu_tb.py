@@ -1,4 +1,4 @@
-"""MicroGPT inference with every learned linear transform executed by TinyLPU RTL."""
+"""MicroGPT inference with every learned linear transform executed by LPULite RTL."""
 
 from __future__ import annotations
 

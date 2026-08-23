@@ -1,7 +1,7 @@
 set_module_property NAME lpu_de1_soc
 set_module_property VERSION 1.0
-set_module_property GROUP "TinyLPU"
-set_module_property DISPLAY_NAME "TinyLPU DE1-SoC Avalon wrapper"
+set_module_property GROUP "LPULite"
+set_module_property DISPLAY_NAME "LPULite DE1-SoC Avalon wrapper"
 set_module_property TOP_LEVEL_HDL_MODULE lpu_de1_soc_wrapper
 set_module_property INSTANTIATE_IN_SYSTEM_MODULE true
 

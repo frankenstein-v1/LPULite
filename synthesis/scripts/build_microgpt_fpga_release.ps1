@@ -24,7 +24,7 @@ function Invoke-Checked {
 }
 
 $repoPath = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
-$sofPath = Join-Path $repoPath "synthesis\build\tiny_lpu_de1_soc_hps\tiny_lpu_de1_soc_hps.sof"
+$sofPath = Join-Path $repoPath "synthesis\build\lpu_lite_de1_soc_hps\lpu_lite_de1_soc_hps.sof"
 
 Push-Location $repoPath
 try {
@@ -74,9 +74,9 @@ try {
                 -Arguments @(
                     "--flow",
                     "compile",
-                    "T:\synthesis\build\tiny_lpu_de1_soc_hps\tiny_lpu_de1_soc_hps"
+                    "T:\synthesis\build\lpu_lite_de1_soc_hps\lpu_lite_de1_soc_hps"
                 ) `
-                -Description "Compile the existing TinyLPU HPS Quartus project"
+                -Description "Compile the existing LPULite HPS Quartus project"
         } finally {
             if ($mappingCreated) {
                 & subst.exe T: /D

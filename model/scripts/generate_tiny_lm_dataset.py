@@ -3,7 +3,7 @@ import random
 from pathlib import Path
 import argparse
 
-parser = argparse.ArgumentParser(description="Tiny LPU LM Dataset Generator")
+parser = argparse.ArgumentParser(description="LPULite LM Dataset Generator")
 parser.add_argument("--vocab-size", type=int, default=256, help="Target vocabulary size (default: 256)")
 parser.add_argument("--out-dir", type=Path, default=Path(__file__).resolve().parents[1] / "datasets" / "tiny_lm", help="Output directory for dataset and vocab")
 args = parser.parse_args()
@@ -11,7 +11,7 @@ args = parser.parse_args()
 TARGET_VOCAB_SIZE = args.vocab_size
 
 # ============================================================
-# Tiny LPU LM Dataset Generator
+# LPULite LM Dataset Generator
 #
 # Creates:
 #   output/dataset_train.txt

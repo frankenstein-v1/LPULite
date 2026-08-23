@@ -25,15 +25,17 @@ model/stories260k/
 
 # Quartus bitstreams are release artifacts. Keep only the verified HPS image.
 *.sof
-!synthesis/build/tiny_lpu_de1_soc_hps/tiny_lpu_de1_soc_hps.sof
+!synthesis/build/lpu_lite_de1_soc_hps/lpu_lite_de1_soc_hps.sof
 
 # Local snapshots of Quartus compilation databases are large and reproducible.
+synthesis/build/**/db/
+synthesis/build/**/incremental_db/
 synthesis/build/**/db_pre_*/
 synthesis/build/**/incremental_db_pre_*/
 
 # One-off Quartus experiments and top-level compiler transcripts are disposable.
 synthesis/build/hps_scratch*/
-synthesis/build/tiny_lpu_de1_soc/
+synthesis/build/lpu_lite_de1_soc/
 synthesis/build/*.log
 
 # Historical Quartus outputs are retained locally when needed, not published.

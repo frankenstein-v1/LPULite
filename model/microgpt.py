@@ -258,7 +258,7 @@ for step in range(num_steps):
 # Save plain numeric matrices plus enough metadata to validate or load them in
 # another implementation. JSON keeps this tiny reference model dependency-free.
 checkpoint = {
-    'format': 'tinylpu.microgpt.weights',
+    'format': 'lpulite.microgpt.weights',
     'format_version': 1,
     'created_utc': datetime.now(timezone.utc).isoformat(),
     'config': {
@@ -326,7 +326,7 @@ def export_lpu_matrix(matrix):
     }
 
 lpu_checkpoint = {
-    'format': 'tinylpu.microgpt.lpu_int8',
+    'format': 'lpulite.microgpt.lpu_int8',
     'format_version': 1,
     'created_utc': checkpoint['created_utc'],
     'numeric_contract': {

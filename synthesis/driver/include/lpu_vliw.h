@@ -1,4 +1,4 @@
-/* Auto-generated TinyLPU VLIW Microcode Header */
+/* Auto-generated LPULite VLIW Microcode Header */
 #ifndef LPU_VLIW_H
 #define LPU_VLIW_H
 

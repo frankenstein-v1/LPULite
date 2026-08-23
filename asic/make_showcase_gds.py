@@ -4,7 +4,7 @@ import pya
 layout = pya.Layout()
 layout.dbu = 0.001
 
-top = layout.create_cell("tinylpu_showcase")
+top = layout.create_cell("lpulite_showcase")
 
 
 def box(layer, x1, y1, x2, y2):
@@ -85,4 +85,4 @@ for x1, y1, x2, y2 in [
 ]:
     box(72, x1, y1, x2, y2)
 
-layout.write("asic/tinylpu_showcase.gds")
+layout.write("asic/lpulite_showcase.gds")

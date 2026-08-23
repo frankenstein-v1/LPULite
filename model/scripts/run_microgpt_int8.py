@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run dependency-free CPU inference from the TinyLPU MicroGPT INT8 export."""
+"""Run dependency-free CPU inference from the LPULite MicroGPT INT8 export."""
 
 from __future__ import annotations
 
@@ -42,14 +42,14 @@ def softmax(values: list[float]) -> list[float]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="CPU simulation of TinyLPU MicroGPT INT8 inference")
+    parser = argparse.ArgumentParser(description="CPU simulation of LPULite MicroGPT INT8 inference")
     parser.add_argument("prompt", help="lowercase character prefix, for example: ken")
     parser.add_argument("--checkpoint", type=Path, default=DEFAULT_CHECKPOINT)
     args = parser.parse_args()
 
     checkpoint = json.loads(args.checkpoint.read_text(encoding="utf-8"))
-    if checkpoint.get("format") != "tinylpu.microgpt.lpu_int8":
-        parser.error("checkpoint is not a TinyLPU MicroGPT INT8 export")
+    if checkpoint.get("format") != "lpulite.microgpt.lpu_int8":
+        parser.error("checkpoint is not a LPULite MicroGPT INT8 export")
 
     config = checkpoint["config"]
     characters = checkpoint["tokenizer"]["characters"]

@@ -17,7 +17,7 @@ I have a directory of SystemVerilog design files inside `src/`:
 
 I want to compile the project entirely using Quartus command-line tools to save time. Please write a PowerShell or Bash automation script that does the following:
 
-1. **Creates a Quartus Project** named `tiny_lpu_de1_soc` targeting the `5CSEMA5F31C6N` chip.
+1. **Creates a Quartus Project** named `lpu_lite_de1_soc` targeting the `5CSEMA5F31C6N` chip.
 2. **Adds all `.sv` and `.v` files** in the `src/` directory to the project.
 3. **Sets `de1_soc_top.sv`** as the top-level entity (please write this simple wrapper file mapping `CLOCK_50` (PIN_AF14), `KEY[0]` (PIN_AJ4), and `LEDR[0]` (PIN_V16)).
 4. **Performs Pin Assignments** for the clock, reset key, and LED status pins.

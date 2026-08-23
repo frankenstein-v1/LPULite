@@ -1,6 +1,6 @@
-# TinyLPU ASIC showcase
+# LPULite ASIC showcase
 
-This directory turns the TinyLPU compute core into a SKY130 physical-design
+This directory turns the LPULite compute core into a SKY130 physical-design
 showcase targeting 100 MHz. It intentionally excludes the FPGA-specific
 DE1-SoC wrapper and preserves the architectural 8x8 MXM and 8-lane VXM.
 
@@ -67,7 +67,7 @@ Clone and build GDS3D, then pass the produced GDS to the launch helper:
 
 ```sh
 git clone https://github.com/trilomix/GDS3D.git ../GDS3D
-asic/render-gds3d.sh ../GDS3D /absolute/path/to/tinylpu_asic_top.gds
+asic/render-gds3d.sh ../GDS3D /absolute/path/to/lpulite_asic_top.gds
 ```
 
 The repository includes a legacy x86_64 macOS executable. Apple Silicon needs

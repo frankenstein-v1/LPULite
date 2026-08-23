@@ -3,7 +3,7 @@ module de1_soc_hps_top (
     input  logic [0:0]  KEY,
     output logic [0:0]  LEDR
 );
-    // TinyLPU currently does not close timing at the board 50 MHz clock.
+    // LPULite currently does not close timing at the board 50 MHz clock.
     // TimeQuest reports an LPU fabric Fmax of ~11 MHz, so run the entire
     // lightweight-HPS/LPU Platform Designer fabric at 50/8 = 6.25 MHz.
     logic [2:0] qsys_clk_div;

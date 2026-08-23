@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Cross-platform build script for TinyLPU C hardware driver.
+"""Cross-platform build script for LPULite C hardware driver.
 
 Automatically exports C headers and compiles synthesis/driver/lpu_driver.c
 using the best available C compiler on Windows/Linux (gcc, clang, cl, or wsl gcc).
@@ -75,7 +75,7 @@ def compile_c_driver():
 
 def main():
     print("\n========================================================================", flush=True)
-    print("        TINYLPU C HARDWARE DRIVER CROSS-PLATFORM BUILDER                ", flush=True)
+    print("        LPULITE C HARDWARE DRIVER CROSS-PLATFORM BUILDER                ", flush=True)
     print("========================================================================\n", flush=True)
     generate_headers()
     compile_c_driver()

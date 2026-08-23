@@ -1,5 +1,5 @@
 /*
- * TinyLPU Native C Hardware Driver Implementation
+ * LPULite Native C Hardware Driver Implementation
  * Executes 100% of LLM forward pass math on physical DE1-SoC Cyclone V FPGA fabric via MMIO.
  */
 
@@ -128,7 +128,7 @@ void lpu_load_program_and_weights(lpu_hardware_t *lpu) {
         ptr[1] = g_mem1_weights[row][1];
         ptr[2] = g_mem1_weights[row][2];
     }
-    printf("  [C HARDWARE READY]: TinyLPU initialization complete!\n");
+    printf("  [C HARDWARE READY]: LPULite initialization complete!\n");
 }
 
 uint32_t lpu_hardware_step(lpu_hardware_t *lpu, uint32_t last_token_id) {

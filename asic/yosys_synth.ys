@@ -1,7 +1,7 @@
-read_verilog -sv -D TINYLPU_USE_SKY130_SRAM -I src \
+read_verilog -sv -D LPULITE_USE_SKY130_SRAM -I src \
     src/lpu_pkg.sv \
     asic/src/sky130_sram_blackbox.v \
-    asic/src/tinylpu_sram_banks.sv \
+    asic/src/lpulite_sram_banks.sv \
     src/mac.sv \
     src/acc.sv \
     src/mxm.sv \
@@ -26,9 +26,9 @@ read_verilog -sv -D TINYLPU_USE_SKY130_SRAM -I src \
     src/eastbound_bus/eastbound_consumer_decode.sv \
     src/eastbound_bus/mxm_eastbound_adapter.sv \
     src/lpu.sv \
-    asic/src/tinylpu_asic_top.sv
+    asic/src/lpulite_asic_top.sv
 
-hierarchy -check -top tinylpu_asic_top
+hierarchy -check -top lpulite_asic_top
 flatten
 select -assert-count 30 t:sky130_sram_1kbyte_1rw1r_8x1024_8
 proc

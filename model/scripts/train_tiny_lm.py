@@ -8,7 +8,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 # ============================================================
-# Tiny LPU LM Training Script
+# LPULite LM Training Script
 # ============================================================
 
 # Default settings / configuration constants
@@ -447,7 +447,7 @@ if __name__ == "__main__":
     torch.manual_seed(SEED)
 
     import argparse
-    parser = argparse.ArgumentParser(description="Train Tiny LPU LM")
+    parser = argparse.ArgumentParser(description="Train LPULite LM")
     parser.add_argument("--preset", type=str, default="tiny", choices=["tiny", "stories10k", "stories260k", "stories288k_lpu", "qa476k_lpu"], help="Preset configuration")
     parser.add_argument("--dim", type=int, default=None)
     parser.add_argument("--ffn-dim", type=int, default=None)

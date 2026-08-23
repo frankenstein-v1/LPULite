@@ -1,5 +1,5 @@
 /*
- * TinyLPU Native C USB JTAG Hardware Runner
+ * LPULite Native C USB JTAG Hardware Runner
  * Communicates with the physical DE1-SoC Cyclone V FPGA over the USB-Blaster II cable directly from C.
  * 100% of LLM forward pass math executes on physical FPGA hardware DSP blocks & ALMs!
  */
@@ -16,7 +16,7 @@
 
 #define SYSTEM_CONSOLE_PATH "C:/altera_lite/25.1std/quartus/sopc_builder/bin/system-console.exe"
 #define QUARTUS_PGM_PATH    "C:/altera_lite/25.1std/quartus/bin64/quartus_pgm.exe"
-#define SOF_PATH            "synthesis/build/tiny_lpu_de1_soc/tiny_lpu_de1_soc.sof"
+#define SOF_PATH            "synthesis/build/lpu_lite_de1_soc/lpu_lite_de1_soc.sof"
 
 // Run System Console TCL script over USB JTAG
 static int run_tcl_script(const char *tcl_code, char *output_buf, size_t buf_size) {

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run a long TinyLPU VLIW image over JTAG without changing LPU RTL.
+"""Run a long LPULite VLIW image over JTAG without changing LPU RTL.
 
 The synthesized DE1-SoC image has a 1024-word IMEM.  This utility executes a
 long, statically compiled program as fixed-size pages: model/scratch SRAM is
@@ -97,24 +97,24 @@ def build_tcl(mem1_rows: list[int], program: list[int], page_size: int, cycle_pa
     for row, value in enumerate(mem1_rows):
         append_row_writes(lines, MEM1_BASE, row, value)
     for page_index, page in enumerate(pages(program, page_size)):
-        lines.append(f"puts \"TINY_LPU_PAGE_BEGIN:{page_index}\"")
+        lines.append(f"puts \"LPU_LITE_PAGE_BEGIN:{page_index}\"")
         append_page(lines, page, cycle_padding_ms)
-        lines.append(f"puts \"TINY_LPU_PAGE_DONE:{page_index}\"")
-    lines += ["close_service master $m", "puts \"TINY_LPU_PAGED_RUN_DONE\""]
+        lines.append(f"puts \"LPU_LITE_PAGE_DONE:{page_index}\"")
+    lines += ["close_service master $m", "puts \"LPU_LITE_PAGED_RUN_DONE\""]
     return "\n".join(lines) + "\n"
 
 
 def run_system_console(system_console: Path, tcl: str) -> str:
     if not system_console.is_file():
         raise JtagPagerError(f"System Console was not found: {system_console}")
-    with tempfile.TemporaryDirectory(prefix="tinylpu-jtag-") as directory:
+    with tempfile.TemporaryDirectory(prefix="lpulite-jtag-") as directory:
         script = Path(directory) / "paged_run.tcl"
         script.write_text(tcl, encoding="ascii")
         completed = subprocess.run(
             [str(system_console), f"--script={script}"], text=True,
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=False,
         )
-    if completed.returncode != 0 or "TINY_LPU_PAGED_RUN_DONE" not in completed.stdout:
+    if completed.returncode != 0 or "LPU_LITE_PAGED_RUN_DONE" not in completed.stdout:
         raise JtagPagerError(f"System Console paged run failed:\n{completed.stdout}")
     return completed.stdout
 

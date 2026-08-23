@@ -1,12 +1,12 @@
-# TinyLPU
+# LPULite
 
-TinyLPU is an 8-lane INT8 language-processing accelerator designed from
+LPULite is an 8-lane INT8 language-processing accelerator designed from
 scratch and demonstrated on the Intel/Altera DE1-SoC FPGA. The completed
 system runs a compiled character-level MicroGPT forward pass through the LPU,
 including RMSNorm, transformer matrix multiplications, causal attention,
 softmax, residual connections, the MLP, and the language-model head.
 
-Read the illustrated project article at **[LPU Lite](https://www.lpulite.com/)**.
+Read the illustrated project article at **[LPULite](https://www.lpulite.com/)**.
 
 Created by **Michael Trbovic**, **Saksham Batra**, and **Arjun Harinath**.
 
@@ -29,8 +29,8 @@ The FPGA demonstration is complete and working:
 The committed release bitstream is:
 
 ```text
-synthesis/build/tiny_lpu_de1_soc_hps/tiny_lpu_de1_soc_hps.sof
-SHA-256: 12AF29D5F557E933FC112FF874403131F23D14AD048A284ACFFA284869333A4A
+synthesis/build/lpu_lite_de1_soc_hps/lpu_lite_de1_soc_hps.sof
+SHA-256: 8102D2F0DFEE19AC8F49AC1335D4AB93A9914107E071829572B7188DE692D02B
 ```
 
 The demo checkpoint is trained for character-level name completion. Its
@@ -176,11 +176,11 @@ python -m pytest model/tests/test_tokenizer.py model/tests/test_lm_shift.py
 
 | Path | Purpose |
 | --- | --- |
-| `src/` | Synthesizable TinyLPU SystemVerilog: ICU, memories, buses, MXM, SXM, and VXM. |
+| `src/` | Synthesizable LPULite SystemVerilog: ICU, memories, buses, MXM, SXM, and VXM. |
 | `tb/` | Unit and core RTL testbenches. |
 | `model/` | MicroGPT training, datasets, checkpoints, INT8 inference, compiler, and generated model artifacts. |
 | `synthesis/` | DE1-SoC wrapper RTL, Quartus project, Linux runtime, drivers, FPGA tests, scripts, and documentation. |
-| `synthesis/build/tiny_lpu_de1_soc_hps/` | Completed HPS Quartus project and verified release bitstream. |
+| `synthesis/build/lpu_lite_de1_soc_hps/` | Completed HPS Quartus project and verified release bitstream. |
 | `asic/` | SKY130/OpenLane synthesis and physical-design experiments. |
 | `archive/` | Historical implementations retained for reference. |
 | `misc/` | Supporting utilities and project notes. |
@@ -197,4 +197,4 @@ python -m pytest model/tests/test_tokenizer.py model/tests/test_lm_shift.py
 
 ## License
 
-TinyLPU is available under the [Apache License 2.0](LICENSE).
+LPULite is available under the [Apache License 2.0](LICENSE).

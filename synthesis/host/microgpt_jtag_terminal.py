@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Interactive MicroGPT runner for the DE1-SoC TinyLPU over USB JTAG.
+"""Interactive MicroGPT runner for the DE1-SoC LPULite over USB JTAG.
 
 This is a host terminal around the existing JTAG-to-Avalon bridge.  It does
 not use UART and it does not modify the FPGA design.  Tensor-heavy stages are
@@ -122,7 +122,7 @@ def build_session_tcl(body: list[str]) -> str:
 def run_system_console(system_console: Path, tcl: str, timeout: int = 120) -> str:
     if not system_console.is_file():
         raise MicroGPTJTAGError(f"System Console was not found: {system_console}")
-    with tempfile.TemporaryDirectory(prefix="tinylpu-microgpt-") as directory:
+    with tempfile.TemporaryDirectory(prefix="lpulite-microgpt-") as directory:
         script = Path(directory) / "microgpt_jtag.tcl"
         script.write_text(tcl, encoding="ascii")
         completed = subprocess.run(

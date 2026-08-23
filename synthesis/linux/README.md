@@ -1,6 +1,6 @@
-# TinyLPU MicroGPT on DE1-SoC HPS Linux
+# LPULite MicroGPT on DE1-SoC HPS Linux
 
-This directory contains the ARM/Linux userspace runtime for driving the TinyLPU
+This directory contains the ARM/Linux userspace runtime for driving the LPULite
 through the DE1-SoC HPS-to-FPGA lightweight bridge instead of USB-JTAG/System
 Console.
 
@@ -15,7 +15,7 @@ The runtime uses the same generated model artifacts as the JTAG testbench:
 
 ## Files
 
-- `src/tinylpu_hps_mmio.c` / `include/tinylpu_hps_mmio.h`:
+- `src/lpulite_hps_mmio.c` / `include/lpulite_hps_mmio.h`:
   `/dev/mem` MMIO driver for the lightweight bridge.
 - `src/microgpt_hps_runtime.c`:
   interactive char-level MicroGPT terminal.
@@ -30,7 +30,7 @@ The Terasic Linux image does not include GCC. Build a static ARMv7 hard-float
 binary from the WSL terminal, then copy it to the board:
 
 ```sh
-cd "/mnt/c/Users/micha/Documents(Local)/Projects/tinyLPU/synthesis/linux"
+cd "/mnt/c/Users/micha/Documents(Local)/Projects/LPULite/synthesis/linux"
 make clean
 make CC=arm-linux-gnueabihf-gcc LDFLAGS=-static
 ```
@@ -38,7 +38,7 @@ make CC=arm-linux-gnueabihf-gcc LDFLAGS=-static
 From Windows PowerShell:
 
 ```powershell
-scp "C:\Users\micha\Documents(Local)\Projects\tinyLPU\synthesis\linux\microgpt_hps_runtime" root@192.168.1.101:/home/root/linux/
+scp "C:\Users\micha\Documents(Local)\Projects\LPULite\synthesis\linux\microgpt_hps_runtime" root@192.168.1.101:/home/root/linux/
 ```
 
 Then run on the board:
@@ -148,7 +148,7 @@ Two otherwise attractive optimizations are outside the software-only scope:
 
 ## Required FPGA address map
 
-The Linux runtime expects the TinyLPU Avalon wrapper to appear in the
+The Linux runtime expects the LPULite Avalon wrapper to appear in the
 lightweight bridge window with this internal map:
 
 | Offset | Region |
@@ -177,4 +177,4 @@ Windows/System Console testbench, but ARM Linux cannot use it as `/dev/mem`.
 
 For this runtime, the Platform Designer system must expose the HPS lightweight
 AXI/Avalon master to the same `lpu_de1_soc_wrapper` Avalon slave. This changes
-the board integration around the LPU, not the TinyLPU compute core.
+the board integration around the LPU, not the LPULite compute core.

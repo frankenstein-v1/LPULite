@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Host-side MicroGPT testbench that drives TinyLPU over JTAG.
+"""Host-side MicroGPT testbench that drives LPULite over JTAG.
 
 This is intentionally a testbench/runtime, not a compiler.  It treats the FPGA
 as an accelerator with visible SRAMs and drives it through Intel System Console:

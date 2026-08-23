@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compile the shipped INT8 MicroGPT checkpoint into a static TinyLPU schedule.
+"""Compile the shipped INT8 MicroGPT checkpoint into a static LPULite schedule.
 
 This compiler does not change the LPU RTL.  It targets the current DE1-SoC
 image by emitting one long 96-bit VLIW stream that is meant to be executed by
@@ -50,6 +50,14 @@ from lpu_vliw_compiler import (  # noqa: E402
     WC_VXM,
     build_instruction,
 )
+
+
+def portable_path(path: Path) -> str:
+    """Keep generated metadata independent of the checkout directory name."""
+    try:
+        return path.resolve().relative_to(ROOT.resolve()).as_posix()
+    except ValueError:
+        return path.as_posix()
 
 
 VXM_OPERAND_DATA = 0
@@ -759,8 +767,8 @@ def main() -> int:
         parser.error(f"--page-size must be in 1..{IMEM_WORDS}")
 
     checkpoint = json.loads(args.checkpoint.read_text(encoding="utf-8"))
-    if checkpoint.get("format") != "tinylpu.microgpt.lpu_int8":
-        parser.error(f"not a TinyLPU MicroGPT INT8 checkpoint: {args.checkpoint}")
+    if checkpoint.get("format") != "lpulite.microgpt.lpu_int8":
+        parser.error(f"not a LPULite MicroGPT INT8 checkpoint: {args.checkpoint}")
     config = checkpoint["config"]
     expected = {"n_layer": 1, "n_embd": 16, "block_size": 16, "n_head": 4, "vocab_size": 27}
     if config != expected:
@@ -794,19 +802,19 @@ def main() -> int:
         "no attention dot products or weighted sums are calculated by the ARM in fpga-mxm mode",
     ]
     manifest = {
-        "format": "tinylpu.microgpt.static-paged-schedule",
+        "format": "lpulite.microgpt.static-paged-schedule",
         "format_version": 1,
-        "checkpoint": str(args.checkpoint.resolve()),
+        "checkpoint": portable_path(args.checkpoint),
         "config": config,
         "tokenizer": checkpoint["tokenizer"],
         "imem": {
-            "path": str(imem_path.resolve()),
+            "path": portable_path(imem_path),
             "instructions": len(schedule.instructions),
             "page_size": args.page_size,
             "pages": split_pages(schedule.instructions, args.page_size),
         },
         "mem1": {
-            "path": str(mem1_path.resolve()),
+            "path": portable_path(mem1_path),
             "rows": len(mem1.rows),
             "symbols": mem1.symbols,
         },
@@ -829,11 +837,11 @@ def main() -> int:
         },
         "microkernels": {
             "softmax": {
-                "path": str(softmax_path.resolve()),
+                "path": portable_path(softmax_path),
                 "instructions": len(softmax_kernel.instructions),
             },
             "attention": {
-                "path": str(attention_path.resolve()),
+                "path": portable_path(attention_path),
                 "instructions": len(attention_kernel.instructions),
                 "sections": attention_sections,
                 "mem1_k_transpose_stage_rows": [Scratch.ATTN_KT_STAGE, Scratch.ATTN_KT_STAGE + 7],
@@ -843,7 +851,8 @@ def main() -> int:
         "limitations": limitations,
         "run_hint": (
             "python synthesis/host/lpu_jtag_pager.py "
-            f"--mem1 {mem1_path} --imem {imem_path} --page-size {args.page_size}"
+            f"--mem1 {portable_path(mem1_path)} --imem {portable_path(imem_path)} "
+            f"--page-size {args.page_size}"
         ),
     }
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")

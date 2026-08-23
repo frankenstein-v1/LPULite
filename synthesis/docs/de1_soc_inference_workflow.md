@@ -1,6 +1,6 @@
-# DE1-SoC JTAG Inference Workflow: TinyLPU Accelerator
+# DE1-SoC JTAG Inference Workflow: LPULite Accelerator
 
-This guide provides a comprehensive, step-by-step workflow to synthesize, deploy, and run inference using your **TinyLPU** accelerator on the **Terasic DE1-SoC** (Cyclone V) board. 
+This guide provides a comprehensive, step-by-step workflow to synthesize, deploy, and run inference using your **LPULite** accelerator on the **Terasic DE1-SoC** (Cyclone V) board.
 
 By utilizing a **JTAG-to-Avalon Master Bridge**, you can communicate with your design, load weights/prompt activations, trigger inference, and retrieve output logits directly from your host PC over the USB-Blaster II interface—**entirely bypassing the need for an SD card or booting Linux on the ARM cores**.
 
@@ -21,7 +21,7 @@ graph LR
         D -->|Avalon-MM Master Address Bus| E[LPU Register Controller]
         D -->|Write/Read Access| F[MEM0 - Activations / Output Data]
         D -->|Write Access| G[MEM1 - Quantized Weights]
-        E -->|Control Signals| H[TinyLPU Core Accelerator]
+        E -->|Control Signals| H[LPULite Core Accelerator]
         H <--> F
         H <--> G
     end
@@ -31,7 +31,7 @@ graph LR
 
 ## Phase 1: Platform Designer (Qsys) Integration
 
-Intel Platform Designer is used to build the interconnect system mapping the JTAG Bridge to your TinyLPU hardware memory addresses.
+Intel Platform Designer is used to build the interconnect system mapping the JTAG Bridge to your LPULite hardware memory addresses.
 
 1. Open **Quartus Prime Lite 18.1** and load your project.
 2. Launch Platform Designer under **Tools > Platform Designer**.
@@ -40,7 +40,7 @@ Intel Platform Designer is used to build the interconnect system mapping the JTA
    * **JTAG to Avalon Master Bridge** (under *Decoder/Interconnect/Bridges*).
    * **LPU Wrapper IP** (wrap your `lpu.sv` control signals and SRAM buses inside Avalon-MM Slaves).
 4. Connect the ports of the **JTAG Bridge master** to the slave ports of your memory segments:
-   * Connect `master.instruction_sender` / `avalon_master` to your **TinyLPU Address Space**.
+   * Connect `master.instruction_sender` / `avalon_master` to your **LPULite Address Space**.
 5. Set the Address Map offsets:
    * **LPU Registers (Ctrl/Status):** `0x0000_0000` (Range: 64 bytes)
    * **MEM0 (Input/Output SRAM):** `0x0001_0000` (Range: 8KB/16KB depending on your packaging width)

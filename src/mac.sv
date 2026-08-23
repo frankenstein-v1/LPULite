@@ -40,7 +40,7 @@ module mac #(
     output logic signed [PRODUCT_W-1:0] product_o
 );
 
-`ifdef TINYLPU_MXM_MAC_LOGIC_MULT
+`ifdef LPULITE_MXM_MAC_LOGIC_MULT
     (* multstyle = "logic" *) logic signed [PRODUCT_W-1:0] product;
 `else
     logic signed [PRODUCT_W-1:0] product;
@@ -154,7 +154,7 @@ module int_mac (
     logic              weight_is_signed_reg;
     logic signed [8:0] input_ext;
     logic signed [8:0] weight_ext;
-`ifdef TINYLPU_MXM_MAC_LOGIC_MULT
+`ifdef LPULITE_MXM_MAC_LOGIC_MULT
     (* multstyle = "logic" *) logic signed [19:0] product_next;
 `else
     logic signed [19:0] product_next;

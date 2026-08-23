@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Edit these if your repo default branch differs
-REMOTE_URL="https://github.com/sakshambatra1/tinyLPU.git"
+REMOTE_URL="https://github.com/sakshambatra1/LPULite.git"
 BRANCH="main"
 
 cd "$(cd "$(dirname "$0")/.." && pwd)"

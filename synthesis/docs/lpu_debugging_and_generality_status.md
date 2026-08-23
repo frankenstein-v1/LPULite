@@ -1,4 +1,4 @@
-# TinyLPU debugging changes and general-purpose status
+# LPULite debugging changes and general-purpose status
 
 Date: 2026-08-12
 

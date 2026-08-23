@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build helper for the DE1-SoC HPS/Linux TinyLPU runtime."""
+"""Build helper for the DE1-SoC HPS/Linux LPULite runtime."""
 from __future__ import annotations
 
 import argparse

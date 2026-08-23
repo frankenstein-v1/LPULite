@@ -1,4 +1,0 @@
-QUARTUS_VERSION = "25.1"
-DATE = "August 9, 2026"
-
-PROJECT_REVISION = "tiny_lpu_de1_soc_hps"

@@ -1,4 +1,4 @@
-#include "tinylpu_hps_mmio.h"
+#include "lpulite_hps_mmio.h"
 #include "microgpt_hps_image.h"
 
 #include <ctype.h>
@@ -54,14 +54,14 @@ typedef struct {
  * LPU data path; these rows only provide the already-observed packed values
  * needed while ARM lays out the next resident attention invocation.
  */
-static tinylpu_mmio_row_t g_k_cache[MICROGPT_BLOCK_SIZE][MICROGPT_ROWS_PER_VEC];
-static tinylpu_mmio_row_t g_v_cache[MICROGPT_BLOCK_SIZE][MICROGPT_ROWS_PER_VEC];
+static lpulite_mmio_row_t g_k_cache[MICROGPT_BLOCK_SIZE][MICROGPT_ROWS_PER_VEC];
+static lpulite_mmio_row_t g_v_cache[MICROGPT_BLOCK_SIZE][MICROGPT_ROWS_PER_VEC];
 static bool g_kv_valid[MICROGPT_BLOCK_SIZE];
 
 /* Shadow the physical 1024-row IMEM so repeated NOPs/unchanged rows are not
  * retransmitted over the lightweight bridge. */
-static tinylpu_mmio_row_t g_imem_shadow[TINYLPU_IMEM_ROWS];
-static bool g_imem_shadow_valid[TINYLPU_IMEM_ROWS];
+static lpulite_mmio_row_t g_imem_shadow[LPULITE_IMEM_ROWS];
+static bool g_imem_shadow_valid[LPULITE_IMEM_ROWS];
 static uint64_t g_imem_rows_considered;
 static uint64_t g_imem_rows_written;
 
@@ -115,12 +115,12 @@ static void print_benchmark(
 }
 
 static void print_mmio_benchmark(
-    const tinylpu_mmio_t *dev,
-    tinylpu_mmio_stats_t before,
+    const lpulite_mmio_t *dev,
+    lpulite_mmio_stats_t before,
     uint64_t imem_considered_before,
     uint64_t imem_written_before
 ) {
-    const tinylpu_mmio_stats_t after = tinylpu_mmio_get_stats(dev);
+    const lpulite_mmio_stats_t after = lpulite_mmio_get_stats(dev);
     const uint64_t considered = g_imem_rows_considered - imem_considered_before;
     const uint64_t written = g_imem_rows_written - imem_written_before;
     fprintf(stderr,
@@ -140,8 +140,8 @@ static char token_char(int token_id);
 static bool is_target_name(const char *text);
 static bool target_has_prefix(const char *text);
 
-static tinylpu_mmio_row_t as_mmio_row(tinylpu_row96_t row) {
-    tinylpu_mmio_row_t out = {row.w0, row.w1, row.w2};
+static lpulite_mmio_row_t as_mmio_row(lpulite_row96_t row) {
+    lpulite_mmio_row_t out = {row.w0, row.w1, row.w2};
     return out;
 }
 
@@ -150,7 +150,7 @@ static int8_t s8(uint32_t value) {
     return (int8_t)byte;
 }
 
-static void unpack_row(tinylpu_mmio_row_t row, int8_t lanes[MICROGPT_LANES], int8_t *scale) {
+static void unpack_row(lpulite_mmio_row_t row, int8_t lanes[MICROGPT_LANES], int8_t *scale) {
     uint64_t packed = (uint64_t)row.w0 | ((uint64_t)row.w1 << 32);
     for (int lane = 0; lane < MICROGPT_LANES; ++lane) {
         lanes[lane] = s8((uint32_t)(packed >> (lane * 8)));
@@ -158,7 +158,7 @@ static void unpack_row(tinylpu_mmio_row_t row, int8_t lanes[MICROGPT_LANES], int
     *scale = s8(row.w2);
 }
 
-static void row_to_vector(const tinylpu_mmio_row_t rows[MICROGPT_ROWS_PER_VEC], double vec[MICROGPT_N_EMBD]) {
+static void row_to_vector(const lpulite_mmio_row_t rows[MICROGPT_ROWS_PER_VEC], double vec[MICROGPT_N_EMBD]) {
     for (int r = 0; r < MICROGPT_ROWS_PER_VEC; ++r) {
         int8_t lanes[MICROGPT_LANES];
         int8_t scale;
@@ -169,7 +169,7 @@ static void row_to_vector(const tinylpu_mmio_row_t rows[MICROGPT_ROWS_PER_VEC], 
     }
 }
 
-static tinylpu_mmio_row_t pack_float_row(const double *values, int count) {
+static lpulite_mmio_row_t pack_float_row(const double *values, int count) {
     double absmax = 0.0;
     for (int i = 0; i < count; ++i) {
         double v = fabs(values[i]);
@@ -197,7 +197,7 @@ static tinylpu_mmio_row_t pack_float_row(const double *values, int count) {
         packed |= ((uint64_t)((uint8_t)((int8_t)q))) << (i * 8);
     }
 
-    tinylpu_mmio_row_t row = {
+    lpulite_mmio_row_t row = {
         (uint32_t)(packed & 0xFFFFFFFFu),
         (uint32_t)(packed >> 32),
         (uint32_t)((uint8_t)((int8_t)scale)),
@@ -205,7 +205,7 @@ static tinylpu_mmio_row_t pack_float_row(const double *values, int count) {
     return row;
 }
 
-static tinylpu_mmio_row_t pack_float_row_at_scale(
+static lpulite_mmio_row_t pack_float_row_at_scale(
     const double *values,
     int count,
     int scale
@@ -223,7 +223,7 @@ static tinylpu_mmio_row_t pack_float_row_at_scale(
         }
         packed |= ((uint64_t)((uint8_t)((int8_t)q))) << (lane * 8);
     }
-    tinylpu_mmio_row_t row = {
+    lpulite_mmio_row_t row = {
         (uint32_t)(packed & 0xFFFFFFFFu),
         (uint32_t)(packed >> 32),
         (uint32_t)((uint8_t)((int8_t)scale)),
@@ -231,12 +231,12 @@ static tinylpu_mmio_row_t pack_float_row_at_scale(
     return row;
 }
 
-static tinylpu_mmio_row_t pack_quant_row(const int8_t lanes[MICROGPT_LANES], int8_t scale) {
+static lpulite_mmio_row_t pack_quant_row(const int8_t lanes[MICROGPT_LANES], int8_t scale) {
     uint64_t packed = 0;
     for (int lane = 0; lane < MICROGPT_LANES; ++lane) {
         packed |= ((uint64_t)((uint8_t)lanes[lane])) << (lane * 8);
     }
-    tinylpu_mmio_row_t row = {
+    lpulite_mmio_row_t row = {
         (uint32_t)(packed & 0xFFFFFFFFu),
         (uint32_t)(packed >> 32),
         (uint32_t)((uint8_t)scale),
@@ -244,17 +244,17 @@ static tinylpu_mmio_row_t pack_quant_row(const int8_t lanes[MICROGPT_LANES], int
     return row;
 }
 
-static bool rows_equal(tinylpu_mmio_row_t lhs, tinylpu_mmio_row_t rhs) {
+static bool rows_equal(lpulite_mmio_row_t lhs, lpulite_mmio_row_t rhs) {
     return lhs.w0 == rhs.w0 && lhs.w1 == rhs.w1 && lhs.w2 == rhs.w2;
 }
 
 static size_t load_imem_cached(
-    tinylpu_mmio_t *dev,
-    const tinylpu_mmio_row_t *rows,
+    lpulite_mmio_t *dev,
+    const lpulite_mmio_row_t *rows,
     size_t count
 ) {
-    if (count > TINYLPU_IMEM_ROWS) {
-        count = TINYLPU_IMEM_ROWS;
+    if (count > LPULITE_IMEM_ROWS) {
+        count = LPULITE_IMEM_ROWS;
     }
     size_t written = 0;
     size_t index = 0;
@@ -273,9 +273,9 @@ static size_t load_imem_cached(
         if (index == first) {
             continue;
         }
-        tinylpu_write_rows(
+        lpulite_write_rows(
             dev,
-            TINYLPU_IMEM_OFFSET,
+            LPULITE_IMEM_OFFSET,
             (uint32_t)first,
             &rows[first],
             index - first
@@ -294,8 +294,8 @@ static size_t load_imem_cached(
 }
 
 static void expand_broadcast_row(
-    tinylpu_mmio_row_t source,
-    tinylpu_mmio_row_t broadcast[MICROGPT_LANES]
+    lpulite_mmio_row_t source,
+    lpulite_mmio_row_t broadcast[MICROGPT_LANES]
 ) {
     int8_t lanes[MICROGPT_LANES];
     int8_t scale;
@@ -309,50 +309,50 @@ static void expand_broadcast_row(
     }
 }
 
-static void stage_broadcast_row(tinylpu_mmio_t *dev, uint32_t src_row, uint32_t dst_base) {
-    const tinylpu_mmio_row_t source = tinylpu_read_row(
+static void stage_broadcast_row(lpulite_mmio_t *dev, uint32_t src_row, uint32_t dst_base) {
+    const lpulite_mmio_row_t source = lpulite_read_row(
         dev,
-        TINYLPU_MEM0_OFFSET,
+        LPULITE_MEM0_OFFSET,
         src_row
     );
-    tinylpu_mmio_row_t broadcast[MICROGPT_LANES];
+    lpulite_mmio_row_t broadcast[MICROGPT_LANES];
     expand_broadcast_row(source, broadcast);
-    tinylpu_write_rows(
+    lpulite_write_rows(
         dev,
-        TINYLPU_MEM0_OFFSET,
+        LPULITE_MEM0_OFFSET,
         dst_base,
         broadcast,
         MICROGPT_LANES
     );
 }
 
-static void stage_broadcast_pair(tinylpu_mmio_t *dev, uint32_t src_row0, uint32_t src_row1, uint32_t dst_base) {
-    tinylpu_mmio_row_t source[2];
+static void stage_broadcast_pair(lpulite_mmio_t *dev, uint32_t src_row0, uint32_t src_row1, uint32_t dst_base) {
+    lpulite_mmio_row_t source[2];
     if (src_row1 == src_row0 + 1u) {
-        tinylpu_read_rows(
+        lpulite_read_rows(
             dev,
-            TINYLPU_MEM0_OFFSET,
+            LPULITE_MEM0_OFFSET,
             src_row0,
             source,
             2u
         );
     } else {
-        source[0] = tinylpu_read_row(dev, TINYLPU_MEM0_OFFSET, src_row0);
-        source[1] = tinylpu_read_row(dev, TINYLPU_MEM0_OFFSET, src_row1);
+        source[0] = lpulite_read_row(dev, LPULITE_MEM0_OFFSET, src_row0);
+        source[1] = lpulite_read_row(dev, LPULITE_MEM0_OFFSET, src_row1);
     }
-    tinylpu_mmio_row_t broadcast[MICROGPT_ROWS_PER_VEC * MICROGPT_LANES];
+    lpulite_mmio_row_t broadcast[MICROGPT_ROWS_PER_VEC * MICROGPT_LANES];
     expand_broadcast_row(source[0], &broadcast[0]);
     expand_broadcast_row(source[1], &broadcast[MICROGPT_LANES]);
-    tinylpu_write_rows(
+    lpulite_write_rows(
         dev,
-        TINYLPU_MEM0_OFFSET,
+        LPULITE_MEM0_OFFSET,
         dst_base,
         broadcast,
         MICROGPT_ROWS_PER_VEC * MICROGPT_LANES
     );
 }
 
-static void vector_to_rows(const double vec[MICROGPT_N_EMBD], tinylpu_mmio_row_t rows[MICROGPT_ROWS_PER_VEC]) {
+static void vector_to_rows(const double vec[MICROGPT_N_EMBD], lpulite_mmio_row_t rows[MICROGPT_ROWS_PER_VEC]) {
     for (int r = 0; r < MICROGPT_ROWS_PER_VEC; ++r) {
         rows[r] = pack_float_row(&vec[r * MICROGPT_LANES], MICROGPT_LANES);
     }
@@ -375,20 +375,20 @@ static void softmax(const double *scores, int count, double *weights) {
     }
 }
 
-static void load_mem1(tinylpu_mmio_t *dev, bool verbose) {
-    tinylpu_mmio_row_t rows[MICROGPT_MEM1_ROWS];
+static void load_mem1(lpulite_mmio_t *dev, bool verbose) {
+    lpulite_mmio_row_t rows[MICROGPT_MEM1_ROWS];
     for (uint32_t row = 0; row < MICROGPT_MEM1_ROWS; ++row) {
         rows[row] = as_mmio_row(g_microgpt_mem1[row]);
     }
-    tinylpu_write_rows(dev, TINYLPU_MEM1_OFFSET, 0u, rows, MICROGPT_MEM1_ROWS);
+    lpulite_write_rows(dev, LPULITE_MEM1_OFFSET, 0u, rows, MICROGPT_MEM1_ROWS);
     if (verbose) {
         fprintf(stderr, "[mem1] row %u/%u\n", MICROGPT_MEM1_ROWS, MICROGPT_MEM1_ROWS);
         fflush(stderr);
     }
 }
 
-static void clear_runtime_state(tinylpu_mmio_t *dev, bool verbose) {
-    tinylpu_mmio_row_t zero = {0, 0, 0};
+static void clear_runtime_state(lpulite_mmio_t *dev, bool verbose) {
+    lpulite_mmio_row_t zero = {0, 0, 0};
     if (verbose) {
         fprintf(stderr, "[reset] initialize causal masks and inactive attention staging\n");
         fflush(stderr);
@@ -398,68 +398,68 @@ static void clear_runtime_state(tinylpu_mmio_t *dev, bool verbose) {
      * whose inactive positions are deliberately not rewritten each step. */
     int8_t masked_lanes[MICROGPT_LANES];
     for (int lane = 0; lane < MICROGPT_LANES; ++lane) masked_lanes[lane] = -127;
-    const tinylpu_mmio_row_t masked = pack_quant_row(masked_lanes, 0);
-    tinylpu_fill_rows(
-        dev, TINYLPU_MEM0_OFFSET, MICROGPT_SOFTMAX_IN_BASE, masked, MICROGPT_BLOCK_SIZE
+    const lpulite_mmio_row_t masked = pack_quant_row(masked_lanes, 0);
+    lpulite_fill_rows(
+        dev, LPULITE_MEM0_OFFSET, MICROGPT_SOFTMAX_IN_BASE, masked, MICROGPT_BLOCK_SIZE
     );
-    tinylpu_fill_rows(
-        dev, TINYLPU_MEM0_OFFSET, MICROGPT_MEM0_ATTN_PV_PROB_BASE, zero, MICROGPT_BLOCK_SIZE
+    lpulite_fill_rows(
+        dev, LPULITE_MEM0_OFFSET, MICROGPT_MEM0_ATTN_PV_PROB_BASE, zero, MICROGPT_BLOCK_SIZE
     );
-    tinylpu_fill_rows(
-        dev, TINYLPU_MEM1_OFFSET, MICROGPT_MEM1_ATTN_KT_STAGE_BASE, zero, 8u
+    lpulite_fill_rows(
+        dev, LPULITE_MEM1_OFFSET, MICROGPT_MEM1_ATTN_KT_STAGE_BASE, zero, 8u
     );
-    tinylpu_fill_rows(
-        dev, TINYLPU_MEM1_OFFSET, MICROGPT_MEM1_ATTN_V_STAGE_BASE, zero, MICROGPT_BLOCK_SIZE
+    lpulite_fill_rows(
+        dev, LPULITE_MEM1_OFFSET, MICROGPT_MEM1_ATTN_V_STAGE_BASE, zero, MICROGPT_BLOCK_SIZE
     );
     memset(g_k_cache, 0, sizeof(g_k_cache));
     memset(g_v_cache, 0, sizeof(g_v_cache));
     memset(g_kv_valid, 0, sizeof(g_kv_valid));
 }
 
-static void reset_prompt_state(tinylpu_mmio_t *dev, const runtime_options_t *opt) {
+static void reset_prompt_state(lpulite_mmio_t *dev, const runtime_options_t *opt) {
     if (opt->verbose) {
         fprintf(stderr, "[reset] assert LPU soft reset\n");
         fflush(stderr);
     }
-    tinylpu_soft_reset(dev, 32u, opt->settle_us);
+    lpulite_soft_reset(dev, 32u, opt->settle_us);
     clear_runtime_state(dev, opt->verbose);
-    tinylpu_soft_reset(dev, 32u, opt->settle_us);
+    lpulite_soft_reset(dev, 32u, opt->settle_us);
 }
 
-static void debug_dump_row(tinylpu_mmio_t *dev, const char *name, uint32_t base, uint32_t row) {
-    tinylpu_mmio_row_t value = tinylpu_read_row(dev, base, row);
+static void debug_dump_row(lpulite_mmio_t *dev, const char *name, uint32_t base, uint32_t row) {
+    lpulite_mmio_row_t value = lpulite_read_row(dev, base, row);
     fprintf(stderr, "[row] %-10s %s[%u]=%08x %08x %08x\n",
             name,
-            base == TINYLPU_MEM1_OFFSET ? "MEM1" : "MEM0",
+            base == LPULITE_MEM1_OFFSET ? "MEM1" : "MEM0",
             row,
             value.w0,
             value.w1,
             value.w2);
 }
 
-static void debug_dump_runtime_rows(tinylpu_mmio_t *dev, const char *stage) {
+static void debug_dump_runtime_rows(lpulite_mmio_t *dev, const char *stage) {
     fprintf(stderr, "[debug] %s row snapshot\n", stage);
-    debug_dump_row(dev, "token0", TINYLPU_MEM0_OFFSET, MICROGPT_MEM0_TOKEN_ROW0);
-    debug_dump_row(dev, "token1", TINYLPU_MEM0_OFFSET, MICROGPT_MEM0_TOKEN_ROW1);
-    debug_dump_row(dev, "pos0", TINYLPU_MEM0_OFFSET, MICROGPT_MEM0_POS_ROW0);
-    debug_dump_row(dev, "pos1", TINYLPU_MEM0_OFFSET, MICROGPT_MEM0_POS_ROW1);
-    debug_dump_row(dev, "embed0", TINYLPU_MEM0_OFFSET, 8u);
-    debug_dump_row(dev, "embed1", TINYLPU_MEM0_OFFSET, 9u);
-    debug_dump_row(dev, "q0", TINYLPU_MEM0_OFFSET, MICROGPT_MEM0_Q_ROW0);
-    debug_dump_row(dev, "q1", TINYLPU_MEM0_OFFSET, MICROGPT_MEM0_Q_ROW1);
-    debug_dump_row(dev, "k0", TINYLPU_MEM0_OFFSET, MICROGPT_MEM0_K_ROW0);
-    debug_dump_row(dev, "k1", TINYLPU_MEM0_OFFSET, MICROGPT_MEM0_K_ROW1);
-    debug_dump_row(dev, "v0", TINYLPU_MEM0_OFFSET, MICROGPT_MEM0_V_ROW0);
-    debug_dump_row(dev, "v1", TINYLPU_MEM0_OFFSET, MICROGPT_MEM0_V_ROW1);
-    debug_dump_row(dev, "attn0", TINYLPU_MEM0_OFFSET, MICROGPT_MEM0_ATTN_ROW0);
-    debug_dump_row(dev, "attn1", TINYLPU_MEM0_OFFSET, MICROGPT_MEM0_ATTN_ROW1);
+    debug_dump_row(dev, "token0", LPULITE_MEM0_OFFSET, MICROGPT_MEM0_TOKEN_ROW0);
+    debug_dump_row(dev, "token1", LPULITE_MEM0_OFFSET, MICROGPT_MEM0_TOKEN_ROW1);
+    debug_dump_row(dev, "pos0", LPULITE_MEM0_OFFSET, MICROGPT_MEM0_POS_ROW0);
+    debug_dump_row(dev, "pos1", LPULITE_MEM0_OFFSET, MICROGPT_MEM0_POS_ROW1);
+    debug_dump_row(dev, "embed0", LPULITE_MEM0_OFFSET, 8u);
+    debug_dump_row(dev, "embed1", LPULITE_MEM0_OFFSET, 9u);
+    debug_dump_row(dev, "q0", LPULITE_MEM0_OFFSET, MICROGPT_MEM0_Q_ROW0);
+    debug_dump_row(dev, "q1", LPULITE_MEM0_OFFSET, MICROGPT_MEM0_Q_ROW1);
+    debug_dump_row(dev, "k0", LPULITE_MEM0_OFFSET, MICROGPT_MEM0_K_ROW0);
+    debug_dump_row(dev, "k1", LPULITE_MEM0_OFFSET, MICROGPT_MEM0_K_ROW1);
+    debug_dump_row(dev, "v0", LPULITE_MEM0_OFFSET, MICROGPT_MEM0_V_ROW0);
+    debug_dump_row(dev, "v1", LPULITE_MEM0_OFFSET, MICROGPT_MEM0_V_ROW1);
+    debug_dump_row(dev, "attn0", LPULITE_MEM0_OFFSET, MICROGPT_MEM0_ATTN_ROW0);
+    debug_dump_row(dev, "attn1", LPULITE_MEM0_OFFSET, MICROGPT_MEM0_ATTN_ROW1);
     fflush(stderr);
 }
 
 static void run_image(
-    tinylpu_mmio_t *dev,
+    lpulite_mmio_t *dev,
     const char *label,
-    const tinylpu_row96_t *image,
+    const lpulite_row96_t *image,
     size_t start_pc,
     size_t instruction_count,
     const runtime_options_t *opt
@@ -482,12 +482,12 @@ static void run_image(
         // gated by run_en, so also clear the following stopped-PC guard row.
         // The rest of IMEM cannot affect this exact-cycle invocation.
         size_t rows_to_write = page_count + 9u;
-        if (rows_to_write > TINYLPU_IMEM_ROWS) {
-            rows_to_write = TINYLPU_IMEM_ROWS;
+        if (rows_to_write > LPULITE_IMEM_ROWS) {
+            rows_to_write = LPULITE_IMEM_ROWS;
         }
-        tinylpu_mmio_row_t page_rows[TINYLPU_IMEM_ROWS];
+        lpulite_mmio_row_t page_rows[LPULITE_IMEM_ROWS];
         for (size_t row = 0; row < rows_to_write; ++row) {
-            tinylpu_mmio_row_t value = {0, 0, 0};
+            lpulite_mmio_row_t value = {0, 0, 0};
             if (row < page_count) {
                 value = as_mmio_row(image[start_pc + done + row]);
             }
@@ -503,7 +503,7 @@ static void run_image(
             fflush(stderr);
         }
         uint32_t requested_cycles = (uint32_t)(page_count + 8u);
-        uint32_t actual_cycles = tinylpu_run_cycles(dev, requested_cycles, opt->settle_us);
+        uint32_t actual_cycles = lpulite_run_cycles(dev, requested_cycles, opt->settle_us);
         if (actual_cycles != requested_cycles) {
             fprintf(stderr, "[%s] warning: page %u cycle mismatch actual=%u requested=%u\n",
                     label,
@@ -523,12 +523,12 @@ static void run_image(
     }
 }
 
-static void run_program(tinylpu_mmio_t *dev, const char *label, size_t start_pc, size_t instruction_count, const runtime_options_t *opt) {
+static void run_program(lpulite_mmio_t *dev, const char *label, size_t start_pc, size_t instruction_count, const runtime_options_t *opt) {
     run_image(dev, label, g_microgpt_vliw, start_pc, instruction_count, opt);
 }
 
 static void run_softmax_program(
-    tinylpu_mmio_t *dev,
+    lpulite_mmio_t *dev,
     const runtime_options_t *opt,
     bool load_image
 ) {
@@ -553,7 +553,7 @@ static void run_softmax_program(
                 requested_cycles);
         fflush(stderr);
     }
-    uint32_t actual_cycles = tinylpu_run_cycles(dev, requested_cycles, opt->settle_us);
+    uint32_t actual_cycles = lpulite_run_cycles(dev, requested_cycles, opt->settle_us);
     if (opt->verbose) {
         fprintf(stderr, "[attention-softmax] resident kernel done cycles=%u/%u\n",
                 actual_cycles, requested_cycles);
@@ -561,59 +561,59 @@ static void run_softmax_program(
     }
 }
 
-static void write_step_inputs(tinylpu_mmio_t *dev, int token_id, int pos_id, bool verbose) {
+static void write_step_inputs(lpulite_mmio_t *dev, int token_id, int pos_id, bool verbose) {
     if (verbose) {
         fprintf(stderr, "[input] token=%d pos=%d\n", token_id, pos_id);
         fflush(stderr);
     }
     uint32_t wte = MICROGPT_MEM1_WTE_BASE + (uint32_t)token_id * MICROGPT_ROWS_PER_VEC;
     uint32_t wpe = MICROGPT_MEM1_WPE_BASE + (uint32_t)pos_id * MICROGPT_ROWS_PER_VEC;
-    const tinylpu_mmio_row_t rows[4] = {
+    const lpulite_mmio_row_t rows[4] = {
         as_mmio_row(g_microgpt_mem1[wte + 0]),
         as_mmio_row(g_microgpt_mem1[wte + 1]),
         as_mmio_row(g_microgpt_mem1[wpe + 0]),
         as_mmio_row(g_microgpt_mem1[wpe + 1]),
     };
-    tinylpu_write_rows(
+    lpulite_write_rows(
         dev,
-        TINYLPU_MEM0_OFFSET,
+        LPULITE_MEM0_OFFSET,
         MICROGPT_MEM0_TOKEN_ROW0,
         rows,
         4u
     );
 }
 
-static void cache_current_kv(tinylpu_mmio_t *dev, int pos_id, bool verbose) {
+static void cache_current_kv(lpulite_mmio_t *dev, int pos_id, bool verbose) {
     if (verbose) {
         fprintf(stderr, "[kv] cache current pos=%d\n", pos_id);
         fflush(stderr);
     }
     uint32_t k_base = MICROGPT_K_CACHE_BASE + (uint32_t)pos_id * MICROGPT_ROWS_PER_VEC;
     uint32_t v_base = MICROGPT_V_CACHE_BASE + (uint32_t)pos_id * MICROGPT_ROWS_PER_VEC;
-    tinylpu_read_rows(
+    lpulite_read_rows(
         dev,
-        TINYLPU_MEM0_OFFSET,
+        LPULITE_MEM0_OFFSET,
         MICROGPT_MEM0_K_ROW0,
         g_k_cache[pos_id],
         MICROGPT_ROWS_PER_VEC
     );
-    tinylpu_read_rows(
+    lpulite_read_rows(
         dev,
-        TINYLPU_MEM0_OFFSET,
+        LPULITE_MEM0_OFFSET,
         MICROGPT_MEM0_V_ROW0,
         g_v_cache[pos_id],
         MICROGPT_ROWS_PER_VEC
     );
-    tinylpu_write_rows(
+    lpulite_write_rows(
         dev,
-        TINYLPU_MEM0_OFFSET,
+        LPULITE_MEM0_OFFSET,
         k_base,
         g_k_cache[pos_id],
         MICROGPT_ROWS_PER_VEC
     );
-    tinylpu_write_rows(
+    lpulite_write_rows(
         dev,
-        TINYLPU_MEM1_OFFSET,
+        LPULITE_MEM1_OFFSET,
         v_base,
         g_v_cache[pos_id],
         MICROGPT_ROWS_PER_VEC
@@ -621,22 +621,22 @@ static void cache_current_kv(tinylpu_mmio_t *dev, int pos_id, bool verbose) {
     g_kv_valid[pos_id] = true;
 }
 
-static void stage_current_attention(tinylpu_mmio_t *dev, bool verbose) {
+static void stage_current_attention(lpulite_mmio_t *dev, bool verbose) {
     if (verbose) {
         fprintf(stderr, "[attention] stage current V\n");
         fflush(stderr);
     }
-    tinylpu_mmio_row_t rows[MICROGPT_ROWS_PER_VEC];
-    tinylpu_read_rows(
+    lpulite_mmio_row_t rows[MICROGPT_ROWS_PER_VEC];
+    lpulite_read_rows(
         dev,
-        TINYLPU_MEM0_OFFSET,
+        LPULITE_MEM0_OFFSET,
         MICROGPT_MEM0_V_ROW0,
         rows,
         MICROGPT_ROWS_PER_VEC
     );
-    tinylpu_write_rows(
+    lpulite_write_rows(
         dev,
-        TINYLPU_MEM0_OFFSET,
+        LPULITE_MEM0_OFFSET,
         MICROGPT_MEM0_ATTN_ROW0,
         rows,
         MICROGPT_ROWS_PER_VEC
@@ -644,7 +644,7 @@ static void stage_current_attention(tinylpu_mmio_t *dev, bool verbose) {
 }
 
 static void fpga_softmax(
-    tinylpu_mmio_t *dev,
+    lpulite_mmio_t *dev,
     const double scores[MICROGPT_BLOCK_SIZE],
     int count,
     double weights[MICROGPT_BLOCK_SIZE],
@@ -652,7 +652,7 @@ static void fpga_softmax(
     bool load_program
 ) {
     int8_t masked_lanes[MICROGPT_LANES];
-    tinylpu_mmio_row_t input_rows[MICROGPT_SOFTMAX_CHUNKS];
+    lpulite_mmio_row_t input_rows[MICROGPT_SOFTMAX_CHUNKS];
     for (int lane = 0; lane < MICROGPT_LANES; ++lane) {
         masked_lanes[lane] = -127;
     }
@@ -669,19 +669,19 @@ static void fpga_softmax(
             input_rows[pos] = pack_quant_row(masked_lanes, 0);
         }
     }
-    tinylpu_write_rows(
+    lpulite_write_rows(
         dev,
-        TINYLPU_MEM0_OFFSET,
+        LPULITE_MEM0_OFFSET,
         MICROGPT_SOFTMAX_IN_BASE,
         input_rows,
         MICROGPT_SOFTMAX_CHUNKS
     );
 
     run_softmax_program(dev, opt, load_program);
-    tinylpu_mmio_row_t output_rows[MICROGPT_SOFTMAX_CHUNKS];
-    tinylpu_read_rows(
+    lpulite_mmio_row_t output_rows[MICROGPT_SOFTMAX_CHUNKS];
+    lpulite_read_rows(
         dev,
-        TINYLPU_MEM0_OFFSET,
+        LPULITE_MEM0_OFFSET,
         MICROGPT_SOFTMAX_OUT_BASE,
         output_rows,
         (size_t)count
@@ -699,7 +699,7 @@ static void fpga_softmax(
 }
 
 static void stage_host_attention(
-    tinylpu_mmio_t *dev,
+    lpulite_mmio_t *dev,
     int through_pos,
     const runtime_options_t *opt,
     bool use_fpga_softmax
@@ -709,10 +709,10 @@ static void stage_host_attention(
                 use_fpga_softmax ? "FPGA" : "ARM", through_pos);
         fflush(stderr);
     }
-    tinylpu_mmio_row_t q_rows[MICROGPT_ROWS_PER_VEC];
-    tinylpu_read_rows(
+    lpulite_mmio_row_t q_rows[MICROGPT_ROWS_PER_VEC];
+    lpulite_read_rows(
         dev,
-        TINYLPU_MEM0_OFFSET,
+        LPULITE_MEM0_OFFSET,
         MICROGPT_MEM0_Q_ROW0,
         q_rows,
         MICROGPT_ROWS_PER_VEC
@@ -757,24 +757,24 @@ static void stage_host_attention(
         }
     }
 
-    tinylpu_mmio_row_t context_rows[MICROGPT_ROWS_PER_VEC];
+    lpulite_mmio_row_t context_rows[MICROGPT_ROWS_PER_VEC];
     vector_to_rows(context, context_rows);
-    tinylpu_write_rows(
+    lpulite_write_rows(
         dev,
-        TINYLPU_MEM0_OFFSET,
+        LPULITE_MEM0_OFFSET,
         MICROGPT_MEM0_ATTN_ROW0,
         context_rows,
         MICROGPT_ROWS_PER_VEC
     );
 }
 
-static void load_attention_image(tinylpu_mmio_t *dev, const runtime_options_t *opt) {
+static void load_attention_image(lpulite_mmio_t *dev, const runtime_options_t *opt) {
     if (opt->verbose) {
         fprintf(stderr, "[attention-mxm] load resident image: %u instructions\n",
                 MICROGPT_ATTENTION_INSTRUCTIONS);
         fflush(stderr);
     }
-    tinylpu_mmio_row_t rows[MICROGPT_ATTENTION_INSTRUCTIONS];
+    lpulite_mmio_row_t rows[MICROGPT_ATTENTION_INSTRUCTIONS];
     for (uint32_t row = 0; row < MICROGPT_ATTENTION_INSTRUCTIONS; ++row) {
         rows[row] = as_mmio_row(g_microgpt_attention_vliw[row]);
     }
@@ -791,15 +791,15 @@ static void load_attention_image(tinylpu_mmio_t *dev, const runtime_options_t *o
     }
     // Park ICU on the final stopped-PC guard. Without this, loading row 0 can
     // leave the K-tile MEM0 read asserted while ARM is staging operands.
-    tinylpu_write32(
+    lpulite_write32(
         dev,
-        TINYLPU_CTRL_PC_LOAD,
+        LPULITE_CTRL_PC_LOAD,
         MICROGPT_ATTENTION_INSTRUCTIONS - 1u
     );
 }
 
 static void run_attention_section(
-    tinylpu_mmio_t *dev,
+    lpulite_mmio_t *dev,
     const char *label,
     uint32_t start,
     uint32_t instructions,
@@ -810,7 +810,7 @@ static void run_attention_section(
                 label, start, instructions);
         fflush(stderr);
     }
-    uint32_t actual = tinylpu_run_cycles_from(
+    uint32_t actual = lpulite_run_cycles_from(
         dev,
         start,
         instructions,
@@ -831,7 +831,7 @@ static int8_t clamp_scale(int scale) {
 }
 
 static void stage_mxm_attention(
-    tinylpu_mmio_t *dev,
+    lpulite_mmio_t *dev,
     int through_pos,
     const runtime_options_t *opt
 ) {
@@ -843,10 +843,10 @@ static void stage_mxm_attention(
     }
     load_attention_image(dev, opt);
 
-    tinylpu_mmio_row_t q_rows[MICROGPT_ROWS_PER_VEC];
-    tinylpu_read_rows(
+    lpulite_mmio_row_t q_rows[MICROGPT_ROWS_PER_VEC];
+    lpulite_read_rows(
         dev,
-        TINYLPU_MEM0_OFFSET,
+        LPULITE_MEM0_OFFSET,
         MICROGPT_MEM0_Q_ROW0,
         q_rows,
         MICROGPT_ROWS_PER_VEC
@@ -858,7 +858,7 @@ static void stage_mxm_attention(
     }
 
     double keys[MICROGPT_BLOCK_SIZE][MICROGPT_N_EMBD] = {{0}};
-    tinylpu_mmio_row_t value_rows[MICROGPT_BLOCK_SIZE][MICROGPT_ROWS_PER_VEC];
+    lpulite_mmio_row_t value_rows[MICROGPT_BLOCK_SIZE][MICROGPT_ROWS_PER_VEC];
     memset(value_rows, 0, sizeof(value_rows));
     for (int pos = 0; pos <= through_pos; ++pos) {
         if (!g_kv_valid[pos]) {
@@ -875,7 +875,7 @@ static void stage_mxm_attention(
 
         // Replicate the four quantized Q scalars into MXM input rows. This and
         // the cache scale alignment below are layout/representation staging.
-        tinylpu_mmio_row_t q_broadcast[MICROGPT_HEAD_DIM];
+        lpulite_mmio_row_t q_broadcast[MICROGPT_HEAD_DIM];
         for (int dim = 0; dim < MICROGPT_HEAD_DIM; ++dim) {
             int8_t replicated[MICROGPT_LANES];
             for (int lane = 0; lane < MICROGPT_LANES; ++lane) {
@@ -883,9 +883,9 @@ static void stage_mxm_attention(
             }
             q_broadcast[dim] = pack_quant_row(replicated, q_scales[row_index]);
         }
-        tinylpu_write_rows(
+        lpulite_write_rows(
             dev,
-            TINYLPU_MEM0_OFFSET,
+            LPULITE_MEM0_OFFSET,
             MICROGPT_MEM0_ATTN_Q_BCAST_BASE,
             q_broadcast,
             MICROGPT_HEAD_DIM
@@ -922,7 +922,7 @@ static void stage_mxm_attention(
                 if (tile_scale < -128) tile_scale = -128;
                 if (tile_scale > 127) tile_scale = 127;
             }
-            tinylpu_mmio_row_t tile_rows[MICROGPT_LANES];
+            lpulite_mmio_row_t tile_rows[MICROGPT_LANES];
             for (int tile_pos = 0; tile_pos < MICROGPT_LANES; ++tile_pos) {
                 tile_rows[tile_pos] = pack_float_row_at_scale(
                     tile[tile_pos],
@@ -930,9 +930,9 @@ static void stage_mxm_attention(
                     tile_scale
                 );
             }
-            tinylpu_write_rows(
+            lpulite_write_rows(
                 dev,
-                TINYLPU_MEM0_OFFSET,
+                LPULITE_MEM0_OFFSET,
                 MICROGPT_MEM0_ATTN_K_TILE_IN_BASE,
                 tile_rows,
                 MICROGPT_LANES
@@ -964,10 +964,10 @@ static void stage_mxm_attention(
             opt
         );
 
-        tinylpu_mmio_row_t score_rows[2];
-        tinylpu_read_rows(
+        lpulite_mmio_row_t score_rows[2];
+        lpulite_read_rows(
             dev,
-            TINYLPU_MEM0_OFFSET,
+            LPULITE_MEM0_OFFSET,
             MICROGPT_MEM0_ATTN_QK_SCORE_BASE,
             score_rows,
             2u
@@ -978,7 +978,7 @@ static void stage_mxm_attention(
             unpack_row(score_rows[block], score_lanes[block], &score_scales[block]);
         }
         const int active_positions = through_pos + 1;
-        tinylpu_mmio_row_t staged_scores[MICROGPT_BLOCK_SIZE];
+        lpulite_mmio_row_t staged_scores[MICROGPT_BLOCK_SIZE];
         for (int pos = 0; pos < active_positions; ++pos) {
             const int block = pos / MICROGPT_LANES;
             int8_t duplicated[MICROGPT_LANES];
@@ -992,9 +992,9 @@ static void stage_mxm_attention(
                 clamp_scale((int)score_scales[block] - 1)
             );
         }
-        tinylpu_write_rows(
+        lpulite_write_rows(
             dev,
-            TINYLPU_MEM0_OFFSET,
+            LPULITE_MEM0_OFFSET,
             MICROGPT_SOFTMAX_IN_BASE,
             staged_scores,
             (size_t)active_positions
@@ -1008,12 +1008,12 @@ static void stage_mxm_attention(
             opt
         );
 
-        tinylpu_mmio_row_t softmax_rows[MICROGPT_BLOCK_SIZE];
-        tinylpu_mmio_row_t probability_rows[MICROGPT_BLOCK_SIZE];
-        tinylpu_mmio_row_t value_stage_rows[MICROGPT_BLOCK_SIZE];
-        tinylpu_read_rows(
+        lpulite_mmio_row_t softmax_rows[MICROGPT_BLOCK_SIZE];
+        lpulite_mmio_row_t probability_rows[MICROGPT_BLOCK_SIZE];
+        lpulite_mmio_row_t value_stage_rows[MICROGPT_BLOCK_SIZE];
+        lpulite_read_rows(
             dev,
-            TINYLPU_MEM0_OFFSET,
+            LPULITE_MEM0_OFFSET,
             MICROGPT_SOFTMAX_OUT_BASE,
             softmax_rows,
             (size_t)active_positions
@@ -1038,16 +1038,16 @@ static void stage_mxm_attention(
             }
             value_stage_rows[pos] = pack_quant_row(head_lanes, value_scale);
         }
-        tinylpu_write_rows(
+        lpulite_write_rows(
             dev,
-            TINYLPU_MEM0_OFFSET,
+            LPULITE_MEM0_OFFSET,
             MICROGPT_MEM0_ATTN_PV_PROB_BASE,
             probability_rows,
             (size_t)active_positions
         );
-        tinylpu_write_rows(
+        lpulite_write_rows(
             dev,
-            TINYLPU_MEM1_OFFSET,
+            LPULITE_MEM1_OFFSET,
             MICROGPT_MEM1_ATTN_V_STAGE_BASE,
             value_stage_rows,
             (size_t)active_positions
@@ -1060,11 +1060,11 @@ static void stage_mxm_attention(
             MICROGPT_ATTN_PV_INSTRUCTIONS,
             opt
         );
-        tinylpu_copy_row(
+        lpulite_copy_row(
             dev,
-            TINYLPU_MEM0_OFFSET,
+            LPULITE_MEM0_OFFSET,
             MICROGPT_MEM0_ATTN_PV_OUT_ROW,
-            TINYLPU_MEM0_OFFSET,
+            LPULITE_MEM0_OFFSET,
             MICROGPT_MEM0_ATTN_HEAD_OUT_BASE + (uint32_t)head
         );
     }
@@ -1078,15 +1078,15 @@ static void stage_mxm_attention(
     );
 }
 
-static void decode_logits(tinylpu_mmio_t *dev, double logits[MICROGPT_VOCAB_SIZE], bool verbose) {
+static void decode_logits(lpulite_mmio_t *dev, double logits[MICROGPT_VOCAB_SIZE], bool verbose) {
     if (verbose) {
         fprintf(stderr, "[logits] read\n");
         fflush(stderr);
     }
-    tinylpu_mmio_row_t rows[4];
-    tinylpu_read_rows(
+    lpulite_mmio_row_t rows[4];
+    lpulite_read_rows(
         dev,
-        TINYLPU_MEM0_OFFSET,
+        LPULITE_MEM0_OFFSET,
         MICROGPT_MEM0_LOGIT_ROW0,
         rows,
         4u
@@ -1141,7 +1141,7 @@ static void decode_logits(tinylpu_mmio_t *dev, double logits[MICROGPT_VOCAB_SIZE
     }
 }
 
-static void run_token(tinylpu_mmio_t *dev, int token_id, int pos_id, const runtime_options_t *opt, double logits[MICROGPT_VOCAB_SIZE]) {
+static void run_token(lpulite_mmio_t *dev, int token_id, int pos_id, const runtime_options_t *opt, double logits[MICROGPT_VOCAB_SIZE]) {
     if (pos_id >= MICROGPT_BLOCK_SIZE) {
         pos_id = MICROGPT_BLOCK_SIZE - 1;
     }
@@ -1368,12 +1368,12 @@ static int constrained_next(const double logits[MICROGPT_VOCAB_SIZE], const char
 }
 
 static generate_result_t generate(
-    tinylpu_mmio_t *dev,
+    lpulite_mmio_t *dev,
     const char *prompt,
     const runtime_options_t *opt
 ) {
     const double request_start = monotonic_seconds();
-    const tinylpu_mmio_stats_t mmio_before = tinylpu_mmio_get_stats(dev);
+    const lpulite_mmio_stats_t mmio_before = lpulite_mmio_get_stats(dev);
     const uint64_t imem_considered_before = g_imem_rows_considered;
     const uint64_t imem_written_before = g_imem_rows_written;
     reset_prompt_state(dev, opt);
@@ -1526,8 +1526,8 @@ static void usage(const char *argv0) {
         "  --decode greedy         raw model argmax every step (default)\n"
         "  --decode target         constrain generated chars to exported target names\n",
         argv0,
-        TINYLPU_HPS_LW_BRIDGE_BASE_DEFAULT,
-        TINYLPU_HPS_LW_BRIDGE_SPAN_DEFAULT);
+        LPULITE_HPS_LW_BRIDGE_BASE_DEFAULT,
+        LPULITE_HPS_LW_BRIDGE_SPAN_DEFAULT);
 }
 
 static int parse_u32(const char *text, uint32_t *out) {
@@ -1542,8 +1542,8 @@ static int parse_u32(const char *text, uint32_t *out) {
 }
 
 static int parse_args(int argc, char **argv, runtime_options_t *opt) {
-    opt->base = TINYLPU_HPS_LW_BRIDGE_BASE_DEFAULT;
-    opt->span = TINYLPU_HPS_LW_BRIDGE_SPAN_DEFAULT;
+    opt->base = LPULITE_HPS_LW_BRIDGE_BASE_DEFAULT;
+    opt->span = LPULITE_HPS_LW_BRIDGE_SPAN_DEFAULT;
     opt->settle_us = 0;
     opt->skip_load_weights = false;
     opt->verbose = false;
@@ -1634,19 +1634,19 @@ static int parse_args(int argc, char **argv, runtime_options_t *opt) {
     return 0;
 }
 
-static int probe_bridge(tinylpu_mmio_t *dev) {
+static int probe_bridge(lpulite_mmio_t *dev) {
     puts("Probe: HPS lightweight bridge control registers");
-    tinylpu_write32(dev, TINYLPU_CTRL_RUN, 0);
-    tinylpu_write32(dev, TINYLPU_CTRL_PC_LOAD, 0);
-    uint32_t run = tinylpu_read32(dev, TINYLPU_CTRL_RUN);
-    uint32_t cycles0 = tinylpu_read32(dev, TINYLPU_CTRL_CYCLES);
+    lpulite_write32(dev, LPULITE_CTRL_RUN, 0);
+    lpulite_write32(dev, LPULITE_CTRL_PC_LOAD, 0);
+    uint32_t run = lpulite_read32(dev, LPULITE_CTRL_RUN);
+    uint32_t cycles0 = lpulite_read32(dev, LPULITE_CTRL_CYCLES);
     usleep(1000);
-    uint32_t cycles1 = tinylpu_read32(dev, TINYLPU_CTRL_CYCLES);
+    uint32_t cycles1 = lpulite_read32(dev, LPULITE_CTRL_CYCLES);
     printf("Probe: CTRL_RUN=0x%08x CYCLES=%u->%u\n", run, cycles0, cycles1);
 
     puts("Probe: soft reset control");
-    tinylpu_soft_reset(dev, 32u, 10u);
-    uint32_t reset_after = tinylpu_read32(dev, TINYLPU_CTRL_SOFT_RESET);
+    lpulite_soft_reset(dev, 32u, 10u);
+    uint32_t reset_after = lpulite_read32(dev, LPULITE_CTRL_SOFT_RESET);
     printf("Probe: SOFT_RESET remaining=%u\n", reset_after);
     if (reset_after != 0u) {
         fprintf(stderr,
@@ -1655,10 +1655,10 @@ static int probe_bridge(tinylpu_mmio_t *dev) {
     }
 
     puts("Probe: exact-cycle run control");
-    uint32_t exact_cycles = tinylpu_run_cycles(dev, 32u, 10u);
-    uint32_t run_after = tinylpu_read32(dev, TINYLPU_CTRL_RUN);
-    uint32_t remaining_after = tinylpu_read32(dev, TINYLPU_CTRL_RUN_CYCLES);
-    uint32_t cycles2 = tinylpu_read32(dev, TINYLPU_CTRL_CYCLES);
+    uint32_t exact_cycles = lpulite_run_cycles(dev, 32u, 10u);
+    uint32_t run_after = lpulite_read32(dev, LPULITE_CTRL_RUN);
+    uint32_t remaining_after = lpulite_read32(dev, LPULITE_CTRL_RUN_CYCLES);
+    uint32_t cycles2 = lpulite_read32(dev, LPULITE_CTRL_CYCLES);
     printf("Probe: RUN_CYCLES requested=32 actual=%u run=%u remaining=%u CYCLES=%u\n",
            exact_cycles,
            run_after,
@@ -1671,40 +1671,40 @@ static int probe_bridge(tinylpu_mmio_t *dev) {
     }
 
     puts("Probe: MEM0 row write/read");
-    tinylpu_mmio_row_t pattern = {0x11223344u, 0x55667788u, 0x99aabbccu};
-    tinylpu_write_row(dev, TINYLPU_MEM0_OFFSET, 15, pattern);
-    tinylpu_mmio_row_t got = tinylpu_read_row(dev, TINYLPU_MEM0_OFFSET, 15);
+    lpulite_mmio_row_t pattern = {0x11223344u, 0x55667788u, 0x99aabbccu};
+    lpulite_write_row(dev, LPULITE_MEM0_OFFSET, 15, pattern);
+    lpulite_mmio_row_t got = lpulite_read_row(dev, LPULITE_MEM0_OFFSET, 15);
     printf("Probe: MEM0[15]=%08x %08x %08x\n", got.w0, got.w1, got.w2);
 
     puts("Probe: MEM1 row write/read");
-    tinylpu_write_row(dev, TINYLPU_MEM1_OFFSET, 15, pattern);
-    got = tinylpu_read_row(dev, TINYLPU_MEM1_OFFSET, 15);
+    lpulite_write_row(dev, LPULITE_MEM1_OFFSET, 15, pattern);
+    got = lpulite_read_row(dev, LPULITE_MEM1_OFFSET, 15);
     printf("Probe: MEM1[15]=%08x %08x %08x\n", got.w0, got.w1, got.w2);
     fflush(stdout);
     return 0;
 }
 
-static int probe_sxm(tinylpu_mmio_t *dev, const runtime_options_t *opt) {
+static int probe_sxm(lpulite_mmio_t *dev, const runtime_options_t *opt) {
     static const int8_t source[MICROGPT_LANES] = {
         -91, -37, -5, 0, 7, 29, 63, 111
     };
     const int8_t source_scale = -6;
     const size_t one_broadcast_instructions =
         (MICROGPT_PREFIX_WQ_START - MICROGPT_PREFIX_ATTN_BCAST_START) / 2u;
-    tinylpu_mmio_row_t zero = {0, 0, 0};
+    lpulite_mmio_row_t zero = {0, 0, 0};
 
     puts("SXM probe: source lanes = [-91 -37 -5 0 7 29 63 111], scale=-6");
-    tinylpu_soft_reset(dev, 32u, opt->settle_us);
-    tinylpu_write_row(
+    lpulite_soft_reset(dev, 32u, opt->settle_us);
+    lpulite_write_row(
         dev,
-        TINYLPU_MEM0_OFFSET,
+        LPULITE_MEM0_OFFSET,
         MICROGPT_MEM0_XN_ROW0,
         pack_quant_row(source, source_scale)
     );
     for (uint32_t row = 0; row < MICROGPT_LANES; ++row) {
-        tinylpu_write_row(
+        lpulite_write_row(
             dev,
-            TINYLPU_MEM0_OFFSET,
+            LPULITE_MEM0_OFFSET,
             MICROGPT_MEM0_X_BCAST_BASE + row,
             zero
         );
@@ -1723,9 +1723,9 @@ static int probe_sxm(tinylpu_mmio_t *dev, const runtime_options_t *opt) {
         int8_t lanes[MICROGPT_LANES];
         int8_t scale;
         unpack_row(
-            tinylpu_read_row(
+            lpulite_read_row(
                 dev,
-                TINYLPU_MEM0_OFFSET,
+                LPULITE_MEM0_OFFSET,
                 MICROGPT_MEM0_X_BCAST_BASE + (uint32_t)row
             ),
             lanes,
@@ -1754,7 +1754,7 @@ static int probe_sxm(tinylpu_mmio_t *dev, const runtime_options_t *opt) {
     }
     printf("SXM probe: %s (%d bad rows)\n", failures ? "FAIL" : "PASS", failures);
     fflush(stdout);
-    tinylpu_soft_reset(dev, 32u, opt->settle_us);
+    lpulite_soft_reset(dev, 32u, opt->settle_us);
     return failures ? 1 : 0;
 }
 
@@ -1765,12 +1765,12 @@ int main(int argc, char **argv) {
         return 2;
     }
 
-    tinylpu_mmio_t dev;
-    if (tinylpu_mmio_open(&dev, opt.base, opt.span) != 0) {
+    lpulite_mmio_t dev;
+    if (lpulite_mmio_open(&dev, opt.base, opt.span) != 0) {
         return 1;
     }
 
-    printf("TinyLPU MicroGPT HPS/Linux runtime\n");
+    printf("LPULite MicroGPT HPS/Linux runtime\n");
     printf("MMIO base: 0x%08lx, span: 0x%zx\n", (unsigned long)opt.base, opt.span);
     printf("VLIW: %u instructions (%u prefix, %u suffix), MEM1: %u rows\n",
            MICROGPT_IMEM_INSTRUCTIONS,
@@ -1790,13 +1790,13 @@ int main(int argc, char **argv) {
 
     if (opt.probe_only) {
         int rc = probe_bridge(&dev);
-        tinylpu_mmio_close(&dev);
+        lpulite_mmio_close(&dev);
         return rc;
     }
 
     if (opt.sxm_probe) {
         int rc = probe_sxm(&dev, &opt);
-        tinylpu_mmio_close(&dev);
+        lpulite_mmio_close(&dev);
         return rc;
     }
 
@@ -1849,7 +1849,7 @@ int main(int argc, char **argv) {
                 lpu_sps);
             fflush(stderr);
         }
-        tinylpu_mmio_close(&dev);
+        lpulite_mmio_close(&dev);
         return 0;
     }
 
@@ -1870,6 +1870,6 @@ int main(int argc, char **argv) {
         generate(&dev, prompt, &opt);
     }
 
-    tinylpu_mmio_close(&dev);
+    lpulite_mmio_close(&dev);
     return 0;
 }

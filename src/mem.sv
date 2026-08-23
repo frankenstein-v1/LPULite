@@ -35,12 +35,12 @@ module mem #(
     assign stream_in = row_in;
     assign row_out = stream_out;
 
-`ifdef TINYLPU_USE_SKY130_SRAM
+`ifdef LPULITE_USE_SKY130_SRAM
     // The showcase configuration uses 1K rows and a bank of nine 8-bit hard
     // macros. The second macro read port services the optional debug port.
     generate
         if (DATA_W == 72 && DEPTH == 1024) begin : gen_sky130_sram
-            tinylpu_sram_banked #(
+            lpulite_sram_banked #(
                 .DATA_W(DATA_W)
             ) u_banked_sram (
                 .clk,
@@ -59,7 +59,7 @@ module mem #(
     // The actual behavioral SRAM vault. Width defaults to one fixed8 row.
     logic [DATA_W-1:0] sram_array [0:DEPTH-1];
 
-`ifdef TINYLPU_FPGA_ALTSYNCRAM
+`ifdef LPULITE_FPGA_ALTSYNCRAM
     logic [ADDR_W-1:0] ram_addr_a;
     logic [DATA_W-1:0] ram_data_a;
     logic [DATA_W-1:0] ram_q_a;

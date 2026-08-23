@@ -3,7 +3,7 @@ import pya
 
 layout = pya.Layout()
 layout.dbu = 0.001
-top = layout.create_cell("tinylpu_logic")
+top = layout.create_cell("lpulite_logic")
 
 
 def layer(number, datatype=20):
@@ -151,4 +151,4 @@ for tap in range(16):
     box(72, x, 285, x + 9, 430)
     via(71, x + 4.5, 330, 10)
 
-layout.write("asic/tinylpu_logic_showcase.gds")
+layout.write("asic/lpulite_logic_showcase.gds")

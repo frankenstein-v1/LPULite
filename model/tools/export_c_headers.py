@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""TinyLPU C Header Exporter.
+"""LPULite C Header Exporter.
 
 Converts PyTorch exported weights and VLIW microcode instructions into C header files
 (synthesis/driver/include/*.h) for compile-time embedding in the ARM C driver.
@@ -23,7 +23,7 @@ from lpu_weight_packer import prepare_mem1_weights
 def export_vliw_header(vliw_program: list[int], out_file: Path):
     """Export 96-bit VLIW microcode program into include/lpu_vliw.h as a 2D uint32_t array."""
     lines = [
-        "/* Auto-generated TinyLPU VLIW Microcode Header */",
+        "/* Auto-generated LPULite VLIW Microcode Header */",
         "#ifndef LPU_VLIW_H",
         "#define LPU_VLIW_H",
         "",
@@ -67,7 +67,7 @@ def export_weights_header(weights: dict, vocab: dict, out_file: Path):
                 id_to_word[k] = v
 
     lines = [
-        "/* Auto-generated TinyLPU Model Weights & Vocabulary Header */",
+        "/* Auto-generated LPULite Model Weights & Vocabulary Header */",
         "#ifndef LPU_WEIGHTS_H",
         "#define LPU_WEIGHTS_H",
         "",

@@ -1,5 +1,5 @@
 /*
- * TinyLPU Native C Hardware Driver Header
+ * LPULite Native C Hardware Driver Header
  * DE1-SoC ARM Cortex-A9 Memory-Mapped I/O (MMIO) Interface
  */
 

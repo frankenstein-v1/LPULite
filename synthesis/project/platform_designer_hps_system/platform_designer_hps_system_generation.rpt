@@ -1,5 +1,5 @@
 Info: Starting: Create HDL design files for synthesis
-Info: qsys-generate C:\Users\micha\Documents(Local)\Projects\tinyLPU\synthesis\project\platform_designer_hps_system.qsys --synthesis=VERILOG --output-directory=C:\Users\micha\Documents(Local)\Projects\tinyLPU\synthesis\project\platform_designer_hps_system\synthesis --family="Cyclone V" --part=5CSEMA5F31C6
+Info: qsys-generate C:\Users\micha\Documents(Local)\Projects\LPULite\synthesis\project\platform_designer_hps_system.qsys --synthesis=VERILOG --output-directory=C:\Users\micha\Documents(Local)\Projects\LPULite\synthesis\project\platform_designer_hps_system\synthesis --family="Cyclone V" --part=5CSEMA5F31C6
 Progress: Loading project/platform_designer_hps_system.qsys
 Progress: Reading input file
 Progress: Adding clk_0 [clock_source 25.1]

@@ -1,7 +1,7 @@
 // ==============================================================================
 // Original Code Credit: SuryaHead
 // Repository: https://github.com/SurjaHead/softmax-in-hardware
-// Modified for tinyLPU Integration.
+// Modified for LPULite Integration.
 // ==============================================================================
 `default_nettype none
 `timescale 1ns/1ns

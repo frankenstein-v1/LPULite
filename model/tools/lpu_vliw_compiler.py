@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""TinyLPU VLIW Microcode Compiler.
+"""LPULite VLIW Microcode Compiler.
 
 Compiles high-level Transformer operations (Q*K^T matmul, Softmax activation,
 S*V context matmul, RMSNorm, LM Head projection) into 96-bit VLIW instructions
-for the Instruction Control Unit (ICU) in the TinyLPU FPGA hardware.
+for the Instruction Control Unit (ICU) in the LPULite FPGA hardware.
 """
 
 WB_NONE = 0; WB_SXM = 1; WB_MEM0 = 2; WB_VXM = 3; WB_MEM1 = 4
@@ -84,7 +84,7 @@ def build_instruction(
     return word
 
 def compile_stories10k_vliw_program() -> list[int]:
-    """Compile full 96-bit microcode program for stories10k decode step on TinyLPU hardware."""
+    """Compile full 96-bit microcode program for stories10k decode step on LPULite hardware."""
     program = []
 
     # Phase 1: Clear MXM & calculate Q * K^T Attention Logits

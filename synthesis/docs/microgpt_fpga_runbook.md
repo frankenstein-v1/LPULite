@@ -1,4 +1,4 @@
-# TinyLPU MicroGPT FPGA runbook
+# LPULite MicroGPT FPGA runbook
 
 This is the canonical setup procedure for the working ARM+FPGA MicroGPT
 configuration on the DE1-SoC.
@@ -6,13 +6,13 @@ configuration on the DE1-SoC.
 ## Verified release files
 
 - FPGA bitstream:
-  `synthesis/build/tiny_lpu_de1_soc_hps/tiny_lpu_de1_soc_hps.sof`
+  `synthesis/build/lpu_lite_de1_soc_hps/lpu_lite_de1_soc_hps.sof`
 - Expected SHA-256:
-  `12AF29D5F557E933FC112FF874403131F23D14AD048A284ACFFA284869333A4A`
+  `8102D2F0DFEE19AC8F49AC1335D4AB93A9914107E071829572B7188DE692D02B`
 - ARM runtime:
   `synthesis/linux/microgpt_hps_runtime`
 - Quartus project:
-  `synthesis/build/tiny_lpu_de1_soc_hps/tiny_lpu_de1_soc_hps.qpf`
+  `synthesis/build/lpu_lite_de1_soc_hps/lpu_lite_de1_soc_hps.qpf`
 
 The `.sof` is volatile. Program it again after every board power cycle unless
 FPGA configuration is later added to the Linux boot process. The runtime loads
@@ -56,7 +56,7 @@ synthesis/scripts/build_microgpt_fpga_release.ps1
 Run it from Windows PowerShell at the repository root:
 
 ```powershell
-cd "C:\Users\micha\Documents(Local)\Projects\tinyLPU"
+cd "C:\Users\micha\Documents(Local)\Projects\LPULite"
 Set-ExecutionPolicy -Scope Process Bypass
 .\synthesis\scripts\build_microgpt_fpga_release.ps1
 ```
@@ -83,21 +83,21 @@ Useful software-only variants:
 Manual equivalent commands are:
 
 ```powershell
-cd "C:\Users\micha\Documents(Local)\Projects\tinyLPU"
+cd "C:\Users\micha\Documents(Local)\Projects\LPULite"
 
 python model\tools\compile_microgpt_lpu.py
 python synthesis\scripts\export_microgpt_hps_headers.py
 
-subst T: "C:\Users\micha\Documents(Local)\Projects\tinyLPU"
+subst T: "C:\Users\micha\Documents(Local)\Projects\LPULite"
 & "C:\altera_lite\25.1std\quartus\bin64\quartus_sh.exe" `
   --flow compile `
-  "T:\synthesis\build\tiny_lpu_de1_soc_hps\tiny_lpu_de1_soc_hps"
+  "T:\synthesis\build\lpu_lite_de1_soc_hps\lpu_lite_de1_soc_hps"
 ```
 
 Cross-compile the runtime from WSL:
 
 ```sh
-cd "/mnt/c/Users/micha/Documents(Local)/Projects/tinyLPU/synthesis/linux"
+cd "/mnt/c/Users/micha/Documents(Local)/Projects/LPULite/synthesis/linux"
 make clean
 make CC=arm-linux-gnueabihf-gcc LDFLAGS=-static
 ```
@@ -178,14 +178,14 @@ The board must be powered on and the USB-Blaster must be connected. From the
 repository root in Windows PowerShell:
 
 ```powershell
-cd "C:\Users\micha\Documents(Local)\Projects\tinyLPU"
+cd "C:\Users\micha\Documents(Local)\Projects\LPULite"
 
 & "C:\altera_lite\25.1std\quartus\bin64\jtagconfig.exe"
 
 & "C:\altera_lite\25.1std\quartus\bin64\quartus_pgm.exe" `
   -m JTAG `
   -c "DE-SoC [USB-1]" `
-  -o "p;synthesis\build\tiny_lpu_de1_soc_hps\tiny_lpu_de1_soc_hps.sof@2"
+  -o "p;synthesis\build\lpu_lite_de1_soc_hps\lpu_lite_de1_soc_hps.sof@2"
 ```
 
 The `@2` is required because the DE1-SoC JTAG chain exposes the ARM debug
@@ -205,7 +205,7 @@ mkdir -p /home/root/linux
 Copy the runtime from Windows PowerShell:
 
 ```powershell
-cd "C:\Users\micha\Documents(Local)\Projects\tinyLPU"
+cd "C:\Users\micha\Documents(Local)\Projects\LPULite"
 scp synthesis\linux\microgpt_hps_runtime root@192.168.1.101:/home/root/linux/
 ```
 

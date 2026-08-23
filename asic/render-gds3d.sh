@@ -9,7 +9,7 @@ fi
 gds3d_root=$1
 gds_file=$2
 tech_file=${3:-"$PWD/asic/gds3d_sky130_showcase.txt"}
-top_cell=${4:-tinylpu_showcase}
+top_cell=${4:-lpulite_showcase}
 gds3d_bin="$gds3d_root/mac/GDS3D.app/Contents/MacOS/GDS3D"
 
 if [[ ! -x "$gds3d_bin" ]]; then

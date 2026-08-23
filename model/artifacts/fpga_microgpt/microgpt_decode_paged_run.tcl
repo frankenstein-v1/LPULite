@@ -2926,7 +2926,7 @@ master_write_32 $m 0xAD98 0x00000000
 master_write_32 $m 0xAD9C 0x7F7F7F7F
 master_write_32 $m 0xADA0 0x7F7F7F7F
 master_write_32 $m 0xADA4 0x00000000
-puts "TINY_LPU_PAGE_BEGIN:0"
+puts "LPU_LITE_PAGE_BEGIN:0"
 master_write_32 $m 0x0000 0x00001000
 master_write_32 $m 0x0004 0x06000000
 master_write_32 $m 0x0008 0x00000000
@@ -6003,8 +6003,8 @@ master_write_32 $m 0xC004 0x00000000
 master_write_32 $m 0xC000 0x00000001
 after 1
 master_write_32 $m 0xC000 0x00000000
-puts "TINY_LPU_PAGE_DONE:0"
-puts "TINY_LPU_PAGE_BEGIN:1"
+puts "LPU_LITE_PAGE_DONE:0"
+puts "LPU_LITE_PAGE_BEGIN:1"
 master_write_32 $m 0x0000 0x00000000
 master_write_32 $m 0x0004 0x06010000
 master_write_32 $m 0x0008 0x00000000
@@ -9081,8 +9081,8 @@ master_write_32 $m 0xC004 0x00000000
 master_write_32 $m 0xC000 0x00000001
 after 1
 master_write_32 $m 0xC000 0x00000000
-puts "TINY_LPU_PAGE_DONE:1"
-puts "TINY_LPU_PAGE_BEGIN:2"
+puts "LPU_LITE_PAGE_DONE:1"
+puts "LPU_LITE_PAGE_BEGIN:2"
 master_write_32 $m 0x0000 0x00301000
 master_write_32 $m 0x0004 0x06000000
 master_write_32 $m 0x0008 0x00000000
@@ -12159,8 +12159,8 @@ master_write_32 $m 0xC004 0x00000000
 master_write_32 $m 0xC000 0x00000001
 after 1
 master_write_32 $m 0xC000 0x00000000
-puts "TINY_LPU_PAGE_DONE:2"
-puts "TINY_LPU_PAGE_BEGIN:3"
+puts "LPU_LITE_PAGE_DONE:2"
+puts "LPU_LITE_PAGE_BEGIN:3"
 master_write_32 $m 0x0000 0x00000044
 master_write_32 $m 0x0004 0x06008000
 master_write_32 $m 0x0008 0x00000000
@@ -15237,8 +15237,8 @@ master_write_32 $m 0xC004 0x00000000
 master_write_32 $m 0xC000 0x00000001
 after 1
 master_write_32 $m 0xC000 0x00000000
-puts "TINY_LPU_PAGE_DONE:3"
-puts "TINY_LPU_PAGE_BEGIN:4"
+puts "LPU_LITE_PAGE_DONE:3"
+puts "LPU_LITE_PAGE_BEGIN:4"
 master_write_32 $m 0x0000 0x00000044
 master_write_32 $m 0x0004 0x06008000
 master_write_32 $m 0x0008 0x00000000
@@ -18315,6 +18315,6 @@ master_write_32 $m 0xC004 0x00000000
 master_write_32 $m 0xC000 0x00000001
 after 1
 master_write_32 $m 0xC000 0x00000000
-puts "TINY_LPU_PAGE_DONE:4"
+puts "LPU_LITE_PAGE_DONE:4"
 close_service master $m
-puts "TINY_LPU_PAGED_RUN_DONE"
+puts "LPU_LITE_PAGED_RUN_DONE"

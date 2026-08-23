@@ -1,8 +1,8 @@
-# TinyLPU Attention, Runtime, and Performance Audit
+# LPULite Attention, Runtime, and Performance Audit
 
 Date: August 12, 2026
 
-This document records the question and answer from the final TinyLPU debugging
+This document records the question and answer from the final LPULite debugging
 discussion. It explains how to verify that attention executes on the FPGA,
 which parts of the LPU are active, which work remains on the ARM, what the
 runtime C functions do, and how to interpret the measured tokens/second.
@@ -138,7 +138,7 @@ head merge
 
 `run_attention_section()` starts each resident attention microcode section at
 its assigned program counter and asks the LPU to execute an exact number of
-cycles. `tinylpu_run_cycles_from()` then polls the FPGA run-control registers
+cycles. `lpulite_run_cycles_from()` then polls the FPGA run-control registers
 and reads the FPGA cycle counter. A cycle mismatch produces a warning.
 
 The cycle counter is part of the FPGA RTL and increments only while the LPU's
@@ -417,22 +417,22 @@ floating representation expected by existing FPGA units.
 
 ## MMIO driver function guide
 
-The low-level driver is `synthesis/linux/src/tinylpu_hps_mmio.c`.
+The low-level driver is `synthesis/linux/src/lpulite_hps_mmio.c`.
 
 | Function | Purpose |
 | --- | --- |
 | `word_ptr()` | Computes a volatile register pointer inside the mapped bridge. |
 | `io_barrier()` | Prevents unsafe compiler/CPU reordering around MMIO. |
-| `tinylpu_mmio_open()` | Opens `/dev/mem` and maps the lightweight HPS-to-FPGA bridge. |
-| `tinylpu_mmio_close()` | Unmaps the bridge and closes `/dev/mem`. |
-| `tinylpu_write32()` / `tinylpu_read32()` | Access 32-bit LPU control registers. |
-| `tinylpu_soft_reset()` | Pulses and polls the LPU soft-reset control. |
-| `tinylpu_write_row()` / `tinylpu_read_row()` | Transfer one packed 96-bit row through three MMIO words. |
-| `tinylpu_copy_row()` | Copies one row through ARM-visible MMIO. |
-| `tinylpu_load_imem_page()` | Loads one VLIW page into FPGA IMEM. |
-| `tinylpu_run_page()` | Starts a loaded page and waits for completion. |
-| `tinylpu_run_cycles_from()` | Loads a PC, requests an exact FPGA cycle count, polls completion, and returns the hardware cycle delta. |
-| `tinylpu_run_cycles()` | Runs an exact number of cycles from the current PC. |
+| `lpulite_mmio_open()` | Opens `/dev/mem` and maps the lightweight HPS-to-FPGA bridge. |
+| `lpulite_mmio_close()` | Unmaps the bridge and closes `/dev/mem`. |
+| `lpulite_write32()` / `lpulite_read32()` | Access 32-bit LPU control registers. |
+| `lpulite_soft_reset()` | Pulses and polls the LPU soft-reset control. |
+| `lpulite_write_row()` / `lpulite_read_row()` | Transfer one packed 96-bit row through three MMIO words. |
+| `lpulite_copy_row()` | Copies one row through ARM-visible MMIO. |
+| `lpulite_load_imem_page()` | Loads one VLIW page into FPGA IMEM. |
+| `lpulite_run_page()` | Starts a loaded page and waits for completion. |
+| `lpulite_run_cycles_from()` | Loads a PC, requests an exact FPGA cycle count, polls completion, and returns the hardware cycle delta. |
+| `lpulite_run_cycles()` | Runs an exact number of cycles from the current PC. |
 
 ## Tokens/second interpretation
 

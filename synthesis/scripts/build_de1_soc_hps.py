@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Create/compile a TinyLPU DE1-SoC design driven by the HPS LW bridge.
+"""Create/compile a LPULite DE1-SoC design driven by the HPS LW bridge.
 
 This is a separate target from build_de1_soc.py.  It keeps the existing
 JTAG-to-Avalon build intact and creates:
 
-    synthesis/build/tiny_lpu_de1_soc_hps/
+    synthesis/build/lpu_lite_de1_soc_hps/
 
 The intended runtime path is:
 
@@ -12,9 +12,9 @@ The intended runtime path is:
       -> HPS lightweight HPS-to-FPGA bridge
       -> Platform Designer AXI/Avalon interconnect
       -> lpu_de1_soc_wrapper Avalon slave
-      -> TinyLPU
+      -> LPULite
 
-The TinyLPU compute RTL is not changed by this script.
+The LPULite compute RTL is not changed by this script.
 """
 from __future__ import annotations
 
@@ -26,14 +26,14 @@ import sys
 from pathlib import Path
 
 
-ROOT = Path(os.environ.get("TINYLPU_REPO_ROOT", Path(__file__).resolve().parents[2])).absolute()
+ROOT = Path(os.environ.get("LPULITE_REPO_ROOT", Path(__file__).resolve().parents[2])).absolute()
 SYNTHESIS_DIR = ROOT / "synthesis"
 SRC = ROOT / "src"
 SYNTHESIS_RTL = SYNTHESIS_DIR / "rtl"
 PROJECT_FILES = SYNTHESIS_DIR / "project"
 IP_DIR = PROJECT_FILES / "ip"
 LPU_IP_DIR = IP_DIR / "lpu_de1_soc"
-PROJECT = "tiny_lpu_de1_soc_hps"
+PROJECT = "lpu_lite_de1_soc_hps"
 PROJECT_DIR = SYNTHESIS_DIR / "build" / PROJECT
 DEVICE = "5CSEMA5F31C6"
 
@@ -91,7 +91,7 @@ TOP = """module de1_soc_hps_top (
     input  logic [0:0]  KEY,
     output logic [0:0]  LEDR
 );
-    // TinyLPU currently does not close timing at the board 50 MHz clock.
+    // LPULite currently does not close timing at the board 50 MHz clock.
     // TimeQuest reports an LPU fabric Fmax of ~11 MHz, so run the entire
     // lightweight-HPS/LPU Platform Designer fabric at 50/8 = 6.25 MHz.
     logic [2:0] qsys_clk_div;
@@ -128,8 +128,8 @@ if {[llength $qsys_clk_pins] > 0} {
 
 LPU_HW_TCL = r"""set_module_property NAME lpu_de1_soc
 set_module_property VERSION 1.0
-set_module_property GROUP "TinyLPU"
-set_module_property DISPLAY_NAME "TinyLPU DE1-SoC Avalon wrapper"
+set_module_property GROUP "LPULite"
+set_module_property DISPLAY_NAME "LPULite DE1-SoC Avalon wrapper"
 set_module_property TOP_LEVEL_HDL_MODULE lpu_de1_soc_wrapper
 set_module_property INSTANTIATE_IN_SYSTEM_MODULE true
 
@@ -242,9 +242,9 @@ PROJECT_REVISION = "{PROJECT}"
         f"set_global_assignment -name DEVICE {DEVICE}",
         "set_global_assignment -name TOP_LEVEL_ENTITY de1_soc_hps_top",
         "set_global_assignment -name VERILOG_MACRO SYNTHESIS",
-        "set_global_assignment -name VERILOG_MACRO TINYLPU_FPGA_ALTSYNCRAM",
-        "set_global_assignment -name VERILOG_MACRO TINYLPU_MXM_MAC_LOGIC_MULT",
-        "set_global_assignment -name VERILOG_MACRO TINYLPU_VXM_LOGIC_MULT",
+        "set_global_assignment -name VERILOG_MACRO LPULITE_FPGA_ALTSYNCRAM",
+        "set_global_assignment -name VERILOG_MACRO LPULITE_MXM_MAC_LOGIC_MULT",
+        "set_global_assignment -name VERILOG_MACRO LPULITE_VXM_LOGIC_MULT",
     ]
     lines.append(f'set_global_assignment -name SDC_FILE "{qpath(SYNTHESIS_RTL / "de1_soc_hps_top.sdc")}"')
     for path in source_files():

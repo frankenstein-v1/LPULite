@@ -42296,7 +42296,7 @@ parameters are a RESULT of the module parameters. -->
   <name>lpu_de1_soc</name>
   <type>com.altera.entityinterfaces.IElementClass</type>
   <subtype>com.altera.entityinterfaces.IModule</subtype>
-  <displayName>TinyLPU DE1-SoC Avalon wrapper</displayName>
+  <displayName>LPULite DE1-SoC Avalon wrapper</displayName>
   <version>1.0</version>
  </plugin>
  <plugin>

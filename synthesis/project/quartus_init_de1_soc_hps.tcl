@@ -1,11 +1,11 @@
 set project_root [file normalize [file dirname [info script]]]
 set synthesis_root [file dirname $project_root]
 set root [file dirname $synthesis_root]
-set project_dir [file join $synthesis_root build tiny_lpu_de1_soc_hps]
+set project_dir [file join $synthesis_root build lpu_lite_de1_soc_hps]
 file mkdir $project_dir
 cd $project_dir
-file delete -force tiny_lpu_de1_soc_hps.qsf
-project_new -overwrite tiny_lpu_de1_soc_hps
+file delete -force lpu_lite_de1_soc_hps.qsf
+project_new -overwrite lpu_lite_de1_soc_hps
 set_global_assignment -name FAMILY "Cyclone V"
 set_global_assignment -name DEVICE 5CSEMA5F31C6
 set_global_assignment -name TOP_LEVEL_ENTITY de1_soc_hps_top

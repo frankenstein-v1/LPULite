@@ -2,7 +2,7 @@
 // Original Mathematical Implementation Credit: SuryaHead
 // Repository: https://github.com/SurjaHead/softmax-in-hardware
 // Implementation based on I-BERT paper integer arithmetic.
-// Modified for tinyLPU Integration.
+// Modified for LPULite Integration.
 // ==============================================================================
 `default_nettype none
 `timescale 1ns/1ns

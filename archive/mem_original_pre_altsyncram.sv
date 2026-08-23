@@ -37,12 +37,12 @@ module mem #(
     assign stream_in = row_in;
     assign row_out = stream_out;
 
-`ifdef TINYLPU_USE_SKY130_SRAM
+`ifdef LPULITE_USE_SKY130_SRAM
     // The showcase configuration uses 1K rows and a bank of nine 8-bit hard
     // macros. The second macro read port services the optional debug port.
     generate
         if (DATA_W == 72 && DEPTH == 1024) begin : gen_sky130_sram
-            tinylpu_sram_banked #(
+            lpulite_sram_banked #(
                 .DATA_W(DATA_W)
             ) u_banked_sram (
                 .clk,

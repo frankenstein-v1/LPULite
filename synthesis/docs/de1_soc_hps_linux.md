@@ -1,4 +1,4 @@
-# DE1-SoC HPS/Linux TinyLPU path
+# DE1-SoC HPS/Linux LPULite path
 
 This is the faster path than USB-JTAG for interactive inference:
 
@@ -6,7 +6,7 @@ This is the faster path than USB-JTAG for interactive inference:
 ARM Linux process
   -> /dev/mem mmap
   -> lightweight HPS-to-FPGA bridge
-  -> TinyLPU Avalon wrapper
+  -> LPULite Avalon wrapper
   -> IMEM / MEM0 / MEM1 / control regs
 ```
 
@@ -75,7 +75,7 @@ base passed to the runtime.
 On the ARM Linux shell:
 
 ```sh
-cd tinyLPU/synthesis/linux
+cd LPULite/synthesis/linux
 make
 sudo ./microgpt_hps_runtime --attention host
 ```

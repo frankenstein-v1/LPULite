@@ -71,7 +71,7 @@ class RealFPGAHardwareLPU:
         if not SYSTEM_CONSOLE.is_file():
             raise FileNotFoundError(f"System Console not found at {SYSTEM_CONSOLE}")
 
-        sof_path = ROOT_DIR / "synthesis" / "build" / "tiny_lpu_de1_soc" / "tiny_lpu_de1_soc.sof"
+        sof_path = ROOT_DIR / "synthesis" / "build" / "lpu_lite_de1_soc" / "lpu_lite_de1_soc.sof"
         pgm_exe = Path("C:/altera_lite/25.1std/quartus/bin64/quartus_pgm.exe")
 
         # Check if FPGA hardware is already connected and programmed

@@ -1,5 +1,5 @@
 {
-  "format": "tinylpu.microgpt.weights",
+  "format": "lpulite.microgpt.weights",
   "format_version": 1,
   "created_utc": "2026-08-01T03:40:13.490920+00:00",
   "config": {

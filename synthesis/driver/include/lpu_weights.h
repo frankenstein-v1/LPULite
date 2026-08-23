@@ -1,4 +1,4 @@
-/* Auto-generated TinyLPU Model Weights & Vocabulary Header */
+/* Auto-generated LPULite Model Weights & Vocabulary Header */
 #ifndef LPU_WEIGHTS_H
 #define LPU_WEIGHTS_H
 
