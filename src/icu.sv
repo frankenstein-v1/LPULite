@@ -53,6 +53,8 @@ module icu #(
     output logic [1:0] mem_store_fmt,
     output logic      vxm_rmsnorm_en,
     output logic      vxm_rope_en,
+    output logic      vxm_rope_lut_en,
+    output logic [7:0] vxm_rope_position,
     output logic [2:0] vxm_residual_op
 );
 
@@ -176,7 +178,9 @@ module icu #(
     //   [62:46] MXM + fixed-point store controls
     //   [65:63] SXM transpose controls
     //   [78:66] VXM controls
-    //   [95:79] reserved
+    //   [79]    use the on-chip RoPE Q1.7 sine/cosine LUT
+    //   [87:80] RoPE token position (0..255)
+    //   [95:88] reserved
 
     // mem0 control
     assign mem0_read_en  = current_instruction[12];
@@ -213,5 +217,7 @@ module icu #(
     assign vxm_rmsnorm_en  = current_instruction[74];
     assign vxm_rope_en     = current_instruction[75];
     assign vxm_residual_op = current_instruction[78:76];
+    assign vxm_rope_lut_en = current_instruction[79];
+    assign vxm_rope_position = current_instruction[87:80];
 
 endmodule

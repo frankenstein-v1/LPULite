@@ -62,6 +62,8 @@ logic mxm_wght_is_signed;
 logic [1:0] mem_store_fmt;
 logic vxm_rmsnorm_en;
 logic vxm_rope_en;
+logic vxm_rope_lut_en;
+logic [7:0] vxm_rope_position;
 logic [2:0] vxm_residual_op;
 
 localparam logic [2:0] VXM_OPERAND_DATA     = 3'd0;
@@ -274,6 +276,8 @@ icu u_icu(
     .mem_store_fmt(mem_store_fmt),
     .vxm_rmsnorm_en(vxm_rmsnorm_en),
     .vxm_rope_en(vxm_rope_en),
+    .vxm_rope_lut_en(vxm_rope_lut_en),
+    .vxm_rope_position(vxm_rope_position),
     .vxm_residual_op(vxm_residual_op)
 );
 
@@ -705,6 +709,8 @@ vxm #(
     .in_ready(vxm_in_ready),
     .vxm_ctrl(vxm_ctrl),
     .rope_en(vxm_rope_en),
+    .rope_lut_en(vxm_rope_lut_en),
+    .rope_position(vxm_rope_position),
     .rope_cos_q1_7(vxm_rope_cos_q1_7_reg),
     .rope_sin_q1_7(vxm_rope_sin_q1_7_reg),
     .residual_op(vxm_residual_op),
