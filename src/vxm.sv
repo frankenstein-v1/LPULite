@@ -28,6 +28,8 @@ module vxm #(
 
     // RoPE control and signed Q1.7 fixed-point cos/sin operands
     input  logic                    rope_en,
+    input  logic                    rope_lut_en,
+    input  logic [7:0]              rope_position,
     input  logic [LANES*8-1:0]      rope_cos_q1_7,
     input  logic [LANES*8-1:0]      rope_sin_q1_7,
 
@@ -115,6 +117,12 @@ module vxm #(
     logic                     rope_stall;
     logic [ROW_W-1:0]         rope_out;
     logic [ROW_W-1:0]         rope_result_reg;
+    logic [31:0]              rope_lut_cos_pairs;
+    logic [31:0]              rope_lut_sin_pairs;
+    logic [LANES*8-1:0]       rope_lut_cos_lanes;
+    logic [LANES*8-1:0]       rope_lut_sin_lanes;
+    logic [LANES*8-1:0]       rope_cos_selected;
+    logic [LANES*8-1:0]       rope_sin_selected;
     logic [ROW_W-1:0]         pre_layernorm_in;
     logic [ROW_W-1:0]         rmsnorm_out;
     logic                     rmsnorm_start;
@@ -147,6 +155,28 @@ module vxm #(
     logic                     unused_scale_factor;
 
     assign unused_scale_factor = ^scale_factor;
+
+    // The current MicroGPT uses head_dim=8: four adjacent RoPE pairs per
+    // VXM chunk. The ROM stores one cosine and sine byte per pair; expand each
+    // coefficient onto both lanes consumed by vxm_rope.
+    rope_trig_lut rope_lut_inst (
+        .position_i(rope_position),
+        .cos_pairs_q1_7_o(rope_lut_cos_pairs),
+        .sin_pairs_q1_7_o(rope_lut_sin_pairs)
+    );
+
+    generate
+        genvar rope_pair;
+        for (rope_pair = 0; rope_pair < LANES/2; rope_pair++) begin : g_rope_lut_expand
+            assign rope_lut_cos_lanes[(2*rope_pair)*8 +: 8] = rope_lut_cos_pairs[rope_pair*8 +: 8];
+            assign rope_lut_cos_lanes[(2*rope_pair+1)*8 +: 8] = rope_lut_cos_pairs[rope_pair*8 +: 8];
+            assign rope_lut_sin_lanes[(2*rope_pair)*8 +: 8] = rope_lut_sin_pairs[rope_pair*8 +: 8];
+            assign rope_lut_sin_lanes[(2*rope_pair+1)*8 +: 8] = rope_lut_sin_pairs[rope_pair*8 +: 8];
+        end
+    endgenerate
+
+    assign rope_cos_selected = rope_lut_en ? rope_lut_cos_lanes : rope_cos_q1_7;
+    assign rope_sin_selected = rope_lut_en ? rope_lut_sin_lanes : rope_sin_q1_7;
 
     //extend from 1 lane to 4 lanes
 
@@ -373,8 +403,8 @@ module vxm #(
         .rst_n(rst_n),
         .start_i(rope_start),
         .x_in(mux_out),
-        .cos_q1_7(rope_cos_q1_7),
-        .sin_q1_7(rope_sin_q1_7),
+        .cos_q1_7(rope_cos_selected),
+        .sin_q1_7(rope_sin_selected),
         .y_out(rope_out),
         .done_o(rope_done),
         .busy_o(rope_busy)
