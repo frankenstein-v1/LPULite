@@ -18,6 +18,80 @@ Read the illustrated project story at **[lpulite.com](https://www.lpulite.com/)*
 
 Created by **Michael Trbovic**, **Saksham Batra**, and **Arjun Harinath**.
 
+## What this repository contains
+
+This is the complete LPULite project, not only the accelerator RTL. It contains
+the model used to exercise the machine, the compiler that turns that model into
+LPU instructions, the synthesizable hardware, the verification environment,
+the DE1-SoC deployment stack, and an experimental ASIC visualization flow.
+
+The repository is organized as one end-to-end pipeline:
+
+```text
+model/          define, train, quantize, and run MicroGPT in Python
+   |
+   v
+model/tools/    pack weights and compile a static LPU memory/schedule image
+   |
+   v
+src/            execute that image in the synthesizable LPU core
+   |
+   +--> tb/ and model/tests/       unit and model-level RTL verification
+   |
+   +--> synthesis/                 DE1-SoC wrapper, ARM runtime, and Quartus flow
+   |
+   +--> asic/                      SKY130/OpenLane physical-design showcase
+```
+
+The major directories are:
+
+```text
+LPULite/
+├── model/
+│   ├── microgpt.py       dependency-free reference model and training entry point
+│   ├── datasets/         names, stories, and other training datasets
+│   ├── artifacts/        checkpoints, packed weights, and compiled model images
+│   ├── scripts/          training, generation, and CPU inference commands
+│   ├── tools/            quantization, memory packing, VLIW compilation, and export
+│   └── tests/            tokenizer, model, compiler, and RTL-backed inference tests
+├── src/                  synthesizable SystemVerilog LPU core
+├── tb/                   focused RTL unit testbenches
+├── synthesis/
+│   ├── rtl/              HPS/Avalon and DE1-SoC wrapper RTL
+│   ├── linux/            ARM Cortex-A9 runtime and MMIO support
+│   ├── project/          Quartus project sources
+│   ├── build/            verified release project and bitstream
+│   ├── scripts/          model, software, and FPGA build automation
+│   ├── tests/            wrapper-level cocotb and physical-board tests
+│   └── docs/             board setup, architecture audits, and runbooks
+├── asic/                 SKY130 SRAM, synthesis, OpenLane, and GDS3D experiment
+├── archive/              older implementations kept for historical reference
+└── misc/                 supporting project material that is not in the main flow
+```
+
+## Where to find the important parts
+
+| If you want to find... | Open this first | Then look at... |
+| --- | --- | --- |
+| The reference transformer | [`model/microgpt.py`](model/microgpt.py) | `model/scripts/` and [`model/README.md`](model/README.md) |
+| Training data and saved weights | `model/datasets/` | `model/artifacts/` |
+| CPU INT8 inference | [`model/scripts/run_microgpt_int8.py`](model/scripts/run_microgpt_int8.py) | `model/tests/` |
+| The full-model LPU compiler | [`model/tools/compile_microgpt_lpu.py`](model/tools/compile_microgpt_lpu.py) | [`model/tools/lpu_vliw_compiler.py`](model/tools/lpu_vliw_compiler.py) |
+| The LPU top level | [`src/lpu.sv`](src/lpu.sv) | [`src/lpu_pkg.sv`](src/lpu_pkg.sv) |
+| Instruction decoding and scheduling | [`src/icu.sv`](src/icu.sv) | the VLIW compiler above |
+| Matrix multiplication | [`src/mxm.sv`](src/mxm.sv) | [`src/mac.sv`](src/mac.sv) and [`src/acc.sv`](src/acc.sv) |
+| Softmax, RMSNorm, quantization, residuals, or RoPE | [`src/vxm.sv`](src/vxm.sv) | `src/softmax.sv`, `src/rmsnorm.sv`, `src/quant.sv`, `src/residual_add.sv`, and `src/vxm_rope.sv` |
+| K transpose and scalar broadcast | [`src/sxm.sv`](src/sxm.sv) | `tb/sxm_scaled_broadcast_tb.sv` |
+| Data memory behavior | [`src/mem.sv`](src/mem.sv) | [`src/lpu_pkg.sv`](src/lpu_pkg.sv) |
+| Complete wrapper simulation | [`synthesis/tests/run_microgpt_wrapper_cocotb.py`](synthesis/tests/run_microgpt_wrapper_cocotb.py) | `synthesis/tests/` |
+| The ARM-side FPGA runtime | [`synthesis/linux/src/microgpt_hps_runtime.c`](synthesis/linux/src/microgpt_hps_runtime.c) | [`synthesis/linux/README.md`](synthesis/linux/README.md) |
+| The verified FPGA setup | [`synthesis/docs/microgpt_fpga_runbook.md`](synthesis/docs/microgpt_fpga_runbook.md) | `synthesis/rtl/` and `synthesis/project/` |
+| The physical-design experiment | [`asic/README.md`](asic/README.md) | `asic/config.json` and `asic/src/` |
+
+If you are new to the project, read **The machine in one picture**, then
+**Guides 1–6**. If you already know which layer you want to change, the table
+above is the fastest entry point.
+
 ## What you will learn
 
 Following this guide, you will see how to:
@@ -395,30 +469,6 @@ This flow is useful for seeing what the project becomes after synthesis and
 placement. It is an architectural showcase, not a claim that the FPGA release
 is a tapeout-ready ASIC. See [the ASIC guide](asic/README.md) for memory macros,
 the 100 MHz target, GDS generation, and GDS3D rendering.
-
-## Choose your path
-
-| Goal | Start here |
-| --- | --- |
-| Understand the project quickly | “The machine in one picture,” then Guides 4–6 |
-| Train or change the names model | [`model/README.md`](model/README.md) |
-| Study the compiler and schedule | Guides 2–3 and `model/tools/` |
-| Work on RTL | Guide 4, `src/`, and `tb/` |
-| Reproduce full inference in simulation | Guide 7 |
-| Program and benchmark the FPGA | Guide 8 and the FPGA runbook |
-| Render the core in 3D | Guide 9 and `asic/README.md` |
-
-## Repository map
-
-| Path | Purpose |
-| --- | --- |
-| `src/` | Synthesizable LPULite SystemVerilog: ICU, memories, buses, MXM, SXM, and VXM |
-| `tb/` | Unit and core RTL testbenches |
-| `model/` | MicroGPT training, datasets, checkpoints, INT8 inference, compiler, and generated artifacts |
-| `synthesis/` | DE1-SoC wrapper RTL, Quartus project, Linux runtime, drivers, tests, scripts, and documentation |
-| `asic/` | SKY130/OpenLane synthesis and physical-design experiments |
-| `archive/` | Historical implementations retained for reference |
-| `misc/` | Supporting utilities and project notes |
 
 ## Reference documentation
 
